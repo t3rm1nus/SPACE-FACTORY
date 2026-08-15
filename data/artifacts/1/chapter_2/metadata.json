@@ -1,0 +1,71 @@
+{
+  "book_metadata": {
+    "book_id": 1,
+    "title": "Exploradores del Cosmos",
+    "subtitle": "Una introduccion a la astrofisica",
+    "description": "Este libro recorre los fundamentos de la astrofisica moderna.",
+    "author": "Space Lair",
+    "target_audience": "lectores curiosos",
+    "genre": "Ciencia divulgacion",
+    "languages": [
+      "es"
+    ],
+    "target_chapters": 3,
+    "status": "edited",
+    "created_at": "2024-01-01T00:00:00"
+  },
+  "chapter_outline": {
+    "number": 2,
+    "title": "Estrellas y galaxias",
+    "objective": "Clasificar galaxias y ciclos estelares",
+    "sections": [
+      {
+        "heading": "Galaxias",
+        "objective": "Tipos Hubble"
+      },
+      {
+        "heading": "Ciclo estelar",
+        "objective": "Nebulosas"
+      }
+    ],
+    "image_requirements": 3
+  },
+  "research": "El universo observable tiene ~93 mil millones de anios luz de diametro.",
+  "sources": [
+    {
+      "url": "https://example.org/universe",
+      "title": "Universo observable"
+    }
+  ],
+  "previous_chapter_summaries": [
+    "# Del punto de partida\n\n## Introduction\nPresentar el universo observable\n\n## Universo observable\nDefinir horizonte y edad\n## Conclusion\nThe chapter synthesizes the key points covered and sets up the t"
+  ],
+  "target_word_count": 800,
+  "style_guide": null,
+  "provider": "none",
+  "model": "",
+  "tokens_input": 0,
+  "tokens_output": 0,
+  "word_count": 42,
+  "text": "# Estrellas y galaxias\n\n## Introduction\nClasificar galaxias y ciclos estelares\n\n## Galaxias\nTipos Hubble\n## Ciclo estelar\nNebulosas\n## Conclusion\nThe chapter synthesizes the key points covered and sets up the transition to the next chapter.\n\n## Sources used\n- https://example.org/universe",
+  "unexpected_sections": [
+    "Introduction",
+    "Conclusion"
+  ],
+  "duplicate_sections": [],
+  "subsections_map": {},
+  "structural_anomalies": [],
+  "duplicate_detected": false,
+  "continuation_rejected_as_duplicate": false,
+  "initial_word_count": 42,
+  "final_word_count": 42,
+  "minimum_words": 1500,
+  "total_continuation_attempts": 0,
+  "successful_continuations": 0,
+  "rejected_continuations": 0,
+  "duplicate_rejections": 0,
+  "repeated_continuation": false,
+  "total_added_words": 0,
+  "final_quality_gate": "FAIL",
+  "deterministic_used": false
+}

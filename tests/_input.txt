@@ -1,0 +1,183 @@
+﻿import pathlib
+
+base = pathlib.Path('c:/proyectos/SPACE LAIR')
+src = base / 'tests' / 'test_chapter_writer.py'
+
+extra = """
+
+# ---------------------------------------------------------------------------
+# Tests de continuación adaptativa (máx. 3 intentos: inicial + 2 continuaciones)
+# ---------------------------------------------------------------------------
+
+def _fake_result(text: str) -> Any:
+    class _Result:
+        text = text
+        raw_response = {"model": "qwen-agent:latest", "context": {}}
+        input_tokens = 10
+        output_tokens = 20
+        provider = "ollama"
+        model = "qwen-agent:latest"
+        cost = 0.0
+
+    return _Result()
+
+
+def test_continuation_first_attempt_reaches_minimum(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generación inicial corta + primera continuación suficiente -> PASS en 2 llamadas."""
+    import modules.chapter_writer.main as main
+
+    short_md = "word " * 100
+    long_md = "word " * 2000
+    responses = [_fake_result(short_md), _fake_result(long_md)]
+    call_count = [0]
+
+    class FakeProvider:
+        name = "ollama"
+        model = "qwen-agent:latest"
+
+        def generate(self, *args: Any, **kwargs: Any) -> Any:
+            idx = call_count[0]
+            call_count[0] += 1
+            return responses[idx]
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "qwen-agent:latest")
+    monkeypatch.setattr(main, "_write_artifacts", lambda *args, **kwargs: "data/artifacts/1/chapter_1/chapter.md")
+
+    out = execute(_payload())
+    assert out["word_count"] >= 1500
+    assert out["quality_gate"] == "PASS"
+    assert call_count[0] == 2
+    assert "word " * 100 in out["chapter_md"]
+    assert "word " * 2000 in out["chapter_md"]
+
+
+def test_continuation_two_attempts_reach_minimum(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generación inicial corta + 2 continuaciones -> PASS en 3 llamadas."""
+    import modules.chapter_writer.main as main
+
+    short_md = "word " * 100
+    medium_md = "word " * 800
+    long_md = "word " * 2000
+    responses = [_fake_result(short_md), _fake_result(medium_md), _fake_result(long_md)]
+    call_count = [0]
+
+    class FakeProvider:
+        name = "ollama"
+        model = "qwen-agent:latest"
+
+        def generate(self, *args: Any, **kwargs: Any) -> Any:
+            idx = call_count[0]
+            call_count[0] += 1
+            return responses[idx]
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "qwen-agent:latest")
+    monkeypatch.setattr(main, "_write_artifacts", lambda *args, **kwargs: "data/artifacts/1/chapter_1/chapter.md")
+
+    out = execute(_payload())
+    assert out["word_count"] >= 1500
+    assert out["quality_gate"] == "PASS"
+    assert call_count[0] == 3
+
+
+def test_continuation_three_attempts_still_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    """3 intentos (inicial + 2 cont.) siguen por debajo -> FAIL y quality gate no se falsea."""
+    import modules.chapter_writer.main as main
+
+    short_md = "word " * 100
+    responses = [_fake_result(short_md)] * 3
+
+    class FakeProvider:
+        name = "ollama"
+        model = "qwen-agent:latest"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, *args: Any, **kwargs: Any) -> Any:
+            idx = min(self.calls, len(responses) - 1)
+            self.calls += 1
+            return responses[idx]
+
+    provider = FakeProvider()
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "qwen-agent:latest")
+    monkeypatch.setattr(main, "_write_artifacts", lambda *args, **kwargs: "data/artifacts/1/chapter_1/chapter.md")
+
+    out = execute(_payload())
+    assert out["word_count"] < 1500
+    assert out["quality_gate"] == "FAIL"
+    assert any("menos de 1500 palabras" in str(e) for e in out.get("quality_errors", []))
+    assert provider.calls == 3
+
+
+def test_continuation_stops_on_no_significant_progress(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si la continuación añade < 5 palabras o es idéntica, el bucle se detiene."""
+    import modules.chapter_writer.main as main
+
+    short_md = "word " * 100
+    tiny_md = "word"
+    responses = [_fake_result(short_md), _fake_result(tiny_md)]
+    call_count = [0]
+
+    class FakeProvider:
+        name = "ollama"
+        model = "qwen-agent:latest"
+
+        def generate(self, *args: Any, **kwargs: Any) -> Any:
+            idx = call_count[0]
+            call_count[0] += 1
+            return responses[idx]
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "qwen-agent:latest")
+    monkeypatch.setattr(main, "_write_artifacts", lambda *args, **kwargs: "data/artifacts/1/chapter_1/chapter.md")
+
+    out = execute(_payload())
+    assert call_count[0] == 2
+    assert out["word_count"] < 1500
+    assert out["quality_gate"] == "FAIL"
+
+
+def test_continuation_target_words_calculation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El prompt de continuación solicita ~remaining_words * 1.3, con mínimo 120."""
+    import modules.chapter_writer.main as main
+
+    short_md = "word " * 100
+    long_md = "word " * 2000
+    captured_prompts = []
+
+    class FakeResult:
+        def __init__(self, text: str) -> None:
+            self.text = text
+            self.raw_response = {"model": "qwen-agent:latest", "context": {}}
+            self.input_tokens = 10
+            self.output_tokens = 20
+            self.provider = "ollama"
+            self.model = "qwen-agent:latest"
+            self.cost = 0.0
+
+    class FakeProvider:
+        name = "ollama"
+        model = "qwen-agent:latest"
+
+        def generate(self, *args: Any, **kwargs: Any) -> Any:
+            captured_prompts.append(args[0] if args else "")
+            if len(captured_prompts) == 1:
+                return FakeResult(short_md)
+            return FakeResult(long_md)
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "qwen-agent:latest")
+    monkeypatch.setattr(main, "_write_artifacts", lambda *args, **kwargs: "data/artifacts/1/chapter_1/chapter.md")
+
+    out = execute(_payload())
+    assert out["word_count"] >= 1500
+    assert len(captured_prompts) == 2
+    continuation_prompt = captured_prompts[1]
+    expected_target = max(int((1500 - 100) * 1.3), 120)
+    assert f"approximately {expected_target} additional words" in continuation_prompt
+"""
+
+src.write_text(src.read_text(encoding='utf-8') + '\n\n' + extra, encoding='utf-8')

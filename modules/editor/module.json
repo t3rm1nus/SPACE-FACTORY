@@ -1,0 +1,14 @@
+{
+  "id": "editor",
+  "name": "Editor Editorial",
+  "description": "Revisa y mejora capítulos: gramática, ortografía, estilo, claridad, estructura, redundancias, transiciones, consistencia terminológica, tono, ritmo y longitud. Nunca altera hechos verificados ni inventa información.",
+  "type": "agent",
+  "capabilities": ["edit_chapter"],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 180,
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}

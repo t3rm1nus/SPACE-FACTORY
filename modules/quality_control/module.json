@@ -1,0 +1,15 @@
+{
+  "id": "quality_control",
+  "name": "Quality Control",
+  "description": "Verifica la calidad final de un libro antes de considerarlo terminado.",
+  "type": "agent",
+  "capabilities": [
+    "final_quality_control"
+  ],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 8,
+    "timeout_seconds": 120
+  }
+}
+

@@ -1,0 +1,17 @@
+{
+  "id": "chapter_writer",
+  "name": "Chapter Writer (ES / EN)",
+  "description": "Generates complete chapters in Spanish or English from an outline, research notes, and verified sources. The English mode produces natural, professional editorial prose rather than literal translation.",
+  "type": "agent",
+  "capabilities": [
+    "write_chapter_es",
+    "write_chapter_en"
+  ],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 180,
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}

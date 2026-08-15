@@ -1,0 +1,88 @@
+{
+  "book_metadata": {
+    "book_id": 15,
+    "title": "Beisbol en los 90",
+    "language": "es"
+  },
+  "chapter_outline": {
+    "title": "Capítulo 4",
+    "number": 4,
+    "objective": null,
+    "sections": []
+  },
+  "research": null,
+  "sources": [
+    {
+      "title": "Campeonato de Béisbol Mayor de Panamá",
+      "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+      "source_type": "web_wikipedia",
+      "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+      "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+    },
+    {
+      "title": "Béisbol en México",
+      "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+      "source_type": "web_wikipedia",
+      "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+      "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+    },
+    {
+      "title": "Selección de béisbol de Colombia",
+      "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+      "source_type": "web_wikipedia",
+      "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+      "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+    },
+    {
+      "title": "Campo de béisbol",
+      "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+      "source_type": "web_wikipedia",
+      "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+      "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+    },
+    {
+      "title": "Guante de béisbol",
+      "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+      "source_type": "web_wikipedia",
+      "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+      "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+    }
+  ],
+  "previous_chapter_summaries": [],
+  "target_word_count": 3000,
+  "style_guide": "Divulgativo, riguroso y claro",
+  "provider": "ollama",
+  "model": "qwen-agent:latest",
+  "tokens_input": 1988,
+  "tokens_output": 1505,
+  "word_count": 977,
+  "text": "# Capítulo 4\n\n## El impacto del béisbol en los años 90: una década de evolución y transformación\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo explora cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\n### La evolución del juego\n\nLa década de 1990 vio un importante cambio en el estilo de juego. Los equipos comenzaron a enfocarse más en el lanzamiento de cambios y en la defensa, lo que llevó a una mayor importancia del batería de cerradura. El \"pitching machine\" se convirtió en una herramienta esencial para entrenar a los lanzadores, permitiendo un control preciso sobre la velocidad y dirección de las pelotas.\n\nAdemás, el uso de tecnologías como el radar de velocidades y el análisis de video se volvió cada vez más prevalente. Estas herramientas ayudaron a los entrenadores a identificar fortalezas y debilidades en los oponentes, lo que permitió desarrollar tácticas más efectivas.\n\n### Innovaciones en la defensa\n\nLa defensa también experimentó cambios significativos durante esta década. La introducción del \"rope-a-dope\" como una estrategia de cerradura fue un ejemplo claro de cómo los equipos buscaban mantener el juego a su favor. Además, el uso de jugadores de batería de cerradura con habilidades excepcionales en la defensa del ronco y la velocidad en el campo de béisbol se volvió más común.\n\nLa evolución del sistema de rotación también fue un factor importante. Los equipos comenzaron a experimentar con diferentes sistemas de rotación, buscando encontrar el equilibrio perfecto entre lanzadores de alta velocidad y defensores versátiles.\n\n### El papel del entrenador\n\nDurante la década de 1990, los entrenadores experimentaron una transformación en su rol dentro del equipo. La tecnología y el análisis de datos se convirtieron en herramientas esenciales para el desarrollo de tácticas y estrategias. Los entrenadores comenzaron a utilizar software especializado para analizar el rendimiento de sus jugadores, lo que les permitía identificar áreas de mejora y optimizar su juego.\n\nAdemás, la comunicación entre los entrenadores y los jugadores también experimentó un cambio. La introducción del \"walkman\" como una herramienta de comunicación entre los entrenadores y los jugadores en el campo fue un ejemplo claro de cómo esta tecnología influyó en la dinámica del equipo.\n\n### El impacto en las selecciones nacionales\n\nLa década de 1990 también tuvo un impacto significativo en las selecciones nacionales de béisbol. En Colombia, por ejemplo, el equipo nacional experimentó una transformación importante durante esta década. La introducción de nuevas tácticas y tecnologías ayudó a los jugadores colombianos a mejorar su rendimiento en el campo.\n\nEn Panamá, la selección nacional también experimentó cambios significativos. La introducción de jugadores con habilidades excepcionales en la defensa del ronco y la velocidad en el campo permitió a los panameños competir con equipos más fuertes internacionales.\n\n### El papel del público\n\nLa década de 1990 también tuvo un impacto significativo en el público que disfrutaba del béisbol. La introducción de nuevas tecnologías como el radar de velocidades y el análisis de video permitió a los espectadores seguir más de cerca el juego, lo que aumentó la apreciación del deporte.\n\nAdemás, la popularización del béisbol en medios de comunicación también fue un factor importante. La televisión y las redes sociales se convirtieron en plataformas esenciales para seguir el juego, lo que permitió a más personas disfrutar del béisbol durante esta década.\n\n### Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\nLa evolución del juego durante esta década fue marcada por un cambio en el estilo de juego. Los equipos comenzaron a enfocarse más en el lanzamiento de cambios y en la defensa, lo que llevó a una mayor importancia del batería de cerradura. El uso de tecnologías como el radar de velocidades y el análisis de video se volvió cada vez más prevalente, ayudando a los entrenadores a identificar fortalezas y debilidades en los oponentes.\n\nLa defensa también experimentó cambios significativos durante esta década. La introducción del \"rope-a-dope\" como una estrategia de cerradura fue un ejemplo claro de cómo los equipos buscaban mantener el juego a su favor. Además, el uso de jugadores de batería de cerradura con habilidades excepcionales en la defensa del ronco y la velocidad en el campo se volvió más común.\n\nDurante la década de 1990, los entrenadores experimentaron una transformación en su rol dentro del equipo. La tecnología y el análisis de datos se convirtieron en herramientas esenciales para el desarrollo de tácticas y estrategias. Los entrenadores comenzaron a utilizar software especializado para analizar el rendimiento de sus jugadores, lo que les permitía identificar áreas de mejora y optimizar su juego.\n\nLa popularización del béisbol en medios de comunicación también fue un factor importante durante esta década. La televisión y las redes sociales se convirtieron en plataformas esenciales para seguir el juego, lo que permitió a más personas disfrutar del béisbol durante esta década.\n\nEn conclusión, la década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+  "unexpected_sections": [
+    "El impacto del béisbol en los años 90: una década de evolución y transformación"
+  ],
+  "duplicate_sections": [],
+  "subsections_map": {
+    "el impacto del beisbol en los anos 90 una decada de evolucion y transformacion": [
+      "La evolución del juego",
+      "Innovaciones en la defensa",
+      "El papel del entrenador",
+      "El impacto en las selecciones nacionales",
+      "El papel del público",
+      "Conclusión"
+    ]
+  },
+  "structural_anomalies": [],
+  "duplicate_detected": false,
+  "continuation_rejected_as_duplicate": false,
+  "initial_word_count": 977,
+  "final_word_count": 977,
+  "minimum_words": 1500,
+  "total_continuation_attempts": 1,
+  "successful_continuations": 0,
+  "rejected_continuations": 0,
+  "duplicate_rejections": 0,
+  "repeated_continuation": false,
+  "total_added_words": 0,
+  "final_quality_gate": "FAIL",
+  "deterministic_used": false
+}

@@ -1,0 +1,78 @@
+{
+  "book_metadata": {
+    "book_id": 13,
+    "title": "Historia de la exploración espacial",
+    "language": "es"
+  },
+  "chapter_outline": {
+    "title": "Capítulo 1",
+    "number": 1,
+    "objective": null,
+    "sections": []
+  },
+  "research": null,
+  "sources": [
+    {
+      "title": "Exploración espacial",
+      "url": "https://es.wikipedia.org/wiki/Exploraci%C3%B3n_espacial",
+      "source_type": "web_wikipedia",
+      "content": "La exploración espacial designa los esfuerzos del ser humano en estudiar el espacio y sus astros desde el punto de vista científico y de su explotación económica. Estos esfuerzos pueden involucrar tanto seres humanos viajando en naves espaciales como satélites con recursos de telemetría o sondas teleguiadas enviadas a otros planetas.",
+      "accessed_at": "2026-08-14T17:11:02.901428+00:00"
+    },
+    {
+      "title": "Exploración del sistema solar",
+      "url": "https://es.wikipedia.org/wiki/Exploraci%C3%B3n_del_sistema_solar",
+      "source_type": "web_wikipedia",
+      "content": "Desde el comienzo de la era espacial se han realizado numerosas misiones no tripuladas de exploración del sistema solar. La primera sonda espacial que aterrizó en otro cuerpo del sistema solar fue la sonda soviética Luna 2 que impactó en la Luna en 1959 casi al comienzo de la carrera espacial. Desde entonces se han alcanzado cuerpos del sistema solar progresivamente más lejanos con sondas impactando en Venus en 1965, Marte en 1971, aterrizando en la Luna en 1966, Venus en 1970, Marte en 1976, el asteroide Eros en el 2001 y Titán en el 2005. Numerosos programas espaciales han desarrollado orbitadores capaces de explorar los planetas cercanos como Marte, Venus, Júpiter o Saturno.",
+      "accessed_at": "2026-08-14T17:11:03.265286+00:00"
+    },
+    {
+      "title": "Era espacial",
+      "url": "https://es.wikipedia.org/wiki/Era_espacial",
+      "source_type": "web_wikipedia",
+      "content": "Se conoce como era espacial al período que comprende las actividades relacionadas con la carrera espacial, la exploración espacial, la tecnología espacial y los desarrollos culturales influidos por estos acontecimientos.",
+      "accessed_at": "2026-08-14T17:11:03.444356+00:00"
+    },
+    {
+      "title": "Centro Espacial de Tanegashima",
+      "url": "https://es.wikipedia.org/wiki/Centro_Espacial_de_Tanegashima",
+      "source_type": "web_wikipedia",
+      "content": "El Centro Espacial Tanegáshima  , conocido también por sus siglas en inglés TNSC, Tanegashima Space Center, es una de las instalaciones de desarrollo e investigación espacial de Japón. Está localizado en Tanegáshima, una isla que se ubica 115 km al sur de Kyūshū. Fue creado en 1969, cuando se formó la Agencia Nacional de Desarrollo Espacial de Japón, la que posteriormente se transformaría en la actual JAXA.",
+      "accessed_at": "2026-08-14T17:11:03.633218+00:00"
+    }
+  ],
+  "previous_chapter_summaries": [],
+  "target_word_count": 3000,
+  "style_guide": "Divulgativo, riguroso y claro",
+  "provider": "ollama",
+  "model": "qwen-agent:latest",
+  "tokens_input": 1968,
+  "tokens_output": 799,
+  "word_count": 490,
+  "text": "# Capítulo 1\n\n## Introducción\n\nLa exploración espacial ha sido una de las más ambiciosas y revolucionarias iniciativas humanas en el siglo XXI. Desde la primera misión tripulada a Marte hasta los primeros pasos del ser humano en la Luna, esta disciplina ha demostrado su capacidad para desafiar nuestras capacidades tecnológicas y científicas más avanzadas. Este capítulo explora la historia de la exploración espacial, desde sus orígenes hasta el presente, destacando los logros más significativos y las futuras perspectivas.\n\n## Era Espacial\n\nLa era espacial se refiere a un período histórico marcado por la creciente capacidad humana para explorar y utilizar el espacio exterior. Este término abarca desde las primeras misiones tripuladas hasta los avances más recientes en tecnología espacial. La Era Espacial ha sido caracterizada por una serie de logros históricos, incluyendo el lanzamiento de la Primera Satélite Artificial (Sputnik 1) por la Unión Soviética en 1957, el viaje tripulado a Marte por la misión Mars Exploration Rover en 2004, y la primera estación espacial internacional, la ISS.\n\n## Exploración del Sistema Solar\n\nLa exploración del sistema solar ha sido un objetivo central de los programas espaciales nacionales e internacionales. Esta sección explora los avances significativos en el estudio de las planetas, lunas, asteroides y cometas que conforman nuestro sistema solar. Se destacarán misiones como Voyager 1, la misión Juno a Júpiter, y la exploración del planeta Marte por rovers como Curiosity.\n\n## Exploración Espacial Internacional\n\nLa cooperación internacional en la exploración espacial ha sido un ejemplo de cómo los países pueden trabajar juntos para alcanzar metas ambiciosas. Esta sección examina las misiones internacionales más significativas, incluyendo la misión Apollo a la Luna, el proyecto Mars Exploration Rovers y la construcción y operación de la ISS.\n\n## Exploración Espacial Privada\n\nLa exploración espacial privada ha emergido como un nuevo actor en este campo. Empresas como SpaceX, Blue Origin y Virgin Galactic están liderando el desarrollo de tecnología espacial para el transporte comercial y la colonización espacial. Esta sección explora los avances más recientes en esta área y sus posibles implicaciones futuras.\n\n## Futuras Perspectivas\n\nLa exploración espacial continúa siendo un campo de gran interés y oportunidad. Esta sección examina las futuras misiones a Marte, la colonización lunar, y el desarrollo de tecnología espacial para el viaje interstelar. También se discutirán los desafíos éticos y legales que surgirán con la exploración espacial más avanzada.\n\n## Conclusión\n\nLa exploración espacial ha sido una de las más ambiciosas e innovadoras iniciativas humanas en el siglo XXI. Desde la primera misión tripulada a Marte hasta los primeros pasos del ser humano en la Luna, esta disciplina ha demostrado su capacidad para desafiar nuestras capacidades tecnológicas y científicas más avanzadas. A pesar de los desafíos que aún nos esperan, la exploración espacial continúa siendo un campo de gran interés y oportunidad.\n\n## Fuentes utilizadas\n\n- Exploración espacial (web_wikipedia)\n- Exploración del sistema solar (web_wikipedia)\n- Era espacial (web_wikipedia)\n- Centro Espacial de Tanegashima (web_wikipedia)",
+  "unexpected_sections": [
+    "Introducción",
+    "Era Espacial",
+    "Exploración del Sistema Solar",
+    "Exploración Espacial Internacional",
+    "Exploración Espacial Privada",
+    "Futuras Perspectivas",
+    "Conclusión"
+  ],
+  "duplicate_sections": [],
+  "subsections_map": {},
+  "structural_anomalies": [],
+  "duplicate_detected": false,
+  "continuation_rejected_as_duplicate": false,
+  "initial_word_count": 490,
+  "final_word_count": 490,
+  "minimum_words": 1500,
+  "total_continuation_attempts": 1,
+  "successful_continuations": 0,
+  "rejected_continuations": 0,
+  "duplicate_rejections": 0,
+  "repeated_continuation": false,
+  "total_added_words": 0,
+  "final_quality_gate": "FAIL",
+  "deterministic_used": false
+}

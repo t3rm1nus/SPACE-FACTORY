@@ -1,0 +1,14 @@
+{
+  "id": "book_planner",
+  "name": "Planificador de libros",
+  "description": "Recibe una idea de libro y genera un plan editorial estructurado con capítulos.",
+  "type": "agent",
+  "capabilities": ["create_book_plan"],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 120,
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}

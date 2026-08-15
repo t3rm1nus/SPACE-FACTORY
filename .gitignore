@@ -1,0 +1,93 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+venv/
+venv310/
+.venv/
+env/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Databases / local runtime data
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated / temporary files
+tmp/
+temp/
+output/
+outputs/
+generated/
+uploads/
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# Node
+node_modules/
+
+# Local caches
+.cache/
+
+# Secrets / credentials
+*.pem
+*.key
+credentials.json
+service-account*.json
+secrets.json
+
+# SPACE LAIR - temporary/debug files
+_cws*.txt
+_diag_*.json
+_dump_*.txt
+_f73c.txt
+_poll*.py
+_tmp_*.txt
+_tmp_*.py
+dbg*.txt
+debug*.txt
+db_tests.txt
+e2e_*.txt
+e2e_*.err
+e2e_*.json
+e2e_*_report.json
+server.err
+test*_result.txt
+tmp_*.py
+integ_*.ps1
+
+# SPACE LAIR runtime/generated data
+data/checkpoints/
+data/dev_ops/
+data/images/
+

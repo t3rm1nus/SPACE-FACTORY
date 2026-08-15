@@ -1,0 +1,38 @@
+{
+  "task_id": "task_7_9d7_prep",
+  "objective": "PREP (solo lectura) para la futura resolucion de 7.9D.7: verificar integridad y disponibilidad del pipeline editorial (modules/chapter_writer/main.py, modules/editor, modules/research, modules/fact_checker intactos y presentes) y de la infraestructura de Autopilot (tests/test_autopilot.py). NO modifica ningun modulo editorial. Queda PENDING a la espera de orden humana.",
+  "commands": [
+    {
+      "name": "probe_readiness",
+      "cmd": [
+        "python",
+        "-c",
+        "import os,sys\ncks={'modules/chapter_writer/main.py':os.path.isfile('modules/chapter_writer/main.py'),'modules/editor':os.path.isdir('modules/editor'),'modules/research':os.path.isdir('modules/research'),'modules/fact_checker':os.path.isdir('modules/fact_checker'),'tests/test_autopilot.py':os.path.isfile('tests/test_autopilot.py')}\nok=True\nfor k,v in cks.items():\n print(('OK  ' if v else 'FAIL')+' '+k)\n ok=ok and v\nprint('READY' if ok else 'NOT_READY')\nsys.exit(0 if ok else 1)"
+      ],
+      "timeout_sec": 60,
+      "allow_failure": false
+    }
+  ],
+  "patches": [],
+  "allowed_files": [
+    "data/autopilot/task_7_9d7_prep"
+  ],
+  "forbidden_files": [
+    "modules/chapter_writer/main.py",
+    "modules/chapter_writer",
+    "modules/editor",
+    "modules/research",
+    "modules/fact_checker",
+    "tests"
+  ],
+  "success_conditions": [
+    {
+      "type": "command_ok",
+      "name": "probe_readiness",
+      "expect": "PASS"
+    }
+  ],
+  "env": {},
+  "max_iterations": 3,
+  "human_approval_required": false
+}

@@ -1,0 +1,46 @@
+{
+  "book_metadata": {
+    "book_id": 1,
+    "title": "T"
+  },
+  "chapter_outline": {
+    "number": 1,
+    "title": "C1",
+    "sections": []
+  },
+  "research": "investigación real",
+  "sources": [
+    {
+      "url": "u1"
+    }
+  ],
+  "previous_chapter_summaries": [],
+  "target_word_count": 3000,
+  "style_guide": null,
+  "provider": "none",
+  "model": "",
+  "tokens_input": 0,
+  "tokens_output": 0,
+  "word_count": 33,
+  "text": "# C1\n\n## Introducción\nEste capítulo desarrolla el tema propuesto en el outline.\n\n## Conclusión\nEl capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente.\n\n## Fuentes utilizadas\n- u1",
+  "unexpected_sections": [
+    "Introducción",
+    "Conclusión"
+  ],
+  "duplicate_sections": [],
+  "subsections_map": {},
+  "structural_anomalies": [],
+  "duplicate_detected": false,
+  "continuation_rejected_as_duplicate": false,
+  "initial_word_count": 33,
+  "final_word_count": 33,
+  "minimum_words": 1500,
+  "total_continuation_attempts": 0,
+  "successful_continuations": 0,
+  "rejected_continuations": 0,
+  "duplicate_rejections": 0,
+  "repeated_continuation": false,
+  "total_added_words": 0,
+  "final_quality_gate": "FAIL",
+  "deterministic_used": false
+}

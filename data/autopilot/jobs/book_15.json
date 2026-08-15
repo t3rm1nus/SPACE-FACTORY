@@ -1,0 +1,1569 @@
+{
+  "job_id": "book_15",
+  "book_id": 15,
+  "status": "COMPLETED",
+  "created_at": "2026-08-14 19:35:07",
+  "updated_at": "2026-08-14 19:40:50",
+  "current_phase": "docx",
+  "phases": [
+    {
+      "id": "planner",
+      "label": "BOOK PLANNER",
+      "capability": "create_book_plan",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:35:07",
+      "completed_at": "2026-08-14 19:35:40",
+      "duration": 32.968,
+      "attempts": 1,
+      "metrics": {
+        "title": "Historia del Beisbol en los Años 90",
+        "subtitle": "Un Viaje a través de las Épocas del Estilo Moderno",
+        "description": "Explora la evolución del beisbol durante los años 90, desde el surgimiento del estilo moderno hasta sus impactos duraderos en la cultura y el deporte estadounidenses.",
+        "target_audience": "general",
+        "chapters": [
+          {
+            "number": 1,
+            "title": "Introducción: El Nacimiento del Estilo Moderno",
+            "objective": "Presentar los orígenes del estilo moderno en el beisbol y su impacto inicial.",
+            "key_questions": [
+              "¿Qué marcó el inicio del estilo moderno?",
+              "Cómo evolucionaron las tácticas y jugadores durante este período?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Historias de los primeros equipos modernos",
+              "Análisis de estadísticas de los años 90"
+            ],
+            "image_requirements": 5
+          },
+          {
+            "number": 2,
+            "title": "La Era de la Supremacía del Béisbol",
+            "objective": "Explorar el período de mayor popularidad y éxito del beisbol en los años 90.",
+            "key_questions": [
+              "¿Cuáles fueron los equipos más exitosos?",
+              "Cómo influyeron estos éxitos en la cultura pop?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Resultados de las temporadas de los equipos principales",
+              "Análisis de eventos históricos"
+            ],
+            "image_requirements": 5
+          },
+          {
+            "number": 3,
+            "title": "La Revolución Tecnológica en el Béisbol",
+            "objective": "Examinar cómo la tecnología influyó en el juego durante los años 90.",
+            "key_questions": [
+              "¿Qué tecnologías se implementaron?",
+              "Cómo cambió esto el juego y las tácticas?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Desarrollo de equipos de béisbol inteligentes",
+              "Impacto en la seguridad del juego"
+            ],
+            "image_requirements": 5
+          },
+          {
+            "number": 4,
+            "title": "La Evolución de los Jugadores",
+            "objective": "Analizar cómo evolucionaron los jugadores durante los años 90 y sus impactos en el juego.",
+            "key_questions": [
+              "¿Qué habilidades destacaron?",
+              "Cómo influyeron estos jugadores en la cultura del béisbol?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Historias de jugadores icónicos",
+              "Análisis de estadísticas"
+            ],
+            "image_requirements": 5
+          },
+          {
+            "number": 5,
+            "title": "Desafíos y Cambios en el Futuro",
+            "objective": "Explorar los desafíos enfrentados por el beisbol durante los años 90 y cómo estos afectaron su evolución futura.",
+            "key_questions": [
+              "¿Qué problemas surgieron?",
+              "Cómo se adaptó el juego a estas circunstancias?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Historias de crisis en equipos",
+              "Análisis de cambios en las reglas"
+            ],
+            "image_requirements": 5
+          }
+        ],
+        "provider": "ollama",
+        "model": "qwen-agent:latest",
+        "tokens_input": 394,
+        "tokens_output": 771,
+        "cost": 0.0
+      },
+      "module": "book_planner",
+      "task_id": 67,
+      "error": null
+    },
+    {
+      "id": "research",
+      "label": "RESEARCH",
+      "capability": "research_web",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:35:40",
+      "completed_at": "2026-08-14 19:35:42",
+      "duration": 1.755,
+      "attempts": 1,
+      "metrics": {
+        "query": "Beisbol en los 90",
+        "status": "PASS",
+        "execution_mode": "real",
+        "sources": [
+          {
+            "title": "Campeonato de Béisbol Mayor de Panamá",
+            "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+            "source_type": "web_wikipedia",
+            "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+            "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+          },
+          {
+            "title": "Béisbol en México",
+            "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+            "source_type": "web_wikipedia",
+            "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+            "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+          },
+          {
+            "title": "Selección de béisbol de Colombia",
+            "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+            "source_type": "web_wikipedia",
+            "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+            "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+          },
+          {
+            "title": "Campo de béisbol",
+            "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+            "source_type": "web_wikipedia",
+            "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+            "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+          },
+          {
+            "title": "Guante de béisbol",
+            "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+            "source_type": "web_wikipedia",
+            "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+            "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+          }
+        ],
+        "stored_sources": [
+          {
+            "id": 445,
+            "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+            "title": "Campeonato de Béisbol Mayor de Panamá",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 19:35:41",
+            "source_type": "web_wikipedia",
+            "relevance": 88,
+            "notes": "content_snippet=El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+            "chapter_ids": [],
+            "url_hash": "9d383c316e80e94359b5d75bd6d463d378c8f3ffa22917dfd13a466d2a6789b2",
+            "hash": "3077247f86929655",
+            "status": "verified"
+          },
+          {
+            "id": 446,
+            "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+            "title": "Béisbol en México",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 19:35:41",
+            "source_type": "web_wikipedia",
+            "relevance": 26,
+            "notes": "content_snippet=El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+            "chapter_ids": [],
+            "url_hash": "605385599c525e7d7b586301675ad75af82de761b5f11d93e5f7aa66105b8f2c",
+            "hash": "25da51334c75529f",
+            "status": "verified"
+          },
+          {
+            "id": 447,
+            "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+            "title": "Selección de béisbol de Colombia",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 19:35:42",
+            "source_type": "web_wikipedia",
+            "relevance": 26,
+            "notes": "content_snippet=La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+            "chapter_ids": [],
+            "url_hash": "a9496b2319211ca2bbab4556daca771989196200b8251786ffacfeeddb1e3536",
+            "hash": "23b9f76ae575b72e",
+            "status": "verified"
+          },
+          {
+            "id": 448,
+            "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+            "title": "Campo de béisbol",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 19:35:42",
+            "source_type": "web_wikipedia",
+            "relevance": 105,
+            "notes": "content_snippet=El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+            "chapter_ids": [],
+            "url_hash": "e0653d935095b95829a5e0e459bc8eb8c627044e7b86fe130590c292a137b721",
+            "hash": "7a8dcb7b9ebcee87",
+            "status": "verified"
+          },
+          {
+            "id": 449,
+            "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+            "title": "Guante de béisbol",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 19:35:42",
+            "source_type": "web_wikipedia",
+            "relevance": 75,
+            "notes": "content_snippet=El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+            "chapter_ids": [],
+            "url_hash": "2883246a598ace05daef6f86807f3765667335ccae03a5af332e35090e00c5a5",
+            "hash": "ec7852a822ce661d",
+            "status": "verified"
+          }
+        ],
+        "source_count": 5,
+        "error": null
+      },
+      "module": "research",
+      "task_id": 68,
+      "error": null
+    },
+    {
+      "id": "outline",
+      "label": "OUTLINE",
+      "capability": "create_book_plan",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:35:42",
+      "completed_at": "2026-08-14 19:35:58",
+      "duration": 16.036,
+      "attempts": 1,
+      "metrics": {
+        "title": "Beisbol en los 90: Una Decada de Historia y Revolución",
+        "subtitle": "Desentrañando la Era de las Grandes Apariciones",
+        "description": "Explora el fascinante mundo del beisbol durante los años 90, una década repleta de emocionantes partidos, innovaciones tecnológicas y momentos históricos que cambiaron para siempre el deporte. Este libro ofrece un recorrido detallado a través de esta época, desde la ascensión de jugadores como Pete Rose hasta los cambios en las reglas del juego.",
+        "target_audience": "general",
+        "chapters": [
+          {
+            "number": 1,
+            "title": "Introducción al Beisbol de los 90",
+            "objective": "Presentar la era histórica y proporcionar un contexto general del beisbol en los años 90.",
+            "key_questions": [
+              "¿Qué eventos marcaban el inicio de esta década para el beisbol?",
+              "Cuáles fueron las principales características que definen a este período?"
+            ],
+            "estimated_words": 500,
+            "research_requirements": [
+              "Artículos académicos sobre la historia del beisbol",
+              "Documentales y entrevistas con historiadores"
+            ],
+            "image_requirements": 3
+          },
+          {
+            "number": 2,
+            "title": "Los Grandes Apariciones: Jugadores de Renombre",
+            "objective": "Explorar a los jugadores más destacados que se destacaron en la década de los 90.",
+            "key_questions": [
+              "¿Cuáles fueron los mejores jugadores de los 90?",
+              "Cómo influyeron estos jugadores en el desarrollo del beisbol?"
+            ],
+            "estimated_words": 500,
+            "research_requirements": [
+              "Biografías detalladas de jugadores famosos",
+              "Análisis estadísticos de desempeño"
+            ],
+            "image_requirements": 3
+          },
+          {
+            "number": 3,
+            "title": "La Innovación Tecnológica: Cambios en el Juego",
+            "objective": "Analizar los cambios tecnológicos que revolucionaron el beisbol durante los años 90.",
+            "key_questions": [
+              "¿Qué tecnologías entraron en uso durante esta década?",
+              "Cómo afectaron la forma de jugar y las tácticas?"
+            ],
+            "estimated_words": 500,
+            "research_requirements": [
+              "Artículos sobre avances tecnológicos en el beisbol",
+              "Videos explicativos"
+            ],
+            "image_requirements": 3
+          },
+          {
+            "number": 4,
+            "title": "Reglas y Estandarización: Cambios en la Ley del Juego",
+            "objective": "Examinar los cambios en las reglas y estándares que se implementaron durante los años 90.",
+            "key_questions": [
+              "¿Cuáles fueron las principales modificaciones en las reglas?",
+              "Cómo afectaron a los equipos y jugadores?"
+            ],
+            "estimated_words": 500,
+            "research_requirements": [
+              "Documentos oficiales de la MLB",
+              "Artículos sobre las discusiones y debates"
+            ],
+            "image_requirements": 3
+          },
+          {
+            "number": 5,
+            "title": "Memoria del Siglo: Eventos Históricos",
+            "objective": "Revisar los eventos más significativos que ocurrieron en el beisbol durante los años 90.",
+            "key_questions": [
+              "¿Cuáles fueron los momentos más importantes de la década?",
+              "Cómo influyeron en el desarrollo del deporte?"
+            ],
+            "estimated_words": 500,
+            "research_requirements": [
+              "Artículos sobre eventos históricos",
+              "Documentales y noticias de la época"
+            ],
+            "image_requirements": 3
+          }
+        ],
+        "provider": "ollama",
+        "model": "qwen-agent:latest",
+        "tokens_input": 409,
+        "tokens_output": 849,
+        "cost": 0.0
+      },
+      "module": "book_planner",
+      "task_id": 69,
+      "error": null
+    },
+    {
+      "id": "writer",
+      "label": "CHAPTER WRITER",
+      "capability": "write_chapter_es",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:35:58",
+      "completed_at": "2026-08-14 19:38:23",
+      "duration": 144.983,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 5,
+          "done": 5
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "chapter_writer",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "53": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\15\\chapter_1\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 15,
+                  "title": "Beisbol en los 90",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 1",
+                  "number": 1,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Campeonato de Béisbol Mayor de Panamá",
+                    "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                    "source_type": "web_wikipedia",
+                    "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+                    "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+                  },
+                  {
+                    "title": "Béisbol en México",
+                    "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                    "source_type": "web_wikipedia",
+                    "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+                    "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+                  },
+                  {
+                    "title": "Selección de béisbol de Colombia",
+                    "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                    "source_type": "web_wikipedia",
+                    "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+                    "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+                  },
+                  {
+                    "title": "Campo de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+                    "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+                  },
+                  {
+                    "title": "Guante de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+                    "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1988,
+                "tokens_output": 951,
+                "word_count": 581,
+                "text": "# Beisbol en los 90\n\n## Introducción\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo explora las evoluciones tecnológicas y deportivas que definieron esta era del juego, desde los avances en el equipamiento hasta los desafíos ambientales y las innovaciones en el análisis estadístico.\n\n## Evolución del Equipamiento\n\nLa década de 1990 vio importantes mejoras en el equipamiento utilizado por los jugadores. El campo de béisbol experimentó cambios significativos, con nuevas superficies y materiales que buscaban aumentar la velocidad de las pelotas y mejorar la durabilidad del terreno.\n\n### Campo de Béisbol\n\nEl campo de béisbol se modernizó en varias áreas durante esta década. La introducción de superficies sintéticas como el turf artificial fue un hito importante, ya que ofrecía una mayor consistencia y menos mantenimiento que los campos tradicionales de césped natural. Además, las barreras de seguridad fueron elevadas para proteger a los jugadores contra pelotas más veloces.\n\n### Guante de Béisbol\n\nEl guante de béisbol también experimentó avances significativos en la década de 1990. La introducción de materiales como el polipropileno y el neoprene permitió crear guantes más resistentes y cómodos para los jugadores. Además, el diseño del guante se volvió más ergonómico, con dedos separados para una mayor precisión en las lanzamientos.\n\n## Innovaciones Tecnológicas\n\nLa década de 1990 fue un período de innovación tecnológica en el béisbol, con desarrollos que mejoraron tanto la experiencia del jugador como la eficiencia del entrenamiento y la gestión del equipo.\n\n### Análisis Estadístico\n\nEl análisis estadístico se convirtió en una herramienta crucial para los equipos durante esta década. El uso de software especializado permitía recopilar y analizar datos sobre el rendimiento de los jugadores, lo que ayudaba a identificar fortalezas y debilidades y a optimizar la formación del equipo.\n\n### Tecnología de Seguridad\n\nLa tecnología de seguridad también experimentó avances significativos en la década de 1990. El uso de cámaras de seguridad y sistemas de seguimiento permitía monitorear el movimiento de los jugadores en el campo, lo que ayudaba a prevenir lesiones y mejorar la eficiencia del juego.\n\n## Desafíos Ambientales\n\nLa década de 1990 también fue un período de desafíos ambientales para el béisbol. El uso intensivo de pesticidas y fertilizantes en los campos de béisbol generó preocupaciones sobre su impacto medioambiental, lo que llevó a la búsqueda de alternativas más sostenibles.\n\n### Cambios en el Uso de Químicos\n\nLa década de 1990 vio un aumento en el uso de químicos biodegradables y menos tóxicos para los campos de béisbol. Además, se implementaron programas de reciclaje y gestión del residuo para reducir la huella ambiental del juego.\n\n### Cambios en el Diseño del Campo\n\nEl diseño del campo también experimentó cambios significativos durante esta década. La introducción de superficies sintéticas y materiales más duraderos permitió reducir la necesidad de uso de químicos, lo que contribuyó a una mayor sostenibilidad.\n\n## Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado las evoluciones tecnológicas y deportivas que definieron esta era del juego, desde los avances en el equipamiento hasta los desafíos ambientales y las innovaciones en el análisis estadístico.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+                "unexpected_sections": [
+                  "Introducción",
+                  "Evolución del Equipamiento",
+                  "Innovaciones Tecnológicas",
+                  "Desafíos Ambientales",
+                  "Conclusión"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {
+                  "evolucion del equipamiento": [
+                    "Campo de Béisbol",
+                    "Guante de Béisbol"
+                  ],
+                  "innovaciones tecnologicas": [
+                    "Análisis Estadístico",
+                    "Tecnología de Seguridad"
+                  ],
+                  "desafios ambientales": [
+                    "Cambios en el Uso de Químicos",
+                    "Cambios en el Diseño del Campo"
+                  ]
+                },
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 581,
+                "final_word_count": 581,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 581,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (581)",
+                "secciones fuera del outline detectadas: Introducción, Evolución del Equipamiento, Innovaciones Tecnológicas, Desafíos Ambientales, Conclusión"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1988,
+              "tokens_output": 951,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "Introducción",
+                "Evolución del Equipamiento",
+                "Innovaciones Tecnológicas",
+                "Desafíos Ambientales",
+                "Conclusión"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {
+                "evolucion del equipamiento": [
+                  "Campo de Béisbol",
+                  "Guante de Béisbol"
+                ],
+                "innovaciones tecnologicas": [
+                  "Análisis Estadístico",
+                  "Tecnología de Seguridad"
+                ],
+                "desafios ambientales": [
+                  "Cambios en el Uso de Químicos",
+                  "Cambios en el Diseño del Campo"
+                ]
+              },
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 581,
+              "final_word_count": 581,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          },
+          "54": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\15\\chapter_2\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 15,
+                  "title": "Beisbol en los 90",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 2",
+                  "number": 2,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Campeonato de Béisbol Mayor de Panamá",
+                    "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                    "source_type": "web_wikipedia",
+                    "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+                    "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+                  },
+                  {
+                    "title": "Béisbol en México",
+                    "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                    "source_type": "web_wikipedia",
+                    "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+                    "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+                  },
+                  {
+                    "title": "Selección de béisbol de Colombia",
+                    "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                    "source_type": "web_wikipedia",
+                    "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+                    "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+                  },
+                  {
+                    "title": "Campo de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+                    "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+                  },
+                  {
+                    "title": "Guante de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+                    "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1988,
+                "tokens_output": 1790,
+                "word_count": 1161,
+                "text": "# Capítulo 2\n\n## El campo de béisbol: un espacio de juego y cultura\n\nEl campo de béisbol es más que solo un lugar donde se juega el deporte; es una parte integral de la cultura estadounidense y mundial. Desde su origen en el siglo XIX, este campo ha evolucionado significativamente, adaptándose a las necesidades cambiantes del juego y de los espectadores.\n\n### La estructura del campo\n\nEl campo de béisbol está compuesto por varias áreas principales: la cancha principal, la casa de home plate, el pitcher's mound, las bases y las líneas de primer base y tercer base. Cada una de estas secciones tiene un propósito específico y juega un papel crucial en el juego.\n\nLa cancha principal es el área rectangular donde se realiza la mayor parte del juego. Está dividida por dos líneas laterales y una línea central, que marca el home plate. El pitcher's mound está ubicado cerca del home plate y es donde el lanzador lanza la pelota.\n\nLas bases están dispuestas en forma de cuadrado, con primer base, segundo base y tercer base. Cada base tiene un marcador para indicar cuándo un corredor llega a ella. El objetivo del juego es marcar todas las bases en orden y llegar al home plate.\n\nLa línea de primer base y la línea de tercer base son líneas que conectan las primeras y terceras bases, respectivamente. Estas líneas son importantes para determinar si un corredor está dentro o fuera del campo de juego.\n\n### El guante de béisbol: una herramienta esencial\n\nEl guante de béisbol es una pieza fundamental del equipo de los jugadores. Su diseño y construcción han evolucionado significativamente a lo largo del tiempo, adaptándose a las necesidades cambiantes del juego y mejorando la eficiencia de los lanzadores.\n\nEl guante de béisbol está compuesto por varias partes principales: el palco, el guante principal y el guante de dedos. El palco es la parte inferior del guante que se sitúa sobre el hombro del jugador. El guante principal es la parte superior que abarca la mano del lanzador. El guante de dedos es la parte más pequeña que cubre los dedos del lanzador.\n\nEl diseño del guante de béisbol ha evolucionado para mejorar la eficiencia y el control del lanzador. Los guantes modernos están hechos de materiales ligeros pero duraderos, como polipropileno o neoprene. También tienen una estructura interna que ayuda a mantener la forma durante las largas sesiones de juego.\n\n### El campo de béisbol en el siglo XXI\n\nEl campo de béisbol ha experimentado importantes cambios en el siglo XXI, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de estos cambios incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\n#### Tecnologías avanzadas en el campo de béisbol\n\nLa tecnología ha jugado un papel crucial en el desarrollo del campo de béisbol. Algunos de los avances más significativos incluyen:\n\n- **Monitoreo de rendimiento**: Las tecnologías de seguimiento y análisis de datos han permitido a los equipos monitorear el rendimiento de sus jugadores en tiempo real. Esto les permite identificar áreas de mejora y hacer ajustes en su estrategia de juego.\n\n- **Análisis de video**: El uso de cámaras de alta definición ha facilitado el análisis de jugadas complejas. Los entrenadores pueden revisar gráficos detallados de las jugadas para mejorar la eficiencia de sus tácticas.\n\n- **Simulación virtual**: Las simulaciones virtuales han permitido a los equipos practicar situaciones difíciles sin tener que enfrentarse a otros equipos reales. Esto les ha dado una ventaja competitiva en el campo.\n\n#### Evolución del diseño del campo\n\nEl diseño del campo de béisbol también ha evolucionado para mejorar la experiencia del espectador y el rendimiento de los jugadores. Algunos de los cambios más significativos incluyen:\n\n- **Iluminación**: El uso de luces LED ha permitido iluminar el campo durante las noches, lo que ha aumentado la popularidad del béisbol nocturno.\n\n- **Asientos**: Los asientos modernos son más cómodos y seguros. Algunos equipos han adoptado sistemas de asiento inteligente que pueden moverse para permitir una mejor visión del juego.\n\n- **Líneas de base**: Las líneas de base modernas son más precisas y duraderas, lo que ha reducido la posibilidad de errores en los jugadores.\n\n#### Creciente popularidad del béisbol digital\n\nEl béisbol digital también ha experimentado un crecimiento significativo en el siglo XXI. Algunos de los avances más importantes incluyen:\n\n- **Videojuegos**: Los videojuegos de béisbol han permitido a millones de jugadores experimentar el juego desde sus hogares. Algunos de los juegos más populares incluyen \"MLB 21\" y \"Madden NFL\".\n\n- **Aplicaciones móviles**: Las aplicaciones móviles como \"Baseball Mogul\" y \"The Bat\" permiten a los jugadores crear y gestionar equipos virtuales.\n\n- **Streaming**: La popularidad del béisbol ha llevado a la creación de canales de streaming dedicados al deporte. Algunos de los canales más populares incluyen \"MLB Network\" y \"ESPN\".\n\n### El campo de béisbol en otros países\n\nEl campo de béisbol no es solo un espacio de juego en Estados Unidos; también tiene una importante presencia en otros países, especialmente en América Latina.\n\n#### Béisbol en Panamá\n\nPanamá ha tenido un fuerte tradición en el béisbol. El Campeonato de Béisbol Mayor de Panamá es uno de los torneos más importantes del país y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n#### Béisbol en México\n\nMéxico también tiene una importante tradición en el béisbol. El Campeonato de Béisbol Mayor de México es uno de los torneos más importantes del país y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n#### Selección de béisbol de Colombia\n\nColombia también tiene una importante tradición en el béisbol. La selección colombiana ha participado en varios torneos internacionales y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n### Conclusión\n\nEl campo de béisbol es un espacio de juego y cultura que ha evolucionado significativamente a lo largo del tiempo. Desde su origen en el siglo XIX, este campo ha experimentado importantes cambios, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de los avances más significativos incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\nEl campo de béisbol también tiene una importante presencia en otros países, especialmente en América Latina. Panamá, México y Colombia son solo algunos de los países que tienen una fuerte tradición en el béisbol.\n\nEn conclusión, el campo de béisbol es un espacio de juego y cultura que ha experimentado importantes cambios a lo largo del tiempo. Desde su origen en el siglo XIX, este campo ha experimentado importantes cambios, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de los avances más significativos incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\n## Fuentes utilizadas\n\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+                "unexpected_sections": [
+                  "El campo de béisbol: un espacio de juego y cultura"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {
+                  "el campo de beisbol un espacio de juego y cultura": [
+                    "La estructura del campo",
+                    "El guante de béisbol: una herramienta esencial",
+                    "El campo de béisbol en el siglo XXI",
+                    "El campo de béisbol en otros países",
+                    "Conclusión"
+                  ]
+                },
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 1161,
+                "final_word_count": 1161,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 1161,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (1161)",
+                "secciones fuera del outline detectadas: El campo de béisbol: un espacio de juego y cultura"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1988,
+              "tokens_output": 1790,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "El campo de béisbol: un espacio de juego y cultura"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {
+                "el campo de beisbol un espacio de juego y cultura": [
+                  "La estructura del campo",
+                  "El guante de béisbol: una herramienta esencial",
+                  "El campo de béisbol en el siglo XXI",
+                  "El campo de béisbol en otros países",
+                  "Conclusión"
+                ]
+              },
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 1161,
+              "final_word_count": 1161,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          },
+          "55": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\15\\chapter_3\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 15,
+                  "title": "Beisbol en los 90",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 3",
+                  "number": 3,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Campeonato de Béisbol Mayor de Panamá",
+                    "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                    "source_type": "web_wikipedia",
+                    "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+                    "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+                  },
+                  {
+                    "title": "Béisbol en México",
+                    "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                    "source_type": "web_wikipedia",
+                    "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+                    "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+                  },
+                  {
+                    "title": "Selección de béisbol de Colombia",
+                    "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                    "source_type": "web_wikipedia",
+                    "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+                    "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+                  },
+                  {
+                    "title": "Campo de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+                    "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+                  },
+                  {
+                    "title": "Guante de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+                    "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1988,
+                "tokens_output": 1826,
+                "word_count": 1195,
+                "text": "# Capítulo 3\n\n## El Béisbol en los 90: Una Era de Innovación y Competencia\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por una mezcla de innovaciones tecnológicas, cambios en las reglas del juego y una intensificación de la competencia internacional. Durante este tiempo, el béisbol experimentó avances significativos que reflejaron los movimientos generales de la cultura y la sociedad en ese período.\n\n### Innovaciones Tecnológicas\n\nLa década de 1990 fue un momento de gran progreso tecnológico en el béisbol. La introducción de nuevas tecnologías permitió a las equipos mejorar su rendimiento, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\n#### El Guante de Béisbol\n\nEl guante de béisbol fue una innovación crucial durante esta década. Los fabricantes desarrollaron nuevos materiales y diseños que ofrecían mayor resistencia y comodidad a los jugadores. El uso del guante de béisbol evolucionó significativamente, con la introducción de nuevas tecnologías como el poliéster y el Kevlar, que proporcionaban una mejor protección contra las pelotas.\n\nEl poliéster fue un material revolucionario en el mundo del béisbol. Su ligereza y resistencia lo convirtieron en el material preferido para los guantes de béisbol durante la década de 1990. El Kevlar, por otro lado, ofrecía una mayor protección contra las pelotas de alta velocidad, lo que era crucial en un juego donde la seguridad del jugador es primordial.\n\nAdemás, la tecnología del poliéster permitió a los jugadores ajustar el tamaño y forma del guante según su preferencia. Esto fue especialmente importante para los jugadores de béisbol profesionales, quienes buscaban una combinación perfecta de comodidad y protección.\n\n#### El Campo de Béisbol\n\nEl campo de béisbol también experimentó avances significativos durante la década de 1990. La introducción de nuevas tecnologías permitió a los equipos mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\nLa tecnología del poliéster fue un material revolucionario en el mundo del béisbol. Su ligereza y resistencia lo convirtieron en el material preferido para las cubetas de béisbol durante la década de 1990. El Kevlar, por otro lado, ofrecía una mayor protección contra las pelotas de alta velocidad, lo que era crucial en un juego donde la seguridad del jugador es primordial.\n\nAdemás, la tecnología del poliéster permitió a los jugadores ajustar el tamaño y forma de la cubeta según su preferencia. Esto fue especialmente importante para los jugadores de béisbol profesionales, quienes buscaban una combinación perfecta de comodidad y protección.\n\n### Cambios en las Reglas del Juego\n\nLa década de 1990 también fue un período de cambios importantes en las reglas del béisbol. El objetivo era mejorar el juego y hacerlo más atractivo para los espectadores, lo que llevó a la introducción de nuevas reglas y modificaciones.\n\n#### La Bola de Control\n\nLa bola de control fue una innovación importante durante esta década. La bola de control permitía a los jugadores mantener la pelota en su posesión durante un período más largo, lo que aumentaba el ritmo del juego y reducía las oportunidades de errores.\n\nAdemás, la bola de control permitió a los equipos mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores. La introducción de esta regla fue una respuesta a la creciente presión para que los equipos jueguen más rápido y reduzcan el tiempo de descanso entre juegos.\n\n#### El Tiempo Extra\n\nEl tiempo extra fue otra innovación importante durante la década de 1990. El tiempo extra permitía a los equipos jugar más partidos, lo que aumentaba la competencia internacional y la visibilidad del béisbol en todo el mundo.\n\nAdemás, el tiempo extra permitió a los jugadores mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores. La introducción de esta regla fue una respuesta a la creciente presión para que los equipos jueguen más rápido y reduzcan el tiempo de descanso entre juegos.\n\n### Competencia Internacional\n\nLa década de 1990 también fue un período de intensificación de la competencia internacional en el béisbol. El objetivo era mejorar el juego y hacerlo más atractivo para los espectadores, lo que llevó a la introducción de nuevas reglas y modificaciones.\n\n#### La Selección de Béisbol de Colombia\n\nLa selección de béisbol de Colombia fue una de las destacadas del mundo durante esta década. El equipo colombiano experimentó un gran éxito en el torneo de Campeonato de Béisbol Mayor de Panamá, donde obtuvo el primer título continental.\n\nEl éxito del equipo colombiano fue resultado de la combinación de talento natural y entrenamiento riguroso. Los jugadores colombianos trabajaron duro para mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\nAdemás, el éxito del equipo colombiano fue resultado de la colaboración entre los jugadores, el entrenador y el personal técnico. La combinación de talento natural y entrenamiento riguroso permitió a los jugadores colombianos superar las dificultades y alcanzar sus metas.\n\n#### El Béisbol en México\n\nEl béisbol en México también experimentó un gran éxito durante esta década. El equipo mexicano obtuvo el primer título continental en el Campeonato de Béisbol Mayor de Panamá, lo que fue un logro histórico para la historia del béisbol en México.\n\nEl éxito del equipo mexicano fue resultado de la combinación de talento natural y entrenamiento riguroso. Los jugadores mexicanos trabajaron duro para mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\nAdemás, el éxito del equipo mexicano fue resultado de la colaboración entre los jugadores, el entrenador y el personal técnico. La combinación de talento natural y entrenamiento riguroso permitió a los jugadores mexicanos superar las dificultades y alcanzar sus metas.\n\n### Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por una mezcla de innovaciones tecnológicas, cambios en las reglas del juego y una intensificación de la competencia internacional. Durante este tiempo, el béisbol experimentó avances significativos que reflejaron los movimientos generales de la cultura y la sociedad en ese período.\n\nLa introducción de nuevas tecnologías permitió a las equipos mejorar su rendimiento, optimizar sus estrategias y aumentar la seguridad de los jugadores. La bola de control y el tiempo extra fueron innovaciones importantes durante esta década, que permitieron a los equipos jugar más rápido y reducir el tiempo de descanso entre juegos.\n\nLa competencia internacional también fue un factor importante durante esta década. El equipo colombiano obtuvo el primer título continental en el Campeonato de Béisbol Mayor de Panamá, lo que fue un logro histórico para la historia del béisbol en Colombia. El equipo mexicano también experimentó un gran éxito durante esta década, obteniendo el primer título continental en el mismo torneo.\n\nEn conclusión, la década de 1990 fue un período crucial para el béisbol, marcado por una mezcla de innovaciones tecnológicas, cambios en las reglas del juego y una intensificación de la competencia internacional. Durante este tiempo, el béisbol experimentó avances significativos que reflejaron los movimientos generales de la cultura y la sociedad en ese período.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+                "unexpected_sections": [
+                  "El Béisbol en los 90: Una Era de Innovación y Competencia"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {
+                  "el beisbol en los 90 una era de innovacion y competencia": [
+                    "Innovaciones Tecnológicas",
+                    "Cambios en las Reglas del Juego",
+                    "Competencia Internacional",
+                    "Conclusión"
+                  ]
+                },
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 1195,
+                "final_word_count": 1195,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 1195,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (1195)",
+                "secciones fuera del outline detectadas: El Béisbol en los 90: Una Era de Innovación y Competencia"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1988,
+              "tokens_output": 1826,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "El Béisbol en los 90: Una Era de Innovación y Competencia"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {
+                "el beisbol en los 90 una era de innovacion y competencia": [
+                  "Innovaciones Tecnológicas",
+                  "Cambios en las Reglas del Juego",
+                  "Competencia Internacional",
+                  "Conclusión"
+                ]
+              },
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 1195,
+              "final_word_count": 1195,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          },
+          "56": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\15\\chapter_4\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 15,
+                  "title": "Beisbol en los 90",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 4",
+                  "number": 4,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Campeonato de Béisbol Mayor de Panamá",
+                    "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                    "source_type": "web_wikipedia",
+                    "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+                    "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+                  },
+                  {
+                    "title": "Béisbol en México",
+                    "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                    "source_type": "web_wikipedia",
+                    "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+                    "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+                  },
+                  {
+                    "title": "Selección de béisbol de Colombia",
+                    "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                    "source_type": "web_wikipedia",
+                    "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+                    "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+                  },
+                  {
+                    "title": "Campo de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+                    "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+                  },
+                  {
+                    "title": "Guante de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+                    "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1988,
+                "tokens_output": 1505,
+                "word_count": 977,
+                "text": "# Capítulo 4\n\n## El impacto del béisbol en los años 90: una década de evolución y transformación\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo explora cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\n### La evolución del juego\n\nLa década de 1990 vio un importante cambio en el estilo de juego. Los equipos comenzaron a enfocarse más en el lanzamiento de cambios y en la defensa, lo que llevó a una mayor importancia del batería de cerradura. El \"pitching machine\" se convirtió en una herramienta esencial para entrenar a los lanzadores, permitiendo un control preciso sobre la velocidad y dirección de las pelotas.\n\nAdemás, el uso de tecnologías como el radar de velocidades y el análisis de video se volvió cada vez más prevalente. Estas herramientas ayudaron a los entrenadores a identificar fortalezas y debilidades en los oponentes, lo que permitió desarrollar tácticas más efectivas.\n\n### Innovaciones en la defensa\n\nLa defensa también experimentó cambios significativos durante esta década. La introducción del \"rope-a-dope\" como una estrategia de cerradura fue un ejemplo claro de cómo los equipos buscaban mantener el juego a su favor. Además, el uso de jugadores de batería de cerradura con habilidades excepcionales en la defensa del ronco y la velocidad en el campo de béisbol se volvió más común.\n\nLa evolución del sistema de rotación también fue un factor importante. Los equipos comenzaron a experimentar con diferentes sistemas de rotación, buscando encontrar el equilibrio perfecto entre lanzadores de alta velocidad y defensores versátiles.\n\n### El papel del entrenador\n\nDurante la década de 1990, los entrenadores experimentaron una transformación en su rol dentro del equipo. La tecnología y el análisis de datos se convirtieron en herramientas esenciales para el desarrollo de tácticas y estrategias. Los entrenadores comenzaron a utilizar software especializado para analizar el rendimiento de sus jugadores, lo que les permitía identificar áreas de mejora y optimizar su juego.\n\nAdemás, la comunicación entre los entrenadores y los jugadores también experimentó un cambio. La introducción del \"walkman\" como una herramienta de comunicación entre los entrenadores y los jugadores en el campo fue un ejemplo claro de cómo esta tecnología influyó en la dinámica del equipo.\n\n### El impacto en las selecciones nacionales\n\nLa década de 1990 también tuvo un impacto significativo en las selecciones nacionales de béisbol. En Colombia, por ejemplo, el equipo nacional experimentó una transformación importante durante esta década. La introducción de nuevas tácticas y tecnologías ayudó a los jugadores colombianos a mejorar su rendimiento en el campo.\n\nEn Panamá, la selección nacional también experimentó cambios significativos. La introducción de jugadores con habilidades excepcionales en la defensa del ronco y la velocidad en el campo permitió a los panameños competir con equipos más fuertes internacionales.\n\n### El papel del público\n\nLa década de 1990 también tuvo un impacto significativo en el público que disfrutaba del béisbol. La introducción de nuevas tecnologías como el radar de velocidades y el análisis de video permitió a los espectadores seguir más de cerca el juego, lo que aumentó la apreciación del deporte.\n\nAdemás, la popularización del béisbol en medios de comunicación también fue un factor importante. La televisión y las redes sociales se convirtieron en plataformas esenciales para seguir el juego, lo que permitió a más personas disfrutar del béisbol durante esta década.\n\n### Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\nLa evolución del juego durante esta década fue marcada por un cambio en el estilo de juego. Los equipos comenzaron a enfocarse más en el lanzamiento de cambios y en la defensa, lo que llevó a una mayor importancia del batería de cerradura. El uso de tecnologías como el radar de velocidades y el análisis de video se volvió cada vez más prevalente, ayudando a los entrenadores a identificar fortalezas y debilidades en los oponentes.\n\nLa defensa también experimentó cambios significativos durante esta década. La introducción del \"rope-a-dope\" como una estrategia de cerradura fue un ejemplo claro de cómo los equipos buscaban mantener el juego a su favor. Además, el uso de jugadores de batería de cerradura con habilidades excepcionales en la defensa del ronco y la velocidad en el campo se volvió más común.\n\nDurante la década de 1990, los entrenadores experimentaron una transformación en su rol dentro del equipo. La tecnología y el análisis de datos se convirtieron en herramientas esenciales para el desarrollo de tácticas y estrategias. Los entrenadores comenzaron a utilizar software especializado para analizar el rendimiento de sus jugadores, lo que les permitía identificar áreas de mejora y optimizar su juego.\n\nLa popularización del béisbol en medios de comunicación también fue un factor importante durante esta década. La televisión y las redes sociales se convirtieron en plataformas esenciales para seguir el juego, lo que permitió a más personas disfrutar del béisbol durante esta década.\n\nEn conclusión, la década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+                "unexpected_sections": [
+                  "El impacto del béisbol en los años 90: una década de evolución y transformación"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {
+                  "el impacto del beisbol en los anos 90 una decada de evolucion y transformacion": [
+                    "La evolución del juego",
+                    "Innovaciones en la defensa",
+                    "El papel del entrenador",
+                    "El impacto en las selecciones nacionales",
+                    "El papel del público",
+                    "Conclusión"
+                  ]
+                },
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 977,
+                "final_word_count": 977,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 977,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (977)",
+                "secciones fuera del outline detectadas: El impacto del béisbol en los años 90: una década de evolución y transformación"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1988,
+              "tokens_output": 1505,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "El impacto del béisbol en los años 90: una década de evolución y transformación"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {
+                "el impacto del beisbol en los anos 90 una decada de evolucion y transformacion": [
+                  "La evolución del juego",
+                  "Innovaciones en la defensa",
+                  "El papel del entrenador",
+                  "El impacto en las selecciones nacionales",
+                  "El papel del público",
+                  "Conclusión"
+                ]
+              },
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 977,
+              "final_word_count": 977,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          },
+          "57": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\15\\chapter_5\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 15,
+                  "title": "Beisbol en los 90",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 5",
+                  "number": 5,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Campeonato de Béisbol Mayor de Panamá",
+                    "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                    "source_type": "web_wikipedia",
+                    "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+                    "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+                  },
+                  {
+                    "title": "Béisbol en México",
+                    "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                    "source_type": "web_wikipedia",
+                    "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+                    "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+                  },
+                  {
+                    "title": "Selección de béisbol de Colombia",
+                    "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                    "source_type": "web_wikipedia",
+                    "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+                    "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+                  },
+                  {
+                    "title": "Campo de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+                    "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+                  },
+                  {
+                    "title": "Guante de béisbol",
+                    "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+                    "source_type": "web_wikipedia",
+                    "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+                    "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1988,
+                "tokens_output": 2000,
+                "word_count": 1224,
+                "text": "# Beisbol en los 90\n\n## El boom del beisbol en América Latina\n\nEl siglo XXI marcó un período de crecimiento y popularización del béisbol en América Latina, especialmente durante los años 90. Este fenómeno fue resultado de una combinación de factores que incluían la expansión deportiva internacional, la importancia económica de las ciudades latinas y el desarrollo tecnológico que facilitó el acceso a información sobre el juego.\n\n### La expansión deportiva internacional\n\nLa década de 1990 vio un aumento significativo en el intercambio de jugadores entre países. El Campeonato de Béisbol Mayor de Panamá, por ejemplo, se convirtió en uno de los torneos más importantes del mundo, atraído por la participación de equipos de Estados Unidos y Canadá junto con los latinos. Este evento no solo aumentó el reconocimiento del béisbol en la región, sino que también generó oportunidades para jugadores latinoamericanos de ascender al mayor nivel.\n\nAdemás, la Copa Mundial de Béisbol de 1992 tuvo un impacto profundo en la popularidad del juego. El evento se celebró en Cuba y Estados Unidos, lo que permitió a millones de espectadores disfrutar de las partidas en su hogar. La participación de jugadores latinoamericanos destacados como Pedro Martinez y Sammy Sosa también contribuyó al crecimiento del deporte.\n\n### La importancia económica\n\nEl desarrollo económico de muchas ciudades latinas durante los años 90 fue un factor clave en la popularización del béisbol. El aumento del nivel de vida permitió a más personas invertir en el juego, tanto como jugadores como espectadores. Las ciudades como Caracas (Venezuela), Bogotá (Colombia) y Lima (Perú) se convirtieron en centros de actividad deportiva, con estadios profesionales y torneos regulares.\n\nAdemás, la creciente importancia económica también llevó a la creación de equipos profesionales latinoamericanos. Equipos como el Toronto Blue Jays (Canadá), los Atlanta Braves (Estados Unidos) y los New York Yankees (Estados Unidos) comenzaron a incluir jugadores latinoamericanos en sus rosters, lo que aumentó su reconocimiento internacional.\n\n### El desarrollo tecnológico\n\nEl avance tecnológico durante los años 90 también contribuyó al crecimiento del béisbol en América Latina. La adopción de internet y la tecnología móvil permitieron a las personas acceder fácilmente a información sobre partidos, jugadores y equipos. Sitios web especializados en beisbol, como ESPN.com y MLB.com, se convirtieron en fuentes confiables de noticias y análisis.\n\nAdemás, el desarrollo de aplicaciones móviles para seguimiento de partidos y estadísticas del béisbol facilitó aún más la participación de los aficionados. Aplicaciones como MiBéisbol (Colombia) y Beisbol Latinoamericano (México) permitieron a los usuarios disfrutar de contenido en tiempo real y acceder a análisis detallados.\n\n### Los equipos latinoamericanos\n\nDurante los años 90, varios equipos latinoamericanos lograron importantes éxitos en el béisbol profesional. El Toronto Blue Jays, por ejemplo, ganó dos campeonatos mundiales consecutivos (1992 y 1993) con jugadores como Pedro Martinez y Sammy Sosa. Este éxito internacional aumentó la popularidad del béisbol en Latinoamérica y generó expectativas altas para los equipos locales.\n\nEn Colombia, el equipo de Beisbol Nacional ganó el Campeonato Sudamericano de Béisbol en 1993, lo que aumentó su reconocimiento tanto dentro como fuera del país. El equipo también participó en la Copa Mundial de Béisbol de 1992 y 1996.\n\nEn México, el equipo de Beisbol Nacional ganó el Campeonato Mexicano de Béisbol en 1993 y 1994, lo que aumentó su popularidad en la región. El equipo también participó en la Copa Mundial de Béisbol de 1992 y 1996.\n\n### Los jugadores latinoamericanos\n\nLos años 90 fueron una época dorada para los jugadores latinoamericanos en el béisbol profesional. Muchos de ellos lograron ascender al mayor nivel, tanto en equipos locales como internacionales. Pedro Martinez, por ejemplo, ganó dos campeonatos mundiales con el Toronto Blue Jays y fue inducto en el Salón de la Fama del Beisbol en 2006.\n\nSammy Sosa también logró éxito internacional durante los años 90, jugando para equipos como el Toronto Blue Jays y el Atlanta Braves. Su carrera en los Estados Unidos aumentó su reconocimiento global y generó expectativas altas para otros jugadores latinoamericanos.\n\nOtros jugadores destacados incluyen Rafael Palmeiro (Colombia), Albert Pujols (México) y Carlos Beltrán (Perú). Estos jugadores no solo lograron éxitos en el béisbol profesional, sino que también ayudaron a aumentar la popularidad del deporte en sus países de origen.\n\n### La cultura del beisbol\n\nLos años 90 también vieron un crecimiento en la cultura del beisbol en América Latina. El apoyo de los aficionados y la participación activa en el juego se convirtieron en parte importante de la identidad cultural de muchas ciudades latinas.\n\nLa celebración de torneos locales, como el Campeonato Sudamericano de Béisbol, se convirtió en eventos importantes para la comunidad. Los aficionados disfrutaban de partidos en vivo, comidas típicas y actividades culturales relacionadas con el deporte.\n\nAdemás, el béisbol se convirtió en un medio de comunicación y expresión cultural. Muchos jugadores latinoamericanos compartían sus experiencias y logros en redes sociales, lo que aumentó su reconocimiento global y generó una comunidad de fans activa.\n\n### La importancia del beisbol para la economía\n\nEl béisbol también tuvo un impacto significativo en la economía de muchas ciudades latinas durante los años 90. El desarrollo de estadios profesionales, como el Estadio José María Córdova (Colombia) y el Estadio Azteca (México), generó empleo y atrajo inversiones turísticas.\n\nAdemás, la popularidad del béisbol aumentó las ventas de entradas y productos relacionados con el deporte. Tiendas especializadas en beisbol se abrieron en muchas ciudades latinas, ofreciendo ropa, juguetes y accesorios para los aficionados.\n\n### La importancia del beisbol para la sociedad\n\nEl béisbol también tuvo un impacto significativo en la sociedad de las ciudades latinas durante los años 90. El deporte se convirtió en una forma de diversión y entretenimiento, especialmente para las familias más jóvenes.\n\nAdemás, el béisbol se convirtió en un medio de expresión social y política. Muchos jugadores latinoamericanos utilizaron su plataforma para hablar sobre temas sociales importantes, como la inmigración y la discriminación racial.\n\n### La importancia del beisbol para la cultura popular\n\nEl béisbol también tuvo un impacto significativo en la cultura popular de las ciudades latinas durante los años 90. El deporte se convirtió en una parte importante de la cultura urbana, con festividades y eventos relacionados con el juego.\n\nAdemás, el béisbol se convirtió en un medio de expresión artística. Muchos artistas latinoamericanos crearon canciones sobre el deporte, lo que aumentó su reconocimiento global y generó una comunidad de fans activa.\n\n### Conclusión\n\nEn conclusión, los años 90 fueron un período de crecimiento y popularización del béisbol en América Latina. La expansión deportiva internacional, la importancia económica de las ciudades latinas y el desarrollo tecnológico facilitaron el acceso a información sobre el juego y aumentaron su reconocimiento global.\n\nLos equipos latinoamericanos lograron importantes éxitos en el béisbol profesional, lo que aumentó su popularidad tanto dentro como fuera del continente. Los jugadores latinoamericanos también lograron éxito internacional, lo que generó expectativas altas para otros jugadores y ayudó a aumentar la popularidad del deporte.\n\nLa cultura del beisbol se convirtió en parte importante de la identidad cultural de muchas ciudades latinas, con eventos importantes como el Campeonato Sudamericano de Béisbol. El béisbol también tuvo un impacto significativo en la economía y la sociedad de las ciudades latinas, siendo una forma de diversión y entretenimiento para las familias más jóvenes.\n\nEn resumen, los años 90 fueron un período dorada para el béisbol en América Latina, con un crecimiento significativo en su popularidad y reconocimiento global.",
+                "unexpected_sections": [
+                  "El boom del beisbol en América Latina"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {
+                  "el boom del beisbol en america latina": [
+                    "La expansión deportiva internacional",
+                    "La importancia económica",
+                    "El desarrollo tecnológico",
+                    "Los equipos latinoamericanos",
+                    "Los jugadores latinoamericanos",
+                    "La cultura del beisbol",
+                    "La importancia del beisbol para la economía",
+                    "La importancia del beisbol para la sociedad",
+                    "La importancia del beisbol para la cultura popular",
+                    "Conclusión"
+                  ]
+                },
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 1224,
+                "final_word_count": 1224,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 1224,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+                "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+                "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+                "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+                "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (1224)",
+                "secciones fuera del outline detectadas: El boom del beisbol en América Latina"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1988,
+              "tokens_output": 2000,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "El boom del beisbol en América Latina"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {
+                "el boom del beisbol en america latina": [
+                  "La expansión deportiva internacional",
+                  "La importancia económica",
+                  "El desarrollo tecnológico",
+                  "Los equipos latinoamericanos",
+                  "Los jugadores latinoamericanos",
+                  "La cultura del beisbol",
+                  "La importancia del beisbol para la economía",
+                  "La importancia del beisbol para la sociedad",
+                  "La importancia del beisbol para la cultura popular",
+                  "Conclusión"
+                ]
+              },
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 1224,
+              "final_word_count": 1224,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          }
+        },
+        "total": 5,
+        "done": 5
+      }
+    },
+    {
+      "id": "fact_check",
+      "label": "FACT CHECK",
+      "capability": "fact_check_chapter",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:38:23",
+      "completed_at": "2026-08-14 19:38:45",
+      "duration": 21.721,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 5,
+          "done": 5
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "fact_checker",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "53": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "fact_checker",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "status": "PASS",
+              "claims_checked": 0,
+              "issues": [],
+              "corrections": [],
+              "unsupported_claims": [],
+              "supported_claims": 0,
+              "conflicting_claims": 0,
+              "quality_gate": "PASS",
+              "execution_mode": "real"
+            }
+          },
+          "54": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "fact_checker",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "status": "PASS",
+              "claims_checked": 0,
+              "issues": [],
+              "corrections": [],
+              "unsupported_claims": [],
+              "supported_claims": 0,
+              "conflicting_claims": 0,
+              "quality_gate": "PASS",
+              "execution_mode": "real"
+            }
+          },
+          "55": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "fact_checker",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "status": "PASS",
+              "claims_checked": 0,
+              "issues": [],
+              "corrections": [],
+              "unsupported_claims": [],
+              "supported_claims": 0,
+              "conflicting_claims": 0,
+              "quality_gate": "PASS",
+              "execution_mode": "real"
+            }
+          },
+          "56": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "fact_checker",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "status": "PASS",
+              "claims_checked": 0,
+              "issues": [],
+              "corrections": [],
+              "unsupported_claims": [],
+              "supported_claims": 0,
+              "conflicting_claims": 0,
+              "quality_gate": "PASS",
+              "execution_mode": "real"
+            }
+          },
+          "57": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "fact_checker",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "status": "PASS",
+              "claims_checked": 0,
+              "issues": [],
+              "corrections": [],
+              "unsupported_claims": [],
+              "supported_claims": 0,
+              "conflicting_claims": 0,
+              "quality_gate": "PASS",
+              "execution_mode": "real"
+            }
+          }
+        },
+        "total": 5,
+        "done": 5
+      }
+    },
+    {
+      "id": "editor",
+      "label": "EDITOR",
+      "capability": "edit_chapter",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:38:45",
+      "completed_at": "2026-08-14 19:40:50",
+      "duration": 125.009,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 5,
+          "done": 5
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "editor",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "53": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "editor",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "edited_text": "# Beisbol en los 90\n\n## Introducción\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo explora las evoluciones tecnológicas y deportivas que definieron esta era del juego, desde los avances en el equipamiento hasta los desafíos ambientales y las innovaciones en el análisis estadístico.\n\n## Evolución del Equipamiento\n\nLa década de 1990 vio importantes mejoras en el equipamiento utilizado por los jugadores. El campo de béisbol experimentó cambios significativos, con nuevas superficies y materiales que buscaban aumentar la velocidad de las pelotas y mejorar la durabilidad del terreno.\n\n### Campo de Béisbol\n\nEl campo de béisbol se modernizó en varias áreas durante esta década. La introducción de superficies sintéticas como el turf artificial fue un hito importante, ya que ofrecía una mayor consistencia y menos mantenimiento que los campos tradicionales de césped natural. Además, las barreras de seguridad fueron elevadas para proteger a los jugadores contra pelotas más veloces.\n\n### Guante de Béisbol\n\nEl guante de béisbol también experimentó avances significativos en la década de 1990. La introducción de materiales como el polipropileno y el neoprene permitió crear guantes más resistentes y cómodos para los jugadores. Además, el diseño del guante se volvió más ergonómico, con dedos separados para una mayor precisión en las lanzamientos.\n\n## Innovaciones Tecnológicas\n\nLa década de 1990 fue un período de innovación tecnológica en el béisbol, con desarrollos que mejoraron tanto la experiencia del jugador como la eficiencia del entrenamiento y la gestión del equipo.\n\n### Análisis Estadístico\n\nEl análisis estadístico se convirtió en una herramienta crucial para los equipos durante esta década. El uso de software especializado permitía recopilar y analizar datos sobre el rendimiento de los jugadores, lo que ayudaba a identificar fortalezas y debilidades y a optimizar la formación del equipo.\n\n### Tecnología de Seguridad\n\nLa tecnología de seguridad también experimentó avances significativos en la década de 1990. El uso de cámaras de seguridad y sistemas de seguimiento permitía monitorear el movimiento de los jugadores en el campo, lo que ayudaba a prevenir lesiones y mejorar la eficiencia del juego.\n\n## Desafíos Ambientales\n\nLa década de 1990 también fue un período de desafíos ambientales para el béisbol. El uso intensivo de pesticidas y fertilizantes en los campos de béisbol generó preocupaciones sobre su impacto medioambiental, lo que llevó a la búsqueda de alternativas más sostenibles.\n\n### Cambios en el Uso de Químicos\n\nLa década de 1990 vio un aumento en el uso de químicos biodegradables y menos tóxicos para los campos de béisbol. Además, se implementaron programas de reciclaje y gestión del residuo para reducir la huella ambiental del juego.\n\n### Cambios en el Diseño del Campo\n\nEl diseño del campo también experimentó cambios significativos durante esta década. La introducción de superficies sintéticas y materiales más duraderos permitió reducir la necesidad de uso de químicos, lo que contribuyó a una mayor sostenibilidad.\n\n## Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado las evoluciones tecnológicas y deportivas que definieron esta era del juego, desde los avances en el equipamiento hasta los desafíos ambientales y las innovaciones en el análisis estadístico.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura.",
+                "Salida demasiado corta (581 palabras, mínimo 1500). Se conserva el original."
+              ],
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor).",
+                "Fallback por longitud insuficiente."
+              ],
+              "input_words": 581,
+              "output_words": 581,
+              "placeholder_detected": false,
+              "quality_gate": "FAIL",
+              "execution_mode": "fallback"
+            }
+          },
+          "54": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "editor",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "edited_text": "# Capítulo 2\n\n## El campo de béisbol: un espacio de juego y cultura\n\nEl campo de béisbol es más que solo un lugar donde se juega el deporte; es una parte integral de la cultura estadounidense y mundial. Desde su origen en el siglo XIX, este campo ha evolucionado significativamente, adaptándose a las necesidades cambiantes del juego y de los espectadores.\n\n### La estructura del campo\n\nEl campo de béisbol está compuesto por varias áreas principales: la cancha principal, la casa de home plate, el pitcher's mound, las bases y las líneas de primer base y tercer base. Cada una de estas secciones tiene un propósito específico y juega un papel crucial en el juego.\n\nLa cancha principal es el área rectangular donde se realiza la mayor parte del juego. Está dividida por dos líneas laterales y una línea central, que marca el home plate. El pitcher's mound está ubicado cerca del home plate y es donde el lanzador lanza la pelota.\n\nLas bases están dispuestas en forma de cuadrado, con primer base, segundo base y tercer base. Cada base tiene un marcador para indicar cuándo un corredor llega a ella. El objetivo del juego es marcar todas las bases en orden y llegar al home plate.\n\nLa línea de primer base y la línea de tercer base son líneas que conectan las primeras y terceras bases, respectivamente. Estas líneas son importantes para determinar si un corredor está dentro o fuera del campo de juego.\n\n### El guante de béisbol: una herramienta esencial\n\nEl guante de béisbol es una pieza fundamental del equipo de los jugadores. Su diseño y construcción han evolucionado significativamente a lo largo del tiempo, adaptándose a las necesidades cambiantes del juego y mejorando la eficiencia de los lanzadores.\n\nEl guante de béisbol está compuesto por varias partes principales: el palco, el guante principal y el guante de dedos. El palco es la parte inferior del guante que se sitúa sobre el hombro del jugador. El guante principal es la parte superior que abarca la mano del lanzador. El guante de dedos es la parte más pequeña que cubre los dedos del lanzador.\n\nEl diseño del guante de béisbol ha evolucionado para mejorar la eficiencia y el control del lanzador. Los guantes modernos están hechos de materiales ligeros pero duraderos, como polipropileno o neoprene. También tienen una estructura interna que ayuda a mantener la forma durante las largas sesiones de juego.\n\n### El campo de béisbol en el siglo XXI\n\nEl campo de béisbol ha experimentado importantes cambios en el siglo XXI, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de estos cambios incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\n#### Tecnologías avanzadas en el campo de béisbol\n\nLa tecnología ha jugado un papel crucial en el desarrollo del campo de béisbol. Algunos de los avances más significativos incluyen:\n\n- **Monitoreo de rendimiento**: Las tecnologías de seguimiento y análisis de datos han permitido a los equipos monitorear el rendimiento de sus jugadores en tiempo real. Esto les permite identificar áreas de mejora y hacer ajustes en su estrategia de juego.\n\n- **Análisis de video**: El uso de cámaras de alta definición ha facilitado el análisis de jugadas complejas. Los entrenadores pueden revisar gráficos detallados de las jugadas para mejorar la eficiencia de sus tácticas.\n\n- **Simulación virtual**: Las simulaciones virtuales han permitido a los equipos practicar situaciones difíciles sin tener que enfrentarse a otros equipos reales. Esto les ha dado una ventaja competitiva en el campo.\n\n#### Evolución del diseño del campo\n\nEl diseño del campo de béisbol también ha evolucionado para mejorar la experiencia del espectador y el rendimiento de los jugadores. Algunos de los cambios más significativos incluyen:\n\n- **Iluminación**: El uso de luces LED ha permitido iluminar el campo durante las noches, lo que ha aumentado la popularidad del béisbol nocturno.\n\n- **Asientos**: Los asientos modernos son más cómodos y seguros. Algunos equipos han adoptado sistemas de asiento inteligente que pueden moverse para permitir una mejor visión del juego.\n\n- **Líneas de base**: Las líneas de base modernas son más precisas y duraderas, lo que ha reducido la posibilidad de errores en los jugadores.\n\n#### Creciente popularidad del béisbol digital\n\nEl béisbol digital también ha experimentado un crecimiento significativo en el siglo XXI. Algunos de los avances más importantes incluyen:\n\n- **Videojuegos**: Los videojuegos de béisbol han permitido a millones de jugadores experimentar el juego desde sus hogares. Algunos de los juegos más populares incluyen \"MLB 21\" y \"Madden NFL\".\n\n- **Aplicaciones móviles**: Las aplicaciones móviles como \"Baseball Mogul\" y \"The Bat\" permiten a los jugadores crear y gestionar equipos virtuales.\n\n- **Streaming**: La popularidad del béisbol ha llevado a la creación de canales de streaming dedicados al deporte. Algunos de los canales más populares incluyen \"MLB Network\" y \"ESPN\".\n\n### El campo de béisbol en otros países\n\nEl campo de béisbol no es solo un espacio de juego en Estados Unidos; también tiene una importante presencia en otros países, especialmente en América Latina.\n\n#### Béisbol en Panamá\n\nPanamá ha tenido un fuerte tradición en el béisbol. El Campeonato de Béisbol Mayor de Panamá es uno de los torneos más importantes del país y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n#### Béisbol en México\n\nMéxico también tiene una importante tradición en el béisbol. El Campeonato de Béisbol Mayor de México es uno de los torneos más importantes del país y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n#### Selección de béisbol de Colombia\n\nColombia también tiene una importante tradición en el béisbol. La selección colombiana ha participado en varios torneos internacionales y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n### Conclusión\n\nEl campo de béisbol es un espacio de juego y cultura que ha evolucionado significativamente a lo largo del tiempo. Desde su origen en el siglo XIX, este campo ha experimentado importantes cambios, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de los avances más significativos incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\nEl campo de béisbol también tiene una importante presencia en otros países, especialmente en América Latina. Panamá, México y Colombia son solo algunos de los países que tienen una fuerte tradición en el béisbol.\n\nEn conclusión, el campo de béisbol es un espacio de juego y cultura que ha experimentado importantes cambios a lo largo del tiempo. Desde su origen en el siglo XIX, este campo ha experimentado importantes cambios, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de los avances más significativos incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\n## Fuentes utilizadas\n\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura.",
+                "Salida demasiado corta (1161 palabras, mínimo 1500). Se conserva el original."
+              ],
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor).",
+                "Fallback por longitud insuficiente."
+              ],
+              "input_words": 1161,
+              "output_words": 1161,
+              "placeholder_detected": false,
+              "quality_gate": "FAIL",
+              "execution_mode": "fallback"
+            }
+          },
+          "55": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "editor",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "edited_text": "# Capítulo 3\n\n## El Béisbol en los 90: Una Era de Innovación y Competencia\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por una mezcla de innovaciones tecnológicas, cambios en las reglas del juego y una intensificación de la competencia internacional. Durante este tiempo, el béisbol experimentó avances significativos que reflejaron los movimientos generales de la cultura y la sociedad en ese período.\n\n### Innovaciones Tecnológicas\n\nLa década de 1990 fue un momento de gran progreso tecnológico en el béisbol. La introducción de nuevas tecnologías permitió a las equipos mejorar su rendimiento, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\n#### El Guante de Béisbol\n\nEl guante de béisbol fue una innovación crucial durante esta década. Los fabricantes desarrollaron nuevos materiales y diseños que ofrecían mayor resistencia y comodidad a los jugadores. El uso del guante de béisbol evolucionó significativamente, con la introducción de nuevas tecnologías como el poliéster y el Kevlar, que proporcionaban una mejor protección contra las pelotas.\n\nEl poliéster fue un material revolucionario en el mundo del béisbol. Su ligereza y resistencia lo convirtieron en el material preferido para los guantes de béisbol durante la década de 1990. El Kevlar, por otro lado, ofrecía una mayor protección contra las pelotas de alta velocidad, lo que era crucial en un juego donde la seguridad del jugador es primordial.\n\nAdemás, la tecnología del poliéster permitió a los jugadores ajustar el tamaño y forma del guante según su preferencia. Esto fue especialmente importante para los jugadores de béisbol profesionales, quienes buscaban una combinación perfecta de comodidad y protección.\n\n#### El Campo de Béisbol\n\nEl campo de béisbol también experimentó avances significativos durante la década de 1990. La introducción de nuevas tecnologías permitió a los equipos mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\nLa tecnología del poliéster fue un material revolucionario en el mundo del béisbol. Su ligereza y resistencia lo convirtieron en el material preferido para las cubetas de béisbol durante la década de 1990. El Kevlar, por otro lado, ofrecía una mayor protección contra las pelotas de alta velocidad, lo que era crucial en un juego donde la seguridad del jugador es primordial.\n\nAdemás, la tecnología del poliéster permitió a los jugadores ajustar el tamaño y forma de la cubeta según su preferencia. Esto fue especialmente importante para los jugadores de béisbol profesionales, quienes buscaban una combinación perfecta de comodidad y protección.\n\n### Cambios en las Reglas del Juego\n\nLa década de 1990 también fue un período de cambios importantes en las reglas del béisbol. El objetivo era mejorar el juego y hacerlo más atractivo para los espectadores, lo que llevó a la introducción de nuevas reglas y modificaciones.\n\n#### La Bola de Control\n\nLa bola de control fue una innovación importante durante esta década. La bola de control permitía a los jugadores mantener la pelota en su posesión durante un período más largo, lo que aumentaba el ritmo del juego y reducía las oportunidades de errores.\n\nAdemás, la bola de control permitió a los equipos mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores. La introducción de esta regla fue una respuesta a la creciente presión para que los equipos jueguen más rápido y reduzcan el tiempo de descanso entre juegos.\n\n#### El Tiempo Extra\n\nEl tiempo extra fue otra innovación importante durante la década de 1990. El tiempo extra permitía a los equipos jugar más partidos, lo que aumentaba la competencia internacional y la visibilidad del béisbol en todo el mundo.\n\nAdemás, el tiempo extra permitió a los jugadores mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores. La introducción de esta regla fue una respuesta a la creciente presión para que los equipos jueguen más rápido y reduzcan el tiempo de descanso entre juegos.\n\n### Competencia Internacional\n\nLa década de 1990 también fue un período de intensificación de la competencia internacional en el béisbol. El objetivo era mejorar el juego y hacerlo más atractivo para los espectadores, lo que llevó a la introducción de nuevas reglas y modificaciones.\n\n#### La Selección de Béisbol de Colombia\n\nLa selección de béisbol de Colombia fue una de las destacadas del mundo durante esta década. El equipo colombiano experimentó un gran éxito en el torneo de Campeonato de Béisbol Mayor de Panamá, donde obtuvo el primer título continental.\n\nEl éxito del equipo colombiano fue resultado de la combinación de talento natural y entrenamiento riguroso. Los jugadores colombianos trabajaron duro para mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\nAdemás, el éxito del equipo colombiano fue resultado de la colaboración entre los jugadores, el entrenador y el personal técnico. La combinación de talento natural y entrenamiento riguroso permitió a los jugadores colombianos superar las dificultades y alcanzar sus metas.\n\n#### El Béisbol en México\n\nEl béisbol en México también experimentó un gran éxito durante esta década. El equipo mexicano obtuvo el primer título continental en el Campeonato de Béisbol Mayor de Panamá, lo que fue un logro histórico para la historia del béisbol en México.\n\nEl éxito del equipo mexicano fue resultado de la combinación de talento natural y entrenamiento riguroso. Los jugadores mexicanos trabajaron duro para mejorar su rendimiento en el campo, optimizar sus estrategias y aumentar la seguridad de los jugadores.\n\nAdemás, el éxito del equipo mexicano fue resultado de la colaboración entre los jugadores, el entrenador y el personal técnico. La combinación de talento natural y entrenamiento riguroso permitió a los jugadores mexicanos superar las dificultades y alcanzar sus metas.\n\n### Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por una mezcla de innovaciones tecnológicas, cambios en las reglas del juego y una intensificación de la competencia internacional. Durante este tiempo, el béisbol experimentó avances significativos que reflejaron los movimientos generales de la cultura y la sociedad en ese período.\n\nLa introducción de nuevas tecnologías permitió a las equipos mejorar su rendimiento, optimizar sus estrategias y aumentar la seguridad de los jugadores. La bola de control y el tiempo extra fueron innovaciones importantes durante esta década, que permitieron a los equipos jugar más rápido y reducir el tiempo de descanso entre juegos.\n\nLa competencia internacional también fue un factor importante durante esta década. El equipo colombiano obtuvo el primer título continental en el Campeonato de Béisbol Mayor de Panamá, lo que fue un logro histórico para la historia del béisbol en Colombia. El equipo mexicano también experimentó un gran éxito durante esta década, obteniendo el primer título continental en el mismo torneo.\n\nEn conclusión, la década de 1990 fue un período crucial para el béisbol, marcado por una mezcla de innovaciones tecnológicas, cambios en las reglas del juego y una intensificación de la competencia internacional. Durante este tiempo, el béisbol experimentó avances significativos que reflejaron los movimientos generales de la cultura y la sociedad en ese período.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura.",
+                "Salida demasiado corta (1195 palabras, mínimo 1500). Se conserva el original."
+              ],
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor).",
+                "Fallback por longitud insuficiente."
+              ],
+              "input_words": 1195,
+              "output_words": 1195,
+              "placeholder_detected": false,
+              "quality_gate": "FAIL",
+              "execution_mode": "fallback"
+            }
+          },
+          "56": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "editor",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "edited_text": "# Capítulo 4\n\n## El impacto del béisbol en los años 90: una década de evolución y transformación\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo explora cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\n### La evolución del juego\n\nLa década de 1990 vio un importante cambio en el estilo de juego. Los equipos comenzaron a enfocarse más en el lanzamiento de cambios y en la defensa, lo que llevó a una mayor importancia del batería de cerradura. El \"pitching machine\" se convirtió en una herramienta esencial para entrenar a los lanzadores, permitiendo un control preciso sobre la velocidad y dirección de las pelotas.\n\nAdemás, el uso de tecnologías como el radar de velocidades y el análisis de video se volvió cada vez más prevalente. Estas herramientas ayudaron a los entrenadores a identificar fortalezas y debilidades en los oponentes, lo que permitió desarrollar tácticas más efectivas.\n\n### Innovaciones en la defensa\n\nLa defensa también experimentó cambios significativos durante esta década. La introducción del \"rope-a-dope\" como una estrategia de cerradura fue un ejemplo claro de cómo los equipos buscaban mantener el juego a su favor. Además, el uso de jugadores de batería de cerradura con habilidades excepcionales en la defensa del ronco y la velocidad en el campo de béisbol se volvió más común.\n\nLa evolución del sistema de rotación también fue un factor importante. Los equipos comenzaron a experimentar con diferentes sistemas de rotación, buscando encontrar el equilibrio perfecto entre lanzadores de alta velocidad y defensores versátiles.\n\n### El papel del entrenador\n\nDurante la década de 1990, los entrenadores experimentaron una transformación en su rol dentro del equipo. La tecnología y el análisis de datos se convirtieron en herramientas esenciales para el desarrollo de tácticas y estrategias. Los entrenadores comenzaron a utilizar software especializado para analizar el rendimiento de sus jugadores, lo que les permitía identificar áreas de mejora y optimizar su juego.\n\nAdemás, la comunicación entre los entrenadores y los jugadores también experimentó un cambio. La introducción del \"walkman\" como una herramienta de comunicación entre los entrenadores y los jugadores en el campo fue un ejemplo claro de cómo esta tecnología influyó en la dinámica del equipo.\n\n### El impacto en las selecciones nacionales\n\nLa década de 1990 también tuvo un impacto significativo en las selecciones nacionales de béisbol. En Colombia, por ejemplo, el equipo nacional experimentó una transformación importante durante esta década. La introducción de nuevas tácticas y tecnologías ayudó a los jugadores colombianos a mejorar su rendimiento en el campo.\n\nEn Panamá, la selección nacional también experimentó cambios significativos. La introducción de jugadores con habilidades excepcionales en la defensa del ronco y la velocidad en el campo permitió a los panameños competir con equipos más fuertes internacionales.\n\n### El papel del público\n\nLa década de 1990 también tuvo un impacto significativo en el público que disfrutaba del béisbol. La introducción de nuevas tecnologías como el radar de velocidades y el análisis de video permitió a los espectadores seguir más de cerca el juego, lo que aumentó la apreciación del deporte.\n\nAdemás, la popularización del béisbol en medios de comunicación también fue un factor importante. La televisión y las redes sociales se convirtieron en plataformas esenciales para seguir el juego, lo que permitió a más personas disfrutar del béisbol durante esta década.\n\n### Conclusión\n\nLa década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\nLa evolución del juego durante esta década fue marcada por un cambio en el estilo de juego. Los equipos comenzaron a enfocarse más en el lanzamiento de cambios y en la defensa, lo que llevó a una mayor importancia del batería de cerradura. El uso de tecnologías como el radar de velocidades y el análisis de video se volvió cada vez más prevalente, ayudando a los entrenadores a identificar fortalezas y debilidades en los oponentes.\n\nLa defensa también experimentó cambios significativos durante esta década. La introducción del \"rope-a-dope\" como una estrategia de cerradura fue un ejemplo claro de cómo los equipos buscaban mantener el juego a su favor. Además, el uso de jugadores de batería de cerradura con habilidades excepcionales en la defensa del ronco y la velocidad en el campo se volvió más común.\n\nDurante la década de 1990, los entrenadores experimentaron una transformación en su rol dentro del equipo. La tecnología y el análisis de datos se convirtieron en herramientas esenciales para el desarrollo de tácticas y estrategias. Los entrenadores comenzaron a utilizar software especializado para analizar el rendimiento de sus jugadores, lo que les permitía identificar áreas de mejora y optimizar su juego.\n\nLa popularización del béisbol en medios de comunicación también fue un factor importante durante esta década. La televisión y las redes sociales se convirtieron en plataformas esenciales para seguir el juego, lo que permitió a más personas disfrutar del béisbol durante esta década.\n\nEn conclusión, la década de 1990 fue un período crucial para el béisbol, marcado por cambios significativos tanto en el campo como en la sala de entrenamiento. Este capítulo ha explorado cómo esta década revolucionó el juego, introduciendo nuevas tácticas, tecnologías y estilos de juego que han influido en la forma en que se juega el béisbol hasta nuestros días.\n\n## Fuentes utilizadas\n\n- [Campeonato de Béisbol Mayor de Panamá (web_wikipedia)]\n- [Béisbol en México (web_wikipedia)]\n- [Selección de béisbol de Colombia (web_wikipedia)]\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura.",
+                "Salida demasiado corta (977 palabras, mínimo 1500). Se conserva el original."
+              ],
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor).",
+                "Fallback por longitud insuficiente."
+              ],
+              "input_words": 977,
+              "output_words": 977,
+              "placeholder_detected": false,
+              "quality_gate": "FAIL",
+              "execution_mode": "fallback"
+            }
+          },
+          "57": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "editor",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "edited_text": "# Beisbol en los 90\n\n## El boom del beisbol en América Latina\n\nEl siglo XXI marcó un período de crecimiento y popularización del béisbol en América Latina, especialmente durante los años 90. Este fenómeno fue resultado de una combinación de factores que incluían la expansión deportiva internacional, la importancia económica de las ciudades latinas y el desarrollo tecnológico que facilitó el acceso a información sobre el juego.\n\n### La expansión deportiva internacional\n\nLa década de 1990 vio un aumento significativo en el intercambio de jugadores entre países. El Campeonato de Béisbol Mayor de Panamá, por ejemplo, se convirtió en uno de los torneos más importantes del mundo, atraído por la participación de equipos de Estados Unidos y Canadá junto con los latinos. Este evento no solo aumentó el reconocimiento del béisbol en la región, sino que también generó oportunidades para jugadores latinoamericanos de ascender al mayor nivel.\n\nAdemás, la Copa Mundial de Béisbol de 1992 tuvo un impacto profundo en la popularidad del juego. El evento se celebró en Cuba y Estados Unidos, lo que permitió a millones de espectadores disfrutar de las partidas en su hogar. La participación de jugadores latinoamericanos destacados como Pedro Martinez y Sammy Sosa también contribuyó al crecimiento del deporte.\n\n### La importancia económica\n\nEl desarrollo económico de muchas ciudades latinas durante los años 90 fue un factor clave en la popularización del béisbol. El aumento del nivel de vida permitió a más personas invertir en el juego, tanto como jugadores como espectadores. Las ciudades como Caracas (Venezuela), Bogotá (Colombia) y Lima (Perú) se convirtieron en centros de actividad deportiva, con estadios profesionales y torneos regulares.\n\nAdemás, la creciente importancia económica también llevó a la creación de equipos profesionales latinoamericanos. Equipos como el Toronto Blue Jays (Canadá), los Atlanta Braves (Estados Unidos) y los New York Yankees (Estados Unidos) comenzaron a incluir jugadores latinoamericanos en sus rosters, lo que aumentó su reconocimiento internacional.\n\n### El desarrollo tecnológico\n\nEl avance tecnológico durante los años 90 también contribuyó al crecimiento del béisbol en América Latina. La adopción de internet y la tecnología móvil permitieron a las personas acceder fácilmente a información sobre partidos, jugadores y equipos. Sitios web especializados en beisbol, como ESPN.com y MLB.com, se convirtieron en fuentes confiables de noticias y análisis.\n\nAdemás, el desarrollo de aplicaciones móviles para seguimiento de partidos y estadísticas del béisbol facilitó aún más la participación de los aficionados. Aplicaciones como MiBéisbol (Colombia) y Beisbol Latinoamericano (México) permitieron a los usuarios disfrutar de contenido en tiempo real y acceder a análisis detallados.\n\n### Los equipos latinoamericanos\n\nDurante los años 90, varios equipos latinoamericanos lograron importantes éxitos en el béisbol profesional. El Toronto Blue Jays, por ejemplo, ganó dos campeonatos mundiales consecutivos (1992 y 1993) con jugadores como Pedro Martinez y Sammy Sosa. Este éxito internacional aumentó la popularidad del béisbol en Latinoamérica y generó expectativas altas para los equipos locales.\n\nEn Colombia, el equipo de Beisbol Nacional ganó el Campeonato Sudamericano de Béisbol en 1993, lo que aumentó su reconocimiento tanto dentro como fuera del país. El equipo también participó en la Copa Mundial de Béisbol de 1992 y 1996.\n\nEn México, el equipo de Beisbol Nacional ganó el Campeonato Mexicano de Béisbol en 1993 y 1994, lo que aumentó su popularidad en la región. El equipo también participó en la Copa Mundial de Béisbol de 1992 y 1996.\n\n### Los jugadores latinoamericanos\n\nLos años 90 fueron una época dorada para los jugadores latinoamericanos en el béisbol profesional. Muchos de ellos lograron ascender al mayor nivel, tanto en equipos locales como internacionales. Pedro Martinez, por ejemplo, ganó dos campeonatos mundiales con el Toronto Blue Jays y fue inducto en el Salón de la Fama del Beisbol en 2006.\n\nSammy Sosa también logró éxito internacional durante los años 90, jugando para equipos como el Toronto Blue Jays y el Atlanta Braves. Su carrera en los Estados Unidos aumentó su reconocimiento global y generó expectativas altas para otros jugadores latinoamericanos.\n\nOtros jugadores destacados incluyen Rafael Palmeiro (Colombia), Albert Pujols (México) y Carlos Beltrán (Perú). Estos jugadores no solo lograron éxitos en el béisbol profesional, sino que también ayudaron a aumentar la popularidad del deporte en sus países de origen.\n\n### La cultura del beisbol\n\nLos años 90 también vieron un crecimiento en la cultura del beisbol en América Latina. El apoyo de los aficionados y la participación activa en el juego se convirtieron en parte importante de la identidad cultural de muchas ciudades latinas.\n\nLa celebración de torneos locales, como el Campeonato Sudamericano de Béisbol, se convirtió en eventos importantes para la comunidad. Los aficionados disfrutaban de partidos en vivo, comidas típicas y actividades culturales relacionadas con el deporte.\n\nAdemás, el béisbol se convirtió en un medio de comunicación y expresión cultural. Muchos jugadores latinoamericanos compartían sus experiencias y logros en redes sociales, lo que aumentó su reconocimiento global y generó una comunidad de fans activa.\n\n### La importancia del beisbol para la economía\n\nEl béisbol también tuvo un impacto significativo en la economía de muchas ciudades latinas durante los años 90. El desarrollo de estadios profesionales, como el Estadio José María Córdova (Colombia) y el Estadio Azteca (México), generó empleo y atrajo inversiones turísticas.\n\nAdemás, la popularidad del béisbol aumentó las ventas de entradas y productos relacionados con el deporte. Tiendas especializadas en beisbol se abrieron en muchas ciudades latinas, ofreciendo ropa, juguetes y accesorios para los aficionados.\n\n### La importancia del beisbol para la sociedad\n\nEl béisbol también tuvo un impacto significativo en la sociedad de las ciudades latinas durante los años 90. El deporte se convirtió en una forma de diversión y entretenimiento, especialmente para las familias más jóvenes.\n\nAdemás, el béisbol se convirtió en un medio de expresión social y política. Muchos jugadores latinoamericanos utilizaron su plataforma para hablar sobre temas sociales importantes, como la inmigración y la discriminación racial.\n\n### La importancia del beisbol para la cultura popular\n\nEl béisbol también tuvo un impacto significativo en la cultura popular de las ciudades latinas durante los años 90. El deporte se convirtió en una parte importante de la cultura urbana, con festividades y eventos relacionados con el juego.\n\nAdemás, el béisbol se convirtió en un medio de expresión artística. Muchos artistas latinoamericanos crearon canciones sobre el deporte, lo que aumentó su reconocimiento global y generó una comunidad de fans activa.\n\n### Conclusión\n\nEn conclusión, los años 90 fueron un período de crecimiento y popularización del béisbol en América Latina. La expansión deportiva internacional, la importancia económica de las ciudades latinas y el desarrollo tecnológico facilitaron el acceso a información sobre el juego y aumentaron su reconocimiento global.\n\nLos equipos latinoamericanos lograron importantes éxitos en el béisbol profesional, lo que aumentó su popularidad tanto dentro como fuera del continente. Los jugadores latinoamericanos también lograron éxito internacional, lo que generó expectativas altas para otros jugadores y ayudó a aumentar la popularidad del deporte.\n\nLa cultura del beisbol se convirtió en parte importante de la identidad cultural de muchas ciudades latinas, con eventos importantes como el Campeonato Sudamericano de Béisbol. El béisbol también tuvo un impacto significativo en la economía y la sociedad de las ciudades latinas, siendo una forma de diversión y entretenimiento para las familias más jóvenes.\n\nEn resumen, los años 90 fueron un período dorada para el béisbol en América Latina, con un crecimiento significativo en su popularidad y reconocimiento global.",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura.",
+                "Salida demasiado corta (1224 palabras, mínimo 1500). Se conserva el original."
+              ],
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor).",
+                "Fallback por longitud insuficiente."
+              ],
+              "input_words": 1224,
+              "output_words": 1224,
+              "placeholder_detected": false,
+              "quality_gate": "FAIL",
+              "execution_mode": "fallback"
+            }
+          }
+        },
+        "total": 5,
+        "done": 5
+      }
+    },
+    {
+      "id": "quality_gate",
+      "label": "QUALITY GATE",
+      "capability": "final_quality_control",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:40:50",
+      "completed_at": "2026-08-14 19:40:50",
+      "duration": 0.072,
+      "attempts": 1,
+      "metrics": {
+        "overall_status": "WARNING",
+        "is_complete": true,
+        "book_checks": [
+          {
+            "status": "PASS",
+            "message": "Libro existe"
+          },
+          {
+            "status": "PASS",
+            "message": "Metadatos completos"
+          },
+          {
+            "status": "PASS",
+            "message": "Índice presente (se generará a partir de los capítulos)"
+          },
+          {
+            "status": "PASS",
+            "message": "Capítulos presentes"
+          }
+        ],
+        "chapter_checks": [
+          {
+            "status": "PASS",
+            "message": "Capítulos suficientes: 5"
+          },
+          {
+            "status": "PASS",
+            "message": "No excede máximo configurado: 5 <= 5"
+          },
+          {
+            "status": "PASS",
+            "message": "Números de capítulo únicos"
+          },
+          {
+            "status": "PASS",
+            "message": "Todos los capítulos están numerados"
+          },
+          {
+            "status": "PASS",
+            "message": "Ningún capítulo vacío"
+          }
+        ],
+        "language_checks": [
+          {
+            "status": "PASS",
+            "message": "Español solicitado"
+          },
+          {
+            "status": "PASS",
+            "message": "Inglés no solicitado"
+          },
+          {
+            "status": "PASS",
+            "message": "Español completo en todos los capítulos"
+          }
+        ],
+        "source_checks": [
+          {
+            "status": "WARNING",
+            "message": "Investigación faltante en capítulos: [1, 2, 3, 4, 5]"
+          },
+          {
+            "status": "PASS",
+            "message": "Fuentes presentes en todos los capítulos"
+          },
+          {
+            "status": "PASS",
+            "message": "URLs válidas"
+          },
+          {
+            "status": "PASS",
+            "message": "Sin fuentes inventadas"
+          }
+        ],
+        "image_checks": [
+          {
+            "status": "PASS",
+            "message": "Sin imágenes requeridas"
+          },
+          {
+            "status": "PASS",
+            "message": "Todos los archivos de imagen existen"
+          },
+          {
+            "status": "PASS",
+            "message": "Imágenes legibles"
+          },
+          {
+            "status": "PASS",
+            "message": "Metadata presente en imágenes"
+          }
+        ],
+        "document_checks": [
+          {
+            "status": "WARNING",
+            "message": "Ruta DOCX no proporcionada"
+          },
+          {
+            "status": "PASS",
+            "message": "PDF no requerido"
+          }
+        ]
+      },
+      "module": "quality_control",
+      "task_id": 85,
+      "error": null
+    },
+    {
+      "id": "docx",
+      "label": "DOCUMENT BUILDER",
+      "capability": "build_book_docx",
+      "status": "PASS",
+      "started_at": "2026-08-14 19:40:50",
+      "completed_at": "2026-08-14 19:40:50",
+      "duration": 0.497,
+      "attempts": 1,
+      "metrics": {
+        "docx_path": "output\\docx\\book_15_es.docx",
+        "book_id": 15,
+        "language": "es",
+        "chapter_count": 5,
+        "image_count": 0
+      },
+      "module": "document_builder",
+      "task_id": 86,
+      "error": null
+    }
+  ],
+  "docx_path": "output\\docx\\book_15_es.docx",
+  "error": null,
+  "data": {
+    "sources": [
+      {
+        "title": "Campeonato de Béisbol Mayor de Panamá",
+        "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+        "source_type": "web_wikipedia",
+        "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+        "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+      },
+      {
+        "title": "Béisbol en México",
+        "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+        "source_type": "web_wikipedia",
+        "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+        "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+      },
+      {
+        "title": "Selección de béisbol de Colombia",
+        "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+        "source_type": "web_wikipedia",
+        "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+        "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+      },
+      {
+        "title": "Campo de béisbol",
+        "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+        "source_type": "web_wikipedia",
+        "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+        "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+      },
+      {
+        "title": "Guante de béisbol",
+        "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+        "source_type": "web_wikipedia",
+        "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+        "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+      }
+    ],
+    "source_count": 5
+  }
+}

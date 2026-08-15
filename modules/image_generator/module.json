@@ -1,0 +1,20 @@
+{
+  "id": "image_generator",
+  "name": "Image Generator",
+  "description": "Genera las imágenes de un capítulo a partir de un ImagePlan, persiste archivos, metadatos y asociación al capítulo.",
+  "type": "agent",
+  "capabilities": [
+    "generate_image",
+    "generate_chapter_images"
+  ],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 180,
+    "default_provider": "local",
+    "default_model": "placeholder",
+    "generate_thumbnails": true,
+    "skip_existing": true,
+    "max_attempts_per_image": 3
+  }
+}

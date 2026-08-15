@@ -1,0 +1,15 @@
+steps:
+  - id: step1
+    capability: count_words
+    payload:
+      text: "Hola mundo desde Space Lair"
+  - id: step2
+    capability: reverse_text
+    depends_on: step1
+    payload:
+      text: "texto para invertir"
+  - id: step3
+    capability: count_words
+    parallel: [step1, step2]
+    payload:
+      text: "tercer paso en paralelo"

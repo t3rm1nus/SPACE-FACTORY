@@ -1,0 +1,14 @@
+{
+  "id": "image_planner",
+  "name": "Planificador de Imágenes",
+  "description": "Genera un plan de imágenes para un capítulo: exactamente 3 imágenes por defecto (configurable), con funciones distintas y no redundantes, prompts compatibles con generadores locales e identidad visual consistente entre capítulos.",
+  "type": "agent",
+  "capabilities": ["create_chapter_image_plan"],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 180,
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}

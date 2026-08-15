@@ -1,0 +1,32 @@
+{
+  "pytest": null,
+  "e2e": {
+    "e2e_status": "PASS",
+    "status": "completed",
+    "failed_stage": null,
+    "error": null,
+    "word_count": 1668,
+    "placeholder_detected": false,
+    "docx_path": "output\\docx\\book_1001_es.docx",
+    "docx_status": "PASS",
+    "last_checkpoint": "data\\checkpoints\\1001\\book\\final_qc\\v0036.json",
+    "report_path": "C:\\proyectos\\SPACE LAIR\\e2e_001_report.json"
+  },
+  "quality_gate": "PASS",
+  "commands_run": [
+    {
+      "name": "echo_ok",
+      "cmd": [
+        "python",
+        "-c",
+        "print('ok')"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "timed_out": false,
+      "duration_sec": 0.03,
+      "stdout": "ok\n",
+      "stderr": ""
+    }
+  ]
+}

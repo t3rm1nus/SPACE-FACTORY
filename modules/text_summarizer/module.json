@@ -1,0 +1,15 @@
+{
+  "id": "text_summarizer",
+  "name": "Resumidor de texto",
+  "description": "Usa LLM para resumir texto en 2-3 frases.",
+  "type": "agent",
+  "capabilities": ["summarize_text"],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 60,
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "ollama_model": "llama3.1"
+  }
+}

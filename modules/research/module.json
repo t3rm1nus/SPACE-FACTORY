@@ -1,0 +1,14 @@
+{
+  "id": "research",
+  "name": "Research Agent",
+  "description": "Busca información en la web, extrae contenido de URLs y almacena fuentes verificadas mediante SourceManager.",
+  "type": "agent",
+  "capabilities": ["research_web", "fetch_url", "extract_text"],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 1,
+    "timeout_seconds": 120,
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}

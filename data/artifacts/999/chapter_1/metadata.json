@@ -1,0 +1,51 @@
+{
+  "book_metadata": {
+    "book_id": 999,
+    "title": "El nacimiento de Internet"
+  },
+  "chapter_outline": {
+    "number": 1,
+    "title": "El nacimiento de Internet",
+    "objective": "Historia",
+    "sections": [
+      {
+        "heading": "Introduccion",
+        "objective": "x"
+      },
+      {
+        "heading": "ARPANET",
+        "objective": "x"
+      },
+      {
+        "heading": "Conclucion",
+        "objective": "x"
+      }
+    ]
+  },
+  "research": "Historia de Internet, ARPANET, ARPA",
+  "sources": [
+    {
+      "url": "https://es.wikipedia.org/wiki/Historia_de_Internet",
+      "title": "Historia",
+      "source_type": "web"
+    },
+    {
+      "url": "https://es.wikipedia.org/wiki/ARPANET",
+      "title": "ARPANET",
+      "source_type": "web"
+    },
+    {
+      "url": "https://es.wikipedia.org/wiki/Protocolo_de_Internet",
+      "title": "TCP/IP",
+      "source_type": "web"
+    }
+  ],
+  "previous_chapter_summaries": [],
+  "target_word_count": 3000,
+  "style_guide": null,
+  "provider": "ollama",
+  "model": "qwen-agent:latest",
+  "tokens_input": 477,
+  "tokens_output": 750,
+  "word_count": 458
+}

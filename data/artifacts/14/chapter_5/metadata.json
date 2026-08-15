@@ -1,0 +1,82 @@
+{
+  "book_metadata": {
+    "book_id": 14,
+    "title": "El nacimiento de Internet",
+    "language": "es"
+  },
+  "chapter_outline": {
+    "title": "Capítulo 5",
+    "number": 5,
+    "objective": null,
+    "sections": []
+  },
+  "research": null,
+  "sources": [
+    {
+      "title": "Internet",
+      "url": "https://es.wikipedia.org/wiki/Internet",
+      "source_type": "web_wikipedia",
+      "content": "Internet es un conjunto descentralizado de redes de comunicaciones interconectadas, que utilizan la familia de protocolos TCP/IP, lo cual garantiza que las redes físicas heterogéneas que la componen constituyen una red lógica única de alcance mundial. Sus orígenes se remontan a 1969, cuando se estableció la primera conexión de ordenadores, conocida como ARPANET, entre tres universidades de California.",
+      "accessed_at": "2026-08-14T19:12:02.750577+00:00"
+    },
+    {
+      "title": "El nacimiento de una nación",
+      "url": "https://es.wikipedia.org/wiki/El_nacimiento_de_una_naci%C3%B3n",
+      "source_type": "web_wikipedia",
+      "content": "El nacimiento de una nación es una película muda estadounidense de 1915 dirigida por D. W. Griffith. Es, debido a su técnica, una de las más famosas de la época del cine mudo, con avances técnicos no utilizados hasta esas épocas que tornaron a la película en un notable progreso en cuanto a la aún joven cinematografía. No obstante, la película ha sido una de las más polémicas debido a que su argumento promueve abiertamente el racismo, apoya sin ambages la supremacía de la raza blanca y describe en sus escenas el supuesto heroísmo de los miembros del Ku Klux Klan, lo que avivó su hasta entonces desgastada popularidad.",
+      "accessed_at": "2026-08-14T19:12:02.960730+00:00"
+    },
+    {
+      "title": "La Torre Oscura: el nacimiento del pistolero",
+      "url": "https://es.wikipedia.org/wiki/La_Torre_Oscura%3A_el_nacimiento_del_pistolero",
+      "source_type": "web_wikipedia",
+      "content": "La Torre Oscura: El nacimiento del Pistolero es una serie limitada de siete números de cómics mensuales y el primer arco argumental de un conjunto de series de cómics publicadas por Marvel Comics, sobre la base de la serie de novelas La Torre Oscura del escritor Stephen King. El nacimiento del Pistolero cuenta con argumento a cargo de Robin Furth, diálogos de Peter David y con Jae Lee y Richard Isanove en la parte gráfica; el proyecto es supervisado por el mismísimo Stephen King.",
+      "accessed_at": "2026-08-14T19:12:03.549017+00:00"
+    },
+    {
+      "title": "Estructura de Internet",
+      "url": "https://es.wikipedia.org/wiki/Estructura_de_Internet",
+      "source_type": "web_wikipedia",
+      "content": "Internet no es una red centralizada ni está regida por un solo organismo. Su estructura es semejante a una tela de araña en la cual unas redes se conectan con otras. No obstante hay una serie de organizaciones responsables de la adjudicación de recursos y el desarrollo de los protocolos necesarios para que Internet evolucione. Por ejemplo:la Internet Engineering Task Force (IETF) se encarga de redactar los protocolos usados en Internet.\nla Corporación de Internet para la Asignación de Nombres y Números (ICANN) es la autoridad que coordina la asignación de identificadores únicos en Internet, incluyendo nombres de dominio, direcciones IP, etcétera.",
+      "accessed_at": "2026-08-14T19:12:04.008463+00:00"
+    },
+    {
+      "title": "Internet Movie Database",
+      "url": "https://es.wikipedia.org/wiki/Internet_Movie_Database",
+      "source_type": "web_wikipedia",
+      "content": "Internet Movie Database es una base de datos en línea que en un principio almacena información relacionada con películas, y con el tiempo se transforma en la base de datos más grande del mundo donde se encuentran programas de televisión, eventos en vivo y difundidos en televisión o en la web, entrega de premios, especiales y videojuegos. Se encuentra el personal de equipo de producción, actores, series y programas de televisión, videojuegos, actores de doblaje y personajes ficticios que aparecen en los medios de entretenimiento visual. Recibe más de 100 000 000 de usuarios únicos al mes y cuenta con una versión móvil. IMDb fue inaugurada el 17 de octubre de 1990, y en 1998 fue adquirida por Amazon.com.",
+      "accessed_at": "2026-08-14T19:12:04.190483+00:00"
+    }
+  ],
+  "previous_chapter_summaries": [],
+  "target_word_count": 3000,
+  "style_guide": "Divulgativo, riguroso y claro",
+  "provider": "ollama",
+  "model": "qwen-agent:latest",
+  "tokens_input": 1977,
+  "tokens_output": 1036,
+  "word_count": 687,
+  "text": "# Capítulo 5: La evolución del protocolo TCP/IP\n\n## El nacimiento de Internet\n\nLa creación de Internet se remonta a los años 1960 cuando el Departamento de Defensa de los Estados Unidos (DOD) comenzó a financiar proyectos relacionados con la comunicación y la cooperación entre diferentes instituciones. Uno de estos proyectos fue ARPANET, un sistema de red experimental diseñado para facilitar la comunicación entre computadoras en distintos lugares.\n\nEl protocolo TCP/IP, que hoy es el fundamento de Internet, nació como parte del proyecto ARPANET. En 1973, Vint Cerf y Bob Kahn desarrollaron el protocolo TCP (Transmission Control Protocol) y IP (Internet Protocol). El TCP se encarga de manejar la transmisión de datos en paquetes, mientras que el IP se ocupa de la dirección y enrute del tráfico.\n\nEl desarrollo de TCP/IP fue un hito crucial para Internet. Su diseño permitió una comunicación eficiente entre diferentes tipos de computadoras y sistemas operativos, lo que facilitó la creación de una red global interconectada. En 1983, el DOD adoptó TCP/IP como el protocolo estándar para ARPANET, lo que marcó el inicio oficial de Internet.\n\n## La expansión de Internet\n\nLa expansión rápida de Internet se debe en gran medida a su diseño flexible y escalable. A medida que más instituciones e individuos comenzaron a utilizar la red, TCP/IP demostró ser capaz de manejar el creciente volumen de tráfico sin problemas.\n\nEl primer dominio público (.com) fue registrado en 1984 por Jon Postel, lo que marcó un hito importante para Internet. A partir de entonces, comenzaron a surgir empresas y organizaciones que ofrecían servicios en línea, como correos electrónicos y sitios web.\n\nLa creación del World Wide Web en 1989 por Tim Berners-Lee fue otro hito crucial para el desarrollo de Internet. El World Wide Web permitió la visualización y navegación de información en formato hipertexto, lo que hizo que Internet se volviera accesible y popular para un público más amplio.\n\nLa expansión rápida de Internet también se debe a su naturaleza abierta y descentralizada. Cualquier persona con una conexión a Internet podía crear contenido y compartirlo con el mundo, lo que fomentó la creación de comunidades en línea y el intercambio de ideas.\n\n## La seguridad de Internet\n\nA pesar de su éxito, la expansión rápida de Internet también planteó problemas de seguridad. En 1988, un virus conocido como \"Morris Worm\" afectó a más de 6000 computadoras en el ARPANET, demostrando la vulnerabilidad de la red.\n\nLa creación del protocolo SSL (Secure Sockets Layer) y TLS (Transport Layer Security) en los años 90 fue un paso importante para mejorar la seguridad de Internet. Estos protocolos proporcionan encriptación y autenticación segura para las comunicaciones en línea, lo que protege contra el robo de información.\n\nLa adopción generalizada de SSL/TLS por parte de los navegadores web y sitios web ha hecho que Internet sea una red más segura y confiable. Sin embargo, la seguridad sigue siendo un desafío constante para mantener Internet libre de amenazas.\n\n## El futuro de Internet\n\nEl futuro de Internet es incierto pero prometedor. A medida que avanzamos en tecnología, podemos esperar ver cambios significativos en cómo interactuamos y nos comunicamos a través de la red.\n\nUna de las áreas más interesantes es el desarrollo de Internet of Things (IoT). Con el aumento del número de dispositivos conectados a Internet, podemos esperar ver una mayor interconexión entre diferentes objetos y sistemas. Esto podría tener aplicaciones en diversos campos, como la inteligencia artificial, la realidad virtual/aumentada y la automatización.\n\nOtro campo prometedor es la creación de redes privadas autónomas (MANETs) y vehículos autónomos que puedan comunicarse entre sí a través de Internet. Estas tecnologías podrían revolucionar el transporte, la educación y muchas otras industrias.\n\nEn conclusión, la evolución del protocolo TCP/IP ha sido un hito crucial para el desarrollo de Internet. Su diseño flexible y escalable ha permitido que la red se expandiera rápidamente y se convirtiera en una herramienta fundamental para la comunicación y la colaboración global. A medida que avanzamos en tecnología, podemos esperar ver cambios significativos en cómo interactuamos y nos comunicamos a través de Internet.\n\n## Fuentes utilizadas\n\n[TCP/IP (web_wikipedia)]  \n[El nacimiento de Internet (web_wikipedia)]",
+  "unexpected_sections": [
+    "El nacimiento de Internet",
+    "La expansión de Internet",
+    "La seguridad de Internet",
+    "El futuro de Internet"
+  ],
+  "duplicate_sections": [],
+  "subsections_map": {},
+  "structural_anomalies": [],
+  "duplicate_detected": false,
+  "continuation_rejected_as_duplicate": false,
+  "initial_word_count": 687,
+  "final_word_count": 687,
+  "minimum_words": 1500,
+  "total_continuation_attempts": 1,
+  "successful_continuations": 0,
+  "rejected_continuations": 0,
+  "duplicate_rejections": 0,
+  "repeated_continuation": false,
+  "total_added_words": 0,
+  "final_quality_gate": "FAIL",
+  "deterministic_used": false
+}

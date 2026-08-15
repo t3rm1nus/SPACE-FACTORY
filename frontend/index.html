@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPACE LAIR — Living AI Factory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="factory-bg" aria-hidden="true"></div>
+
+    <header class="system-status" id="system-status">
+        <div class="system-brand">
+            <div class="system-logo">SPACE LAIR</div>
+            <div class="system-subtitle">LIVING AI FACTORY</div>
+        </div>
+        <div class="system-indicators">
+            <div class="indicator">
+                <span class="indicator-dot online"></span>
+                <span class="indicator-label">SISTEMA EN LÍNEA</span>
+            </div>
+            <div class="indicator" id="indicator-workers">
+                <span class="indicator-value">0/0</span>
+                <span class="indicator-label">TRABAJADORES</span>
+            </div>
+            <div class="indicator" id="indicator-running">
+                <span class="indicator-value">0</span>
+                <span class="indicator-label">ACTIVOS</span>
+            </div>
+            <div class="indicator" id="indicator-queue">
+                <span class="indicator-value">0</span>
+                <span class="indicator-label">EN COLA</span>
+            </div>
+            <div class="indicator" id="indicator-books">
+                <span class="indicator-value">0</span>
+                <span class="indicator-label">LIBROS</span>
+            </div>
+            <div class="indicator" id="indicator-sse">
+                <span class="indicator-dot" id="sse-dot"></span>
+                <span class="indicator-label">SSE</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="control-room">
+        <nav class="navigation-rail" id="navigation-rail">
+            <button class="nav-item active" data-view="control-room" aria-label="Sala de control">
+                <span class="nav-icon">⌂</span>
+                <span class="nav-label">SALA DE CONTROL</span>
+            </button>
+            <button class="nav-item" data-view="books" aria-label="Libros">
+                <span class="nav-icon">📚</span>
+                <span class="nav-label">LIBROS</span>
+            </button>
+            <button class="nav-item" data-view="activity" aria-label="Actividad">
+                <span class="nav-icon">⚡</span>
+                <span class="nav-label">ACTIVIDAD</span>
+            </button>
+            <button class="nav-item" data-view="config" aria-label="Sistema">
+                <span class="nav-icon">⚙</span>
+                <span class="nav-label">SISTEMA</span>
+            </button>
+        </nav>
+
+        <main class="viewport">
+            <section class="view-section active" data-view="control-room">
+                <div class="pipeline-section-header">
+                    <div class="pipeline-heading">
+                        <h1 class="pipeline-title">LIVING AI FACTORY</h1>
+                        <div class="pipeline-subtitle">FLUJO EDITORIAL</div>
+                    </div>
+                    <div class="pipeline-live">
+                        <span class="live-dot">●</span>
+                        <span class="live-text">EN VIVO</span>
+                        <span class="live-meta" id="live-modules">0 MÓDULOS · 0 ACTIVOS</span>
+                    </div>
+                </div>
+
+                <div class="command-center" id="command-center">
+                    <div class="command-center-header">
+                        <div class="command-center-title-block">
+                            <div class="command-center-title">CENTRO DE CONTROL</div>
+                            <div class="command-center-subtitle">OPERACIONES EDITORIALES</div>
+                        </div>
+                        <div class="command-center-status" id="command-center-status">
+                            <span class="cmd-status-dot" id="cmd-status-dot"></span>
+                            <span class="cmd-status-text" id="cmd-status-text">SISTEMA LISTO</span>
+                        </div>
+                    </div>
+                    <div class="command-center-actions">
+                        <button class="btn-command-primary" id="btn-new-project" type="button">
+                            <span class="btn-command-icon" aria-hidden="true">+</span>
+                            <span class="btn-command-label">NUEVO PROYECTO EDITORIAL</span>
+                        </button>
+                        <button class="btn-command-secondary" id="btn-open-project" type="button">
+                            <span class="btn-command-icon" aria-hidden="true">📂</span>
+                            <span class="btn-command-label">ABRIR PROYECTO</span>
+                        </button>
+                        <button class="btn-command-secondary" id="btn-refresh" type="button">
+                            <span class="btn-command-icon" aria-hidden="true">↻</span>
+                            <span class="btn-command-label">ACTUALIZAR</span>
+                        </button>
+                        <button class="btn-command-secondary" id="btn-view-activity" type="button">
+                            <span class="btn-command-icon" aria-hidden="true">⚡</span>
+                            <span class="btn-command-label">VER ACTIVIDAD</span>
+                        </button>
+                        <button class="btn-command-secondary" id="btn-view-system" type="button">
+                            <span class="btn-command-icon" aria-hidden="true">⚙</span>
+                            <span class="btn-command-label">ESTADO DEL SISTEMA</span>
+                        </button>
+                        <div class="autopilot-bar">
+                            <span class="autopilot-book-label">LIBRO:</span>
+                            <select id="book-selector" class="book-select-input">
+                                <option value="">Seleccionar libro…</option>
+                            </select>
+                            <div id="autopilot-actions" class="autopilot-actions"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="book-ready-banner" class="book-ready-banner" style="display:none;"></div>
+
+
+                <div class="control-room-grid">
+                    <div class="living-pipeline" id="living-pipeline">
+                    </div>
+                    <div class="current-book" id="current-book">
+                        <div class="current-book-header">
+                            <span class="current-book-label">LIBRO ACTUAL</span>
+                            <button class="current-book-link" id="current-book-link" title="Abrir libro">📖</button>
+                        </div>
+                        <div class="current-book-body" id="current-book-body">
+                            <div class="empty-state">Sin libro activo</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="view-section" data-view="books">
+                <div class="view-header">
+                    <h2 class="view-title">📚 Biblioteca</h2>
+                    <p class="view-subtitle">Libros y proyectos editoriales</p>
+                </div>
+                <div id="books-section" class="books-section">
+                    <div class="empty-state">Cargando libros...</div>
+                </div>
+            </section>
+            <section class="view-section" data-view="activity">
+                <div class="view-header">
+                    <h2 class="view-title">⚡ Actividad del sistema</h2>
+                    <p class="view-subtitle">Eventos en tiempo real</p>
+                </div>
+                <div id="activity-full" class="activity-full"></div>
+            </section>
+            <section class="view-section" data-view="config">
+                <div class="view-header">
+                    <h2 class="view-title">⚙ Sistema</h2>
+                    <p class="view-subtitle">Módulos, tareas, métricas del autopilot y logs</p>
+                </div>
+                <div id="config-content" class="config-content">
+                    <h3 class="config-subtitle">Métricas del autopilot (reales)</h3>
+                    <div id="metrics-content" class="metrics-content"></div>
+                    <h3 class="config-subtitle">Módulos</h3>
+                    <div id="modules-section" class="modules-grid"></div>
+                    <h3 class="config-subtitle">Tareas del scheduler</h3>
+                    <div id="tasks-list" class="tasks-list"></div>
+                    <h3 class="config-subtitle">Logs</h3>
+                    <div id="logs-list" class="logs-list"></div>
+                </div>
+            </section>
+
+        </main>
+
+        <div class="inspector-backdrop" id="inspector-backdrop"></div>
+        <aside class="module-inspector" id="module-inspector">
+            <div class="inspector-header">
+                <div>
+                    <div class="inspector-title" id="inspector-name">Módulo</div>
+                    <div class="inspector-status" id="inspector-status"></div>
+                </div>
+                <button class="inspector-close" id="inspector-close" aria-label="Cerrar inspector">✕</button>
+            </div>
+            <div class="inspector-body" id="inspector-body">
+                <div class="inspector-placeholder">Selecciona un modulo para inspeccionar</div>
+            </div>
+        </aside>
+    </div>
+
+    <footer class="activity-feed" id="activity-feed">
+        <div class="feed-header">
+            <span class="feed-title">ACTIVIDAD EN VIVO</span>
+            <span class="feed-status" id="feed-status">● CONECTADO</span>
+        </div>
+        <div class="feed-content" id="feed-content"></div>
+    </footer>
+
+    <div id="enqueue-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>📦 Nueva tarea</h3>
+            <label for="enqueue-capability">Tarea</label>
+            <select id="enqueue-capability" class="enqueue-input"></select>
+            <div id="enqueue-fields"></div>
+            <button type="button" class="btn btn-info" id="btn-toggle-advanced" style="margin-top: 8px;">▶ Opciones avanzadas</button>
+            <div id="enqueue-advanced" style="display: none; margin-top: 8px;">
+                <label for="enqueue-payload">JSON del payload</label>
+                <textarea id="enqueue-payload" class="enqueue-textarea" rows="6" placeholder='{}'></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="btn-confirm-enqueue">Encolar</button>
+                <button class="btn btn-danger" id="btn-cancel-enqueue">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="book-detail-overlay" class="modal-overlay" style="display:none;">
+        <div class="modal-content book-detail-content">
+            <button class="book-detail-close" id="book-detail-close">✕</button>
+            <div id="book-detail-content"></div>
+        </div>
+    </div>
+
+    <div id="book-create-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <h3>📕 Nuevo proyecto editorial</h3>
+            <label for="new-book-title">Título *</label>
+            <input id="new-book-title" class="enqueue-input" type="text" placeholder="Título del libro">
+            <label for="new-book-chapters">Capítulos objetivo</label>
+            <input id="new-book-chapters" class="enqueue-input" type="number" value="1" min="1">
+            <label for="new-book-idea">Idea / descripción</label>
+            <textarea id="new-book-idea" class="enqueue-textarea" rows="3" placeholder="Tema del libro..."></textarea>
+            <label for="new-book-author">Autor/a</label>
+            <input id="new-book-author" class="enqueue-input" type="text" placeholder="Autor/a">
+            <label for="new-book-genre">Género</label>
+            <input id="new-book-genre" class="enqueue-input" type="text" placeholder="Género (ej. Divulgación)">
+            <label for="new-book-audience">Público objetivo</label>
+            <input id="new-book-audience" class="enqueue-input" type="text" placeholder="Público objetivo (ej. General)">
+            <label for="new-book-images">Imágenes por capítulo</label>
+            <div class="radio-group" id="new-book-images">
+                <label class="radio-inline"><input type="radio" name="images_per_chapter" value="0"> 0</label>
+                <label class="radio-inline"><input type="radio" name="images_per_chapter" value="1"> 1</label>
+                <label class="radio-inline"><input type="radio" name="images_per_chapter" value="3" checked> 3</label>
+                <label class="radio-inline"><input type="radio" name="images_per_chapter" value="5"> 5</label>
+            </div>
+            <h4 style="margin:14px 0 6px;">MAQUETACIÓN</h4>
+            <label for="layout-preset">Preset</label>
+            <select id="layout-preset" class="enqueue-input">
+                <option value="editorial" selected>Editorial</option>
+                <option value="moderno">Moderno</option>
+                <option value="clasico">Clásico</option>
+                <option value="academico">Académico</option>
+                <option value="dossier">Dossier</option>
+            </select>
+            <label for="layout-font">Fuente</label>
+            <select id="layout-font" class="enqueue-input">
+                <option value="Georgia" selected>Georgia</option>
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times New Roman</option>
+                <option value="Garamond">Garamond</option>
+                <option value="Calibri">Calibri</option>
+            </select>
+            <label for="layout-heading-color">Color títulos</label>
+            <input id="layout-heading-color" class="enqueue-input" type="color" value="#1F3A5F">
+            <label for="layout-alignment">Alineación</label>
+            <select id="layout-alignment" class="enqueue-input">
+                <option value="justify" selected>Justificado</option>
+                <option value="left">Izquierda</option>
+            </select>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="btn-create-book">Crear</button>
+                <button class="btn btn-danger" id="btn-cancel-create">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

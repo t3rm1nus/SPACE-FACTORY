@@ -1,0 +1,364 @@
+{
+  "job_id": "book_9",
+  "book_id": 9,
+  "status": "FAILED",
+  "created_at": "2026-08-14 15:42:41",
+  "updated_at": "2026-08-14 15:43:59",
+  "current_phase": "fact_check",
+  "phases": [
+    {
+      "id": "planner",
+      "label": "BOOK PLANNER",
+      "capability": "create_book_plan",
+      "status": "PASS",
+      "started_at": "2026-08-14 15:42:42",
+      "completed_at": "2026-08-14 15:43:13",
+      "duration": 31.089,
+      "attempts": 1,
+      "metrics": {
+        "title": "El Nacimiento de Internet hasta la Era de la IA",
+        "subtitle": "Un Viaje Atravesando las Tecnologías Digitales",
+        "description": "Este libro explora el origen y desarrollo del internet, desde su concepción en los años 50 hasta sus aplicaciones actuales en la inteligencia artificial. Cada capítulo presenta un hito clave en la historia de la tecnología digital.",
+        "target_audience": "Todos",
+        "chapters": [
+          {
+            "number": 1,
+            "title": "El Nacimiento del Internet: Conceptos y Inicios",
+            "objective": "Introducir los conceptos fundamentales del internet y su origen en el proyecto ARPANET.",
+            "key_questions": [
+              "¿Qué fue el ARPANET?",
+              "Cómo se desarrolló la idea del internet"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Historia de la computación",
+              "Proyecto ARPANET"
+            ],
+            "image_requirements": 3
+          }
+        ],
+        "provider": "ollama",
+        "model": "qwen-agent:latest",
+        "tokens_input": 397,
+        "tokens_output": 231,
+        "cost": 0.0
+      },
+      "module": "book_planner",
+      "task_id": 7,
+      "error": null
+    },
+    {
+      "id": "research",
+      "label": "RESEARCH",
+      "capability": "research_web",
+      "status": "PASS",
+      "started_at": "2026-08-14 15:43:13",
+      "completed_at": "2026-08-14 15:43:14",
+      "duration": 0.601,
+      "attempts": 1,
+      "metrics": {
+        "query": "el nacimineto de internet",
+        "status": "FAIL",
+        "execution_mode": "real",
+        "sources": [
+          {
+            "title": "Gabriel Argany",
+            "url": "https://es.wikipedia.org/wiki/Gabriel_Argany",
+            "source_type": "web_wikipedia",
+            "content": "Gabriel Argany (fl.1688-1716) fue un músico y maestro de capilla español.",
+            "accessed_at": "2026-08-14T15:43:14.080578+00:00"
+          }
+        ],
+        "stored_sources": [
+          {
+            "id": 392,
+            "url": "https://es.wikipedia.org/wiki/Gabriel_Argany",
+            "title": "Gabriel Argany",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 15:43:14",
+            "source_type": "web_wikipedia",
+            "relevance": 11,
+            "notes": "content_snippet=Gabriel Argany (fl.1688-1716) fue un músico y maestro de capilla español.",
+            "chapter_ids": [],
+            "url_hash": "5b7241ffb577d6d496a0be5177df676ace15239c1b75c2a206c6146d7842355d",
+            "hash": "4361d5c32ab4aebf",
+            "status": "verified"
+          }
+        ],
+        "source_count": 1,
+        "error": "research_required=true y se obtuvieron 1 fuentes (< mínimo 3).",
+        "quality_gate": "FAIL"
+      },
+      "module": "research",
+      "task_id": 8,
+      "error": null
+    },
+    {
+      "id": "outline",
+      "label": "OUTLINE",
+      "capability": "create_book_plan",
+      "status": "PASS",
+      "started_at": "2026-08-14 15:43:14",
+      "completed_at": "2026-08-14 15:43:19",
+      "duration": 5.853,
+      "attempts": 1,
+      "metrics": {
+        "title": "El Nacimiento de Internet",
+        "subtitle": "Desde sus primeros pasos hasta la era de la IA",
+        "description": "Este libro explora el origen y desarrollo del internet, desde su concepción hasta las aplicaciones actuales en inteligencia artificial.",
+        "target_audience": "Todos",
+        "chapters": [
+          {
+            "number": 1,
+            "title": "El Concepto de Internet",
+            "objective": "Introducir la idea de la red y sus primeros conceptos teóricos.",
+            "key_questions": [
+              "¿Qué fue el primer paso hacia la internet?",
+              "Cómo surgió el concepto de una red global?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Historia de las redes",
+              "Primeros experimentos en comunicación"
+            ],
+            "image_requirements": 1
+          }
+        ],
+        "provider": "ollama",
+        "model": "qwen-agent:latest",
+        "tokens_input": 411,
+        "tokens_output": 201,
+        "cost": 0.0
+      },
+      "module": "book_planner",
+      "task_id": 9,
+      "error": null
+    },
+    {
+      "id": "writer",
+      "label": "CHAPTER WRITER",
+      "capability": "write_chapter_es",
+      "status": "PASS",
+      "started_at": "2026-08-14 15:43:19",
+      "completed_at": "2026-08-14 15:43:46",
+      "duration": 26.2,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 1,
+          "done": 1
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "chapter_writer",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "39": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\9\\chapter_1\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 9,
+                  "title": "el nacimineto de internet",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 1",
+                  "number": 1,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Gabriel Argany",
+                    "url": "https://es.wikipedia.org/wiki/Gabriel_Argany",
+                    "source_type": "web_wikipedia",
+                    "content": "Gabriel Argany (fl.1688-1716) fue un músico y maestro de capilla español.",
+                    "accessed_at": "2026-08-14T15:43:14.080578+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1929,
+                "tokens_output": 1506,
+                "word_count": 1008,
+                "text": "# El Nacimiento de Internet\n\n## Introducción\n\nEl nacimiento del Internet es un proceso complejo que ha involucrado décadas de trabajo y colaboración entre científicos, ingenieros y políticos. Aunque se considera que el Internet como conocemos hoy comenzó en los años 60, su desarrollo ha sido gradual y ha experimentado numerosas etapas clave. Este capítulo explora la historia del Internet desde sus orígenes hasta su transformación en la red global que conocemos.\n\n## La Era de los Experimentos\n\nLa idea de una red de computadoras interconectadas surgió por primera vez en el año 1960, cuando el Departamento de Defensa de los Estados Unidos (DOD) comenzó a financiar proyectos relacionados con la comunicación entre sistemas informáticos. Uno de estos proyectos fue ARPANET, que se inició en 1969 como un experimento para conectar cuatro universidades y instituciones de investigación.\n\nEl principal objetivo de ARPANET era desarrollar una red robusta y segura que pudiera soportar la comunicación entre diferentes sistemas informáticos. Para lograr esto, los ingenieros utilizaron el protocolo TCP/IP (Transmission Control Protocol/Internet Protocol), que se considera uno de los fundamentos del Internet moderno.\n\n## El Desarrollo de TCP/IP\n\nEl protocolo TCP/IP fue desarrollado por Vint Cerf y Bob Kahn en la Universidad de Stanford. Su diseño fue inspirado en el trabajo previo de Paul Baran, quien había propuesto una arquitectura de red distribuida para sistemas de comunicación robustos.\n\nTCP/IP se caracteriza por su capacidad para proporcionar una capa de comunicación segura y confiable entre diferentes dispositivos. La separación del protocolo en dos partes (TCP y IP) permite un diseño modular y escalable, lo que ha hecho posible el desarrollo de redes complejas como la actual.\n\n## El Auge de ARPANET\n\nA medida que ARPANET se expandía, su alcance y capacidad para soportar más dispositivos aumentaron. En 1983, el DOD decidió adoptar TCP/IP como el protocolo estándar para ARPANET, lo que marcó un hito importante en el desarrollo del Internet.\n\nEn los años 70, la red comenzó a experimentar un crecimiento exponencial. Se conectaron universidades, instituciones gubernamentales y empresas, lo que permitió el intercambio de información y recursos entre diferentes partes del mundo.\n\n## La Creación de Internet\n\nEl término \"Internet\" como tal se introdujo por primera vez en 1983, cuando el DOD anunció la creación de una red global basada en TCP/IP. Esta red fue llamada NSFNET (National Science Foundation Network), y su objetivo era conectar las redes nacionales de investigación y educación.\n\nNSFNET se conectó a más de 200 universidades y instituciones, lo que permitió un intercambio masivo de información y recursos entre diferentes partes del mundo. Este desarrollo fue crucial para el crecimiento del Internet como red global.\n\n## El Auge de la Web\n\nEl año 1989 marcó otro hito importante en el desarrollo del Internet. Tim Berners-Lee, un científico de la CERN (European Organization for Nuclear Research), propuso el concepto de World Wide Web (WWW). La WWW permitía a los usuarios acceder a información en formato hipertexto a través de una interfaz gráfica sencilla.\n\nLa introducción de la Web fue crucial para el crecimiento del Internet como red global, ya que proporcionó una forma más accesible y fácil de usar para el intercambio de información. La Web se ha vuelto un elemento esencial de la vida diaria en todo el mundo, permitiendo a las personas acceder a una amplia gama de recursos y servicios en línea.\n\n## El Auge del Comercio Electrónico\n\nEl año 1994 marcó otro hito importante en el desarrollo del Internet. Este fue el año en que se estableció la primera transacción comercial electrónica, cuando un comprador de Estados Unidos pagó por una camiseta de una empresa alemán a través de la red.\n\nLa introducción del comercio electrónico ha transformado la economía global, permitiendo a las empresas vender productos y servicios a clientes en todo el mundo sin necesidad de establecer presencia física. El comercio electrónico ha experimentado un crecimiento exponencial desde entonces, convirtiéndose en una parte esencial de la economía mundial.\n\n## La Seguridad del Internet\n\nA pesar de su crecimiento y éxito, el Internet también ha enfrentado desafíos importantes relacionados con la seguridad. En los últimos años, se han registrado numerosos ataques cibernéticos y piraterías digitales que afectan a individuos, empresas y gobierno.\n\nPara abordar estos desafíos, se han desarrollado medidas de seguridad avanzadas como firewalls, antivirus y sistemas de autenticación multifactor. Además, se ha implementado una serie de regulaciones y leyes para proteger la privacidad y los derechos digitales de las personas.\n\n## La Expansión del Internet a todo el Mundo\n\nA medida que el Internet experimentó un crecimiento exponencial en los últimos años, su alcance también aumentó. Hoy en día, es difícil encontrar una persona que no tenga acceso a internet, ya sea a través de computadoras personales, teléfonos móviles o dispositivos IoT (Internet of Things).\n\nLa expansión del Internet ha permitido un intercambio masivo de información y recursos entre diferentes partes del mundo. El Internet ha transformado la forma en que trabajamos, nos comunicamos y nos divertimos, convirtiéndose en una herramienta esencial para el desarrollo económico y social.\n\n## Conclusión\n\nEl nacimiento del Internet es un proceso complejo que ha involucrado décadas de trabajo y colaboración entre científicos, ingenieros y políticos. Aunque se considera que el Internet como conocemos hoy comenzó en los años 60, su desarrollo ha sido gradual y ha experimentado numerosas etapas clave. Este capítulo ha explorado la historia del Internet desde sus orígenes hasta su transformación en la red global que conocemos.\n\nEl desarrollo del Internet ha sido marcado por numerosos hitos importantes, como el lanzamiento de ARPANET, la creación de TCP/IP y la introducción de la Web. El comercio electrónico también ha experimentado un crecimiento exponencial desde los años 90, convirtiéndose en una parte esencial de la economía global.\n\nA pesar de sus desafíos, el Internet ha transformado la vida diaria de las personas y ha permitido un intercambio masivo de información y recursos entre diferentes partes del mundo. El futuro del Internet es incierto, pero se espera que siga experimentando crecimiento y evolución en los años venideros.\n\n## Fuentes utilizadas\n\n[Tim Berners-Lee (web_wikipedia)]",
+                "unexpected_sections": [
+                  "Introducción",
+                  "La Era de los Experimentos",
+                  "El Desarrollo de TCP/IP",
+                  "El Auge de ARPANET",
+                  "La Creación de Internet",
+                  "El Auge de la Web",
+                  "El Auge del Comercio Electrónico",
+                  "La Seguridad del Internet",
+                  "La Expansión del Internet a todo el Mundo",
+                  "Conclusión"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {},
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 1008,
+                "final_word_count": 1008,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 1008,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Gabriel_Argany"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (1008)",
+                "secciones fuera del outline detectadas: Introducción, La Era de los Experimentos, El Desarrollo de TCP/IP, El Auge de ARPANET, La Creación de Internet, El Auge de la Web, El Auge del Comercio Electrónico, La Seguridad del Internet, La Expansión del Internet a todo el Mundo, Conclusión"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1929,
+              "tokens_output": 1506,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "Introducción",
+                "La Era de los Experimentos",
+                "El Desarrollo de TCP/IP",
+                "El Auge de ARPANET",
+                "La Creación de Internet",
+                "El Auge de la Web",
+                "El Auge del Comercio Electrónico",
+                "La Seguridad del Internet",
+                "La Expansión del Internet a todo el Mundo",
+                "Conclusión"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {},
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 1008,
+              "final_word_count": 1008,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          }
+        },
+        "total": 1,
+        "done": 1
+      }
+    },
+    {
+      "id": "fact_check",
+      "label": "FACT CHECK",
+      "capability": "fact_check_chapter",
+      "status": "FAIL",
+      "started_at": "2026-08-14 15:43:54",
+      "completed_at": "2026-08-14 15:43:59",
+      "duration": 5.279,
+      "attempts": 2,
+      "metrics": {},
+      "module": null,
+      "task_id": null,
+      "error": "fact_check#39: fact_check#status=FAIL quality_gate=PASS",
+      "subs": {
+        "chapters": {
+          "39": {
+            "status": "FAIL",
+            "attempts": 2,
+            "module": "fact_checker",
+            "duration": null,
+            "error": "fact_check#status=FAIL quality_gate=PASS"
+          }
+        },
+        "total": 1,
+        "done": 0
+      }
+    },
+    {
+      "id": "editor",
+      "label": "EDITOR",
+      "capability": "edit_chapter",
+      "status": "PENDING",
+      "started_at": null,
+      "completed_at": null,
+      "duration": null,
+      "attempts": 0,
+      "metrics": {},
+      "module": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "id": "quality_gate",
+      "label": "QUALITY GATE",
+      "capability": "final_quality_control",
+      "status": "PENDING",
+      "started_at": null,
+      "completed_at": null,
+      "duration": null,
+      "attempts": 0,
+      "metrics": {},
+      "module": null,
+      "task_id": null,
+      "error": null
+    },
+    {
+      "id": "docx",
+      "label": "DOCUMENT BUILDER",
+      "capability": "build_book_docx",
+      "status": "PENDING",
+      "started_at": null,
+      "completed_at": null,
+      "duration": null,
+      "attempts": 0,
+      "metrics": {},
+      "module": null,
+      "task_id": null,
+      "error": null
+    }
+  ],
+  "docx_path": null,
+  "error": "fact_check#39: fact_check#status=FAIL quality_gate=PASS",
+  "data": {
+    "sources": [
+      {
+        "title": "Gabriel Argany",
+        "url": "https://es.wikipedia.org/wiki/Gabriel_Argany",
+        "source_type": "web_wikipedia",
+        "content": "Gabriel Argany (fl.1688-1716) fue un músico y maestro de capilla español.",
+        "accessed_at": "2026-08-14T15:43:14.080578+00:00"
+      }
+    ],
+    "source_count": 1
+  }
+}

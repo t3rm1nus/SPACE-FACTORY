@@ -1,0 +1,87 @@
+{
+  "book_metadata": {
+    "book_id": 15,
+    "title": "Beisbol en los 90",
+    "language": "es"
+  },
+  "chapter_outline": {
+    "title": "Capítulo 2",
+    "number": 2,
+    "objective": null,
+    "sections": []
+  },
+  "research": null,
+  "sources": [
+    {
+      "title": "Campeonato de Béisbol Mayor de Panamá",
+      "url": "https://es.wikipedia.org/wiki/Campeonato_de_B%C3%A9isbol_Mayor_de_Panam%C3%A1",
+      "source_type": "web_wikipedia",
+      "content": "El Campeonato de béisbol Mayor de Panamá, iniciado en el año de 1944, hoy cuenta con 12 equipos, a saber: Panamá Metro, Colón, Panamá Oeste, Coclé, Herrera, Los Santos, Chiriquí, Bocas del Toro, Panamá Este, Chiriquí Occidente, Veraguas, y Darién. Es la principal liga de béisbol en el verano en Panamá, principalmente representada por provincias y no por equipos profesionales. Se considera la segunda mejor liga del país, solo por debajo de la Liga Profesional de Béisbol de Panamá, cuyo campeón participa en la Serie de las Américas.",
+      "accessed_at": "2026-08-14T19:35:41.705088+00:00"
+    },
+    {
+      "title": "Béisbol en México",
+      "url": "https://es.wikipedia.org/wiki/B%C3%A9isbol_en_M%C3%A9xico",
+      "source_type": "web_wikipedia",
+      "content": "El béisbol en México hay indicios de sus orígenes por algunos juegos en la segunda mitad del siglo XIX en al menos 6 lugares de México.",
+      "accessed_at": "2026-08-14T19:35:41.891718+00:00"
+    },
+    {
+      "title": "Selección de béisbol de Colombia",
+      "url": "https://es.wikipedia.org/wiki/Selecci%C3%B3n_de_b%C3%A9isbol_de_Colombia",
+      "source_type": "web_wikipedia",
+      "content": "La selección de béisbol de Colombia es el conjunto que representa al país en las principales competencias de este deporte a nivel mundial, continental y regional.",
+      "accessed_at": "2026-08-14T19:35:42.075135+00:00"
+    },
+    {
+      "title": "Campo de béisbol",
+      "url": "https://es.wikipedia.org/wiki/Campo_de_b%C3%A9isbol",
+      "source_type": "web_wikipedia",
+      "content": "El campo de béisbol es el área donde se desarrolla un partido de béisbol. El infield comienza por el punto del home en el que los dos lados de 12 pulgadas se unen en ángulo recto, que está en una esquina de un cuadro de noventa pies de lado. A las otras tres esquinas del campo, en sentido inverso a las agujas del reloj, se les llama primera base, segunda base y tercera base. Tres losas cuadrangulares de lienzo de 18 pulgadas por lado marcan las tres bases. Estas tres bases juntas o con el home conforman las cuatro bases en las esquinas del infield.",
+      "accessed_at": "2026-08-14T19:35:42.270039+00:00"
+    },
+    {
+      "title": "Guante de béisbol",
+      "url": "https://es.wikipedia.org/wiki/Guante_de_b%C3%A9isbol",
+      "source_type": "web_wikipedia",
+      "content": "El guante de béisbol, es una prenda, parte de la indumentaria defensiva utilizada por los jugadores de este deporte para auxiliar y proteger la mano al capturar la pelota que es lanzada por los demás jugadores de su propio equipo o por los batazos de sus contrarios. Anteriormente este deporte se jugaba a mano limpia. El primer guante que se conoció en el beisbol, lo fabricó un cátcher universitario, llamado Charles C. White en 1875.",
+      "accessed_at": "2026-08-14T19:35:42.455936+00:00"
+    }
+  ],
+  "previous_chapter_summaries": [],
+  "target_word_count": 3000,
+  "style_guide": "Divulgativo, riguroso y claro",
+  "provider": "ollama",
+  "model": "qwen-agent:latest",
+  "tokens_input": 1988,
+  "tokens_output": 1790,
+  "word_count": 1161,
+  "text": "# Capítulo 2\n\n## El campo de béisbol: un espacio de juego y cultura\n\nEl campo de béisbol es más que solo un lugar donde se juega el deporte; es una parte integral de la cultura estadounidense y mundial. Desde su origen en el siglo XIX, este campo ha evolucionado significativamente, adaptándose a las necesidades cambiantes del juego y de los espectadores.\n\n### La estructura del campo\n\nEl campo de béisbol está compuesto por varias áreas principales: la cancha principal, la casa de home plate, el pitcher's mound, las bases y las líneas de primer base y tercer base. Cada una de estas secciones tiene un propósito específico y juega un papel crucial en el juego.\n\nLa cancha principal es el área rectangular donde se realiza la mayor parte del juego. Está dividida por dos líneas laterales y una línea central, que marca el home plate. El pitcher's mound está ubicado cerca del home plate y es donde el lanzador lanza la pelota.\n\nLas bases están dispuestas en forma de cuadrado, con primer base, segundo base y tercer base. Cada base tiene un marcador para indicar cuándo un corredor llega a ella. El objetivo del juego es marcar todas las bases en orden y llegar al home plate.\n\nLa línea de primer base y la línea de tercer base son líneas que conectan las primeras y terceras bases, respectivamente. Estas líneas son importantes para determinar si un corredor está dentro o fuera del campo de juego.\n\n### El guante de béisbol: una herramienta esencial\n\nEl guante de béisbol es una pieza fundamental del equipo de los jugadores. Su diseño y construcción han evolucionado significativamente a lo largo del tiempo, adaptándose a las necesidades cambiantes del juego y mejorando la eficiencia de los lanzadores.\n\nEl guante de béisbol está compuesto por varias partes principales: el palco, el guante principal y el guante de dedos. El palco es la parte inferior del guante que se sitúa sobre el hombro del jugador. El guante principal es la parte superior que abarca la mano del lanzador. El guante de dedos es la parte más pequeña que cubre los dedos del lanzador.\n\nEl diseño del guante de béisbol ha evolucionado para mejorar la eficiencia y el control del lanzador. Los guantes modernos están hechos de materiales ligeros pero duraderos, como polipropileno o neoprene. También tienen una estructura interna que ayuda a mantener la forma durante las largas sesiones de juego.\n\n### El campo de béisbol en el siglo XXI\n\nEl campo de béisbol ha experimentado importantes cambios en el siglo XXI, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de estos cambios incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\n#### Tecnologías avanzadas en el campo de béisbol\n\nLa tecnología ha jugado un papel crucial en el desarrollo del campo de béisbol. Algunos de los avances más significativos incluyen:\n\n- **Monitoreo de rendimiento**: Las tecnologías de seguimiento y análisis de datos han permitido a los equipos monitorear el rendimiento de sus jugadores en tiempo real. Esto les permite identificar áreas de mejora y hacer ajustes en su estrategia de juego.\n\n- **Análisis de video**: El uso de cámaras de alta definición ha facilitado el análisis de jugadas complejas. Los entrenadores pueden revisar gráficos detallados de las jugadas para mejorar la eficiencia de sus tácticas.\n\n- **Simulación virtual**: Las simulaciones virtuales han permitido a los equipos practicar situaciones difíciles sin tener que enfrentarse a otros equipos reales. Esto les ha dado una ventaja competitiva en el campo.\n\n#### Evolución del diseño del campo\n\nEl diseño del campo de béisbol también ha evolucionado para mejorar la experiencia del espectador y el rendimiento de los jugadores. Algunos de los cambios más significativos incluyen:\n\n- **Iluminación**: El uso de luces LED ha permitido iluminar el campo durante las noches, lo que ha aumentado la popularidad del béisbol nocturno.\n\n- **Asientos**: Los asientos modernos son más cómodos y seguros. Algunos equipos han adoptado sistemas de asiento inteligente que pueden moverse para permitir una mejor visión del juego.\n\n- **Líneas de base**: Las líneas de base modernas son más precisas y duraderas, lo que ha reducido la posibilidad de errores en los jugadores.\n\n#### Creciente popularidad del béisbol digital\n\nEl béisbol digital también ha experimentado un crecimiento significativo en el siglo XXI. Algunos de los avances más importantes incluyen:\n\n- **Videojuegos**: Los videojuegos de béisbol han permitido a millones de jugadores experimentar el juego desde sus hogares. Algunos de los juegos más populares incluyen \"MLB 21\" y \"Madden NFL\".\n\n- **Aplicaciones móviles**: Las aplicaciones móviles como \"Baseball Mogul\" y \"The Bat\" permiten a los jugadores crear y gestionar equipos virtuales.\n\n- **Streaming**: La popularidad del béisbol ha llevado a la creación de canales de streaming dedicados al deporte. Algunos de los canales más populares incluyen \"MLB Network\" y \"ESPN\".\n\n### El campo de béisbol en otros países\n\nEl campo de béisbol no es solo un espacio de juego en Estados Unidos; también tiene una importante presencia en otros países, especialmente en América Latina.\n\n#### Béisbol en Panamá\n\nPanamá ha tenido un fuerte tradición en el béisbol. El Campeonato de Béisbol Mayor de Panamá es uno de los torneos más importantes del país y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n#### Béisbol en México\n\nMéxico también tiene una importante tradición en el béisbol. El Campeonato de Béisbol Mayor de México es uno de los torneos más importantes del país y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n#### Selección de béisbol de Colombia\n\nColombia también tiene una importante tradición en el béisbol. La selección colombiana ha participado en varios torneos internacionales y ha producido numerosos jugadores talentosos que han llegado a las ligas profesionales estadounidenses.\n\n### Conclusión\n\nEl campo de béisbol es un espacio de juego y cultura que ha evolucionado significativamente a lo largo del tiempo. Desde su origen en el siglo XIX, este campo ha experimentado importantes cambios, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de los avances más significativos incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\nEl campo de béisbol también tiene una importante presencia en otros países, especialmente en América Latina. Panamá, México y Colombia son solo algunos de los países que tienen una fuerte tradición en el béisbol.\n\nEn conclusión, el campo de béisbol es un espacio de juego y cultura que ha experimentado importantes cambios a lo largo del tiempo. Desde su origen en el siglo XIX, este campo ha experimentado importantes cambios, adaptándose a las necesidades cambiantes del juego y de los espectadores. Algunos de los avances más significativos incluyen la introducción de tecnologías avanzadas, la evolución del diseño del campo y la creciente popularidad del béisbol digital.\n\n## Fuentes utilizadas\n\n- [Campo de béisbol (web_wikipedia)]\n- [Guante de béisbol (web_wikipedia)]",
+  "unexpected_sections": [
+    "El campo de béisbol: un espacio de juego y cultura"
+  ],
+  "duplicate_sections": [],
+  "subsections_map": {
+    "el campo de beisbol un espacio de juego y cultura": [
+      "La estructura del campo",
+      "El guante de béisbol: una herramienta esencial",
+      "El campo de béisbol en el siglo XXI",
+      "El campo de béisbol en otros países",
+      "Conclusión"
+    ]
+  },
+  "structural_anomalies": [],
+  "duplicate_detected": false,
+  "continuation_rejected_as_duplicate": false,
+  "initial_word_count": 1161,
+  "final_word_count": 1161,
+  "minimum_words": 1500,
+  "total_continuation_attempts": 1,
+  "successful_continuations": 0,
+  "rejected_continuations": 0,
+  "duplicate_rejections": 0,
+  "repeated_continuation": false,
+  "total_added_words": 0,
+  "final_quality_gate": "FAIL",
+  "deterministic_used": false
+}

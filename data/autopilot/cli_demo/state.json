@@ -1,0 +1,102 @@
+{
+  "task_id": "cli_demo",
+  "objective": "demo",
+  "status": "COMPLETED",
+  "phase": "COMPLETED",
+  "attempt": 1,
+  "commands_run": [
+    {
+      "name": "echo_ok",
+      "cmd": [
+        "python",
+        "-c",
+        "print('ok')"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "timed_out": false,
+      "duration_sec": 0.03,
+      "stdout": "ok\n",
+      "stderr": ""
+    }
+  ],
+  "patches_applied": [],
+  "last_diff_signature": "43d5857f31bf9d1f066fdca94a2e1d0c9bc65d8493b20079da4c9d521af74b89",
+  "last_diagnosis": {
+    "failed_stage": null,
+    "error_type": "pytest_fail",
+    "error_message": "E2E completado (status=completed).",
+    "relevant_logs": [
+      "e2e stage: None wc=1668"
+    ],
+    "suspected_files": [
+      "echo_ok"
+    ],
+    "suspected_root_cause": "E2E completado (status=completed).",
+    "confidence": 0.6,
+    "recommended_action": "revisar logs de pytest en attempt_dir",
+    "evidence": [
+      "e2e stage: None wc=1668"
+    ],
+    "reason": "E2E completado (status=completed)."
+  },
+  "history": [
+    {
+      "attempt": 1,
+      "phase": "COMPLETED",
+      "status": "COMPLETED",
+      "diagnosis": {
+        "failed_stage": null,
+        "error_type": "pytest_fail",
+        "error_message": "E2E completado (status=completed).",
+        "relevant_logs": [
+          "e2e stage: None wc=1668"
+        ],
+        "suspected_files": [
+          "echo_ok"
+        ],
+        "suspected_root_cause": "E2E completado (status=completed).",
+        "confidence": 0.6,
+        "recommended_action": "revisar logs de pytest en attempt_dir",
+        "evidence": [
+          "e2e stage: None wc=1668"
+        ],
+        "reason": "E2E completado (status=completed)."
+      }
+    }
+  ],
+  "created_at": "2026-08-14 23:12:01",
+  "updated_at": "2026-08-14 23:12:01",
+  "last_validation": {
+    "pytest": null,
+    "e2e": {
+      "e2e_status": "PASS",
+      "status": "completed",
+      "failed_stage": null,
+      "error": null,
+      "word_count": 1668,
+      "placeholder_detected": false,
+      "docx_path": "output\\docx\\book_1001_es.docx",
+      "docx_status": "PASS",
+      "last_checkpoint": "data\\checkpoints\\1001\\book\\final_qc\\v0036.json",
+      "report_path": "C:\\proyectos\\SPACE LAIR\\e2e_001_report.json"
+    },
+    "quality_gate": "PASS",
+    "commands_run": [
+      {
+        "name": "echo_ok",
+        "cmd": [
+          "python",
+          "-c",
+          "print('ok')"
+        ],
+        "returncode": 0,
+        "ok": true,
+        "timed_out": false,
+        "duration_sec": 0.03,
+        "stdout": "ok\n",
+        "stderr": ""
+      }
+    ]
+  }
+}

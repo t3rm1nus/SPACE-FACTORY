@@ -1,0 +1,7 @@
+pydantic
+flask
+python-dotenv
+click
+python-docx
+fpdf2
+pypdf

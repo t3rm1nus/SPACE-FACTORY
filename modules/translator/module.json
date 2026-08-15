@@ -1,0 +1,14 @@
+{
+  "id": "translator",
+  "name": "Traductor Editorial",
+  "description": "Traducción editorial entre español e inglés (no literal). Mantiene estructura, headings, citas, referencias, notas, nombres, números y unidades; adapta expresiones idiomáticas, construcción, puntuación y tono. Ejecuta una auditoría automática post-traducción.",
+  "type": "agent",
+  "capabilities": ["translate_es_en", "translate_en_es"],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 240,
+    "provider": "ollama",
+    "model": "llama3.1"
+  }
+}

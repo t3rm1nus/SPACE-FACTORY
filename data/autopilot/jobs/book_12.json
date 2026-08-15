@@ -1,0 +1,633 @@
+{
+  "job_id": "book_12",
+  "book_id": 12,
+  "status": "COMPLETED",
+  "created_at": "2026-08-14 16:56:16",
+  "updated_at": "2026-08-14 16:58:33",
+  "current_phase": "docx",
+  "phases": [
+    {
+      "id": "planner",
+      "label": "BOOK PLANNER",
+      "capability": "create_book_plan",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:57:09",
+      "completed_at": "2026-08-14 16:57:16",
+      "duration": 7.156,
+      "attempts": 1,
+      "metrics": {
+        "title": "La Via Láctea: El hogar del universo",
+        "subtitle": "Una exploración fascinante de nuestra galaxia",
+        "description": "Descubre los misterios y la belleza de la Via Láctea, el hogar que nos rodea. Desde su origen hasta sus secretos ocultos, este libro te guiará a través de una viaje fascinante por el cosmos.",
+        "target_audience": "Todos",
+        "chapters": [
+          {
+            "number": 1,
+            "title": "Introducción a la Via Láctea",
+            "objective": "Presentar los fundamentos de la Via Láctea y su importancia en el universo.",
+            "key_questions": [
+              "¿Qué es la Via Láctea?",
+              "Cuán grande es la Via Láctea?",
+              "Cómo se formó la Via Láctea?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Información sobre el tamaño y composición de la Via Láctea",
+              "Historia de su formación"
+            ],
+            "image_requirements": 3
+          }
+        ],
+        "provider": "ollama",
+        "model": "qwen-agent:latest",
+        "tokens_input": 389,
+        "tokens_output": 265,
+        "cost": 0.0
+      },
+      "module": "book_planner",
+      "task_id": 22,
+      "error": null
+    },
+    {
+      "id": "research",
+      "label": "RESEARCH",
+      "capability": "research_web",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:57:16",
+      "completed_at": "2026-08-14 16:57:17",
+      "duration": 1.615,
+      "attempts": 1,
+      "metrics": {
+        "query": "Cosmos",
+        "status": "PASS",
+        "execution_mode": "real",
+        "sources": [
+          {
+            "title": "Cosmos: Un viaje personal",
+            "url": "https://es.wikipedia.org/wiki/Cosmos%3A_Un_viaje_personal",
+            "source_type": "web_wikipedia",
+            "content": "Cosmos: un viaje personal es una serie documental de divulgación científica escrita por Carl Sagan, Ann Druyan y Steven Soter, cuyos objetivos fundamentales fueron:Difundir la historia de la astronomía y de la ciencia, así como sobre el origen de la vida.\nHacer conciencia sobre el lugar que ocupa nuestra especie y nuestro planeta en el universo, y presentar las modernas visiones de la cosmología y las últimas noticias de la exploración espacial, y en particular, las misiones Voyager.",
+            "accessed_at": "2026-08-14T16:57:16.789780+00:00"
+          },
+          {
+            "title": "Cosmos (satélite)",
+            "url": "https://es.wikipedia.org/wiki/Cosmos_(sat%C3%A9lite)",
+            "source_type": "web_wikipedia",
+            "content": "Cosmos es la designación dada a un gran número de satélites artificiales operados desde 1962 por la Unión Soviética y, tras su disolución, por Rusia hasta la actualidad. Los satélites que obtienen esta denominación no forman un único programa sino que se refieren a distintos satélites sobre los cuales, en ocasiones, las autoridades no proporcionaron información específica.",
+            "accessed_at": "2026-08-14T16:57:16.972489+00:00"
+          },
+          {
+            "title": "Cosmos bipinnatus",
+            "url": "https://es.wikipedia.org/wiki/Cosmos_bipinnatus",
+            "source_type": "web_wikipedia",
+            "content": "Cosmos bipinnatus, comúnmente llamado cosmos, mirasol, coreopsis o girasol púrpura es una especie de plantas de la familia Asteraceae nativa de México.",
+            "accessed_at": "2026-08-14T16:57:17.163581+00:00"
+          },
+          {
+            "title": "Cosmos sulphureus",
+            "url": "https://es.wikipedia.org/wiki/Cosmos_sulphureus",
+            "source_type": "web_wikipedia",
+            "content": "Cosmos sulphureus, cosmos, cosmos azufrado, cosmos amarillo, mata piojos, es una especie fanerogámica endémica de América Central.",
+            "accessed_at": "2026-08-14T16:57:17.778351+00:00"
+          }
+        ],
+        "stored_sources": [
+          {
+            "id": 397,
+            "url": "https://es.wikipedia.org/wiki/Cosmos%3A_Un_viaje_personal",
+            "title": "Cosmos: Un viaje personal",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 16:57:16",
+            "source_type": "web_wikipedia",
+            "relevance": 78,
+            "notes": "content_snippet=Cosmos: un viaje personal es una serie documental de divulgación científica escrita por Carl Sagan, Ann Druyan y Steven Soter, cuyos objetivos fundamentales fueron:Difundir la historia de la astronomía y de la ciencia, así como sobre el origen de la vida.\nHacer conciencia sobre el lugar que ocupa nuestra especie y nuestro planeta en el universo, y presentar las modernas visiones de la cosmología y las últimas noticias de la exploración espacial, y en particular, las misiones Voyager.",
+            "chapter_ids": [],
+            "url_hash": "6a39dd328c3cb43b8ce815f462ebf42d01ba155bc09e95e47c0a00d4fd8d5f4f",
+            "hash": "229a309db7201400",
+            "status": "verified"
+          },
+          {
+            "id": 398,
+            "url": "https://es.wikipedia.org/wiki/Cosmos_(sat%C3%A9lite)",
+            "title": "Cosmos (satélite)",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 16:57:16",
+            "source_type": "web_wikipedia",
+            "relevance": 57,
+            "notes": "content_snippet=Cosmos es la designación dada a un gran número de satélites artificiales operados desde 1962 por la Unión Soviética y, tras su disolución, por Rusia hasta la actualidad. Los satélites que obtienen esta denominación no forman un único programa sino que se refieren a distintos satélites sobre los cuales, en ocasiones, las autoridades no proporcionaron información específica.",
+            "chapter_ids": [],
+            "url_hash": "a27be163ca512a2132087ae421ebb83d95eff62950ab32bf4e5be0ff8f0933da",
+            "hash": "a72814798c0dabd9",
+            "status": "verified"
+          },
+          {
+            "id": 399,
+            "url": "https://es.wikipedia.org/wiki/Cosmos_bipinnatus",
+            "title": "Cosmos bipinnatus",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 16:57:17",
+            "source_type": "web_wikipedia",
+            "relevance": 22,
+            "notes": "content_snippet=Cosmos bipinnatus, comúnmente llamado cosmos, mirasol, coreopsis o girasol púrpura es una especie de plantas de la familia Asteraceae nativa de México.",
+            "chapter_ids": [],
+            "url_hash": "838e959738e90979d46de43481540868fa267c2ee8b3628f505239f5b02ebb10",
+            "hash": "edd1fc4ef68b2f0a",
+            "status": "verified"
+          },
+          {
+            "id": 400,
+            "url": "https://es.wikipedia.org/wiki/Cosmos_sulphureus",
+            "title": "Cosmos sulphureus",
+            "publisher": null,
+            "author": null,
+            "publication_date": null,
+            "accessed_at": "2026-08-14 16:57:17",
+            "source_type": "web_wikipedia",
+            "relevance": 17,
+            "notes": "content_snippet=Cosmos sulphureus, cosmos, cosmos azufrado, cosmos amarillo, mata piojos, es una especie fanerogámica endémica de América Central.",
+            "chapter_ids": [],
+            "url_hash": "8a40e065eacecb5a161767ae1f6b86b5cf69df36068be2fe1e737d210dfb0b02",
+            "hash": "f03955e806f1d189",
+            "status": "verified"
+          }
+        ],
+        "source_count": 4,
+        "error": null
+      },
+      "module": "research",
+      "task_id": 23,
+      "error": null
+    },
+    {
+      "id": "outline",
+      "label": "OUTLINE",
+      "capability": "create_book_plan",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:57:17",
+      "completed_at": "2026-08-14 16:57:24",
+      "duration": 7.158,
+      "attempts": 1,
+      "metrics": {
+        "title": "La Via Láctea: Explorando la Galaxia que Habita Nuestro Universo",
+        "subtitle": "Una Guía Divulgativa y Rigurosa sobre la Via Láctea",
+        "description": "Este libro ofrece una visión detallada y accesible de la Via Láctea, la galaxia en la que habitamos. A través de un enfoque divulgativo pero riguroso, exploraremos los fundamentos científicos de esta fascinante estructura cósmica.",
+        "target_audience": "Todos",
+        "chapters": [
+          {
+            "number": 1,
+            "title": "Introducción a la Via Láctea",
+            "objective": "Presentar el concepto básico de la Via Láctea y su importancia en el estudio del universo.",
+            "key_questions": [
+              "¿Qué es la Via Láctea?",
+              "Por qué es importante estudiarla?"
+            ],
+            "estimated_words": 3000,
+            "research_requirements": [
+              "Información básica sobre la estructura de la Via Láctea",
+              "Historia de su descubrimiento y estudio"
+            ],
+            "image_requirements": 1
+          }
+        ],
+        "provider": "ollama",
+        "model": "qwen-agent:latest",
+        "tokens_input": 397,
+        "tokens_output": 278,
+        "cost": 0.0
+      },
+      "module": "book_planner",
+      "task_id": 24,
+      "error": null
+    },
+    {
+      "id": "writer",
+      "label": "CHAPTER WRITER",
+      "capability": "write_chapter_es",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:57:24",
+      "completed_at": "2026-08-14 16:57:45",
+      "duration": 20.84,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 1,
+          "done": 1
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "chapter_writer",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "42": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "chapter_writer",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\12\\chapter_1\\chapter.md",
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 12,
+                  "title": "Cosmos",
+                  "language": "es"
+                },
+                "chapter_outline": {
+                  "title": "Capítulo 1",
+                  "number": 1,
+                  "objective": null,
+                  "sections": []
+                },
+                "research": null,
+                "sources": [
+                  {
+                    "title": "Cosmos: Un viaje personal",
+                    "url": "https://es.wikipedia.org/wiki/Cosmos%3A_Un_viaje_personal",
+                    "source_type": "web_wikipedia",
+                    "content": "Cosmos: un viaje personal es una serie documental de divulgación científica escrita por Carl Sagan, Ann Druyan y Steven Soter, cuyos objetivos fundamentales fueron:Difundir la historia de la astronomía y de la ciencia, así como sobre el origen de la vida.\nHacer conciencia sobre el lugar que ocupa nuestra especie y nuestro planeta en el universo, y presentar las modernas visiones de la cosmología y las últimas noticias de la exploración espacial, y en particular, las misiones Voyager.",
+                    "accessed_at": "2026-08-14T16:57:16.789780+00:00"
+                  },
+                  {
+                    "title": "Cosmos (satélite)",
+                    "url": "https://es.wikipedia.org/wiki/Cosmos_(sat%C3%A9lite)",
+                    "source_type": "web_wikipedia",
+                    "content": "Cosmos es la designación dada a un gran número de satélites artificiales operados desde 1962 por la Unión Soviética y, tras su disolución, por Rusia hasta la actualidad. Los satélites que obtienen esta denominación no forman un único programa sino que se refieren a distintos satélites sobre los cuales, en ocasiones, las autoridades no proporcionaron información específica.",
+                    "accessed_at": "2026-08-14T16:57:16.972489+00:00"
+                  },
+                  {
+                    "title": "Cosmos bipinnatus",
+                    "url": "https://es.wikipedia.org/wiki/Cosmos_bipinnatus",
+                    "source_type": "web_wikipedia",
+                    "content": "Cosmos bipinnatus, comúnmente llamado cosmos, mirasol, coreopsis o girasol púrpura es una especie de plantas de la familia Asteraceae nativa de México.",
+                    "accessed_at": "2026-08-14T16:57:17.163581+00:00"
+                  },
+                  {
+                    "title": "Cosmos sulphureus",
+                    "url": "https://es.wikipedia.org/wiki/Cosmos_sulphureus",
+                    "source_type": "web_wikipedia",
+                    "content": "Cosmos sulphureus, cosmos, cosmos azufrado, cosmos amarillo, mata piojos, es una especie fanerogámica endémica de América Central.",
+                    "accessed_at": "2026-08-14T16:57:17.778351+00:00"
+                  }
+                ],
+                "previous_chapter_summaries": [],
+                "target_word_count": 3000,
+                "style_guide": "Divulgativo, riguroso y claro",
+                "provider": "ollama",
+                "model": "qwen-agent:latest",
+                "tokens_input": 1960,
+                "tokens_output": 1069,
+                "word_count": 657,
+                "text": "# Capítulo 1\n\n## Introducción\n\nEl cosmos es un término que ha sido objeto de fascinación y misterio durante siglos. Desde las antiguas civilizaciones hasta los científicos contemporáneos, el universo ha sido el escenario de innumerables preguntas sobre su origen, composición y destino. Este capítulo explora la naturaleza del cosmos, sus principales características y cómo nuestra comprensión de él ha evolucionado a lo largo del tiempo.\n\n## Historia del conocimiento cosmológico\n\nLa historia del conocimiento cosmológico es un viaje fascinante que atraviesa el tiempo, desde las teorías antiguas hasta los descubrimientos modernos. Las primeras concepciones del cosmos provienen de culturas prehistóricas y religiosas, donde el universo era a menudo personificado como una entidad viviente o un lugar sagrado.\n\nEn la antigua Grecia, filósofos como Aristarco de Samos propusieron que la Tierra gira sobre su eje, una idea que desafiaba las creencias tradicionales y fue rechazada por el consenso científico durante siglos. A lo largo del siglo XVIII, científicos como Isaac Newton desarrollaron la física clásica, que proporcionó un marco teórico para entender el movimiento de los cuerpos celestes.\n\nEl descubrimiento del universo cósmico en el siglo XX fue un revolucionario cambio. En 1927, Edwin Hubble demostró que las galaxias distantes se alejan de nosotros a velocidades crecientes, lo que implica que estamos experimentando la expansión del universo. Este descubrimiento abrió nuevas perspectivas sobre el origen y destino del cosmos.\n\n## Características fundamentales del cosmos\n\nEl cosmos es un vasto y diverso entorno compuesto por una gran variedad de objetos astronómicos, desde estrellas hasta planetas y galaxias. Cada uno de estos elementos tiene sus propias características únicas que contribuyen a la complejidad del universo.\n\nLas estrellas son el principal componente del cosmos, siendo las fuentes de energía y luz en muchas galaxias. El sol es una estrella similar a nuestra, pero su tamaño y edad lo hacen distintos. Las galaxias son sistemas gravitacionales que contienen millones o incluso billones de estrellas y otros objetos celestes.\n\nLos planetas son cuerpos rocosos o gaseosos orbitando alrededor de un cuerpo central, como una estrella. La Tierra es el único planeta conocido con vida, pero la búsqueda de planetas habitables en otras galaxias ha sido un objetivo importante para los científicos espaciales.\n\n## Exploración del cosmos\n\nLa exploración del cosmos ha sido una parte integral de la historia humana desde tiempos inmemoriales. Desde las misiones espaciales soviéticas hasta las misiones norteamericanas, el viaje en el espacio ha sido un desafío tecnológico y científico.\n\nLa misión Apollo 11 marcó un hito importante en la historia de la exploración espacial, al ser la primera aterrizar en la Luna. Desde entonces, han habido numerosas misiones que han investigado diferentes aspectos del cosmos, desde la investigación científica hasta la búsqueda de vida extraterrestre.\n\nLos satélites y observatorios espaciales también han desempeñado un papel crucial en la exploración del universo. Estos vehículos nos permiten observar el cosmos a gran distancia y con mayor precisión que nunca antes.\n\n## Futuro del cosmos\n\nEl futuro del cosmos es un campo de estudio fascinante, lleno de posibilidades y desafíos. La búsqueda de vida extraterrestre, la colonización espacial y la exploración de nuevos planetas son solo algunas de las áreas en las que se espera avances significativos.\n\nLa tecnología ha avanzado rápidamente en los últimos años, permitiendo a los científicos realizar descubrimientos más precisos y a los astronautas explorar el espacio de formas nunca antes vistas. La colaboración internacional es clave para estos proyectos, ya que requieren recursos y conocimientos de todo el mundo.\n\n## Conclusión\n\nEl cosmos es un vasto y complejo entorno que ha sido objeto de fascinación y misterio durante siglos. Desde las antiguas civilizaciones hasta los científicos contemporáneos, la comprensión del universo ha evolucionado a lo largo del tiempo. A medida que nuestra tecnología avanza, podemos esperar descubrimientos aún más sorprendentes y reveladores sobre el cosmos.\n\n## Fuentes utilizadas\n\n- Cosmos: Un viaje personal (web_wikipedia)\n- Cosmos (satélite) (web_wikipedia)\n- Cosmos bipinnatus (web_wikipedia)\n- Cosmos sulphureus (web_wikipedia)",
+                "unexpected_sections": [
+                  "Introducción",
+                  "Historia del conocimiento cosmológico",
+                  "Características fundamentales del cosmos",
+                  "Exploración del cosmos",
+                  "Futuro del cosmos",
+                  "Conclusión"
+                ],
+                "duplicate_sections": [],
+                "subsections_map": {},
+                "structural_anomalies": [],
+                "duplicate_detected": false,
+                "continuation_rejected_as_duplicate": false,
+                "initial_word_count": 657,
+                "final_word_count": 657,
+                "minimum_words": 1500,
+                "total_continuation_attempts": 1,
+                "successful_continuations": 0,
+                "rejected_continuations": 0,
+                "duplicate_rejections": 0,
+                "repeated_continuation": false,
+                "total_added_words": 0,
+                "final_quality_gate": "FAIL",
+                "deterministic_used": false
+              },
+              "word_count": 657,
+              "sources_used": [
+                "https://es.wikipedia.org/wiki/Cosmos%3A_Un_viaje_personal",
+                "https://es.wikipedia.org/wiki/Cosmos_(sat%C3%A9lite)",
+                "https://es.wikipedia.org/wiki/Cosmos_bipinnatus",
+                "https://es.wikipedia.org/wiki/Cosmos_sulphureus"
+              ],
+              "quality_gate": "FAIL",
+              "quality_errors": [
+                "menos de 1500 palabras (657)",
+                "secciones fuera del outline detectadas: Introducción, Historia del conocimiento cosmológico, Características fundamentales del cosmos, Exploración del cosmos, Futuro del cosmos, Conclusión"
+              ],
+              "execution_mode": "real",
+              "provider": "ollama",
+              "model": "qwen-agent:latest",
+              "tokens_input": 1960,
+              "tokens_output": 1069,
+              "cost": 0.0,
+              "unexpected_sections": [
+                "Introducción",
+                "Historia del conocimiento cosmológico",
+                "Características fundamentales del cosmos",
+                "Exploración del cosmos",
+                "Futuro del cosmos",
+                "Conclusión"
+              ],
+              "duplicate_sections": [],
+              "subsections_map": {},
+              "structural_anomalies": [],
+              "duplicate_detected": false,
+              "continuation_rejected_as_duplicate": false,
+              "initial_word_count": 657,
+              "final_word_count": 657,
+              "minimum_words": 1500,
+              "target_word_count": 3000,
+              "total_continuation_attempts": 1,
+              "successful_continuations": 0,
+              "rejected_continuations": 0,
+              "duplicate_rejections": 0,
+              "repeated_continuation": false,
+              "total_added_words": 0,
+              "final_quality_gate": "FAIL",
+              "deterministic_used": false
+            }
+          }
+        },
+        "total": 1,
+        "done": 1
+      }
+    },
+    {
+      "id": "fact_check",
+      "label": "FACT CHECK",
+      "capability": "fact_check_chapter",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:57:45",
+      "completed_at": "2026-08-14 16:57:49",
+      "duration": 3.913,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 1,
+          "done": 1
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "fact_checker",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "42": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "fact_checker",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "status": "PASS",
+              "claims_checked": 0,
+              "issues": [],
+              "corrections": [],
+              "unsupported_claims": [],
+              "supported_claims": 0,
+              "conflicting_claims": 0,
+              "quality_gate": "PASS",
+              "execution_mode": "real"
+            }
+          }
+        },
+        "total": 1,
+        "done": 1
+      }
+    },
+    {
+      "id": "editor",
+      "label": "EDITOR",
+      "capability": "edit_chapter",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:57:49",
+      "completed_at": "2026-08-14 16:58:33",
+      "duration": 43.526,
+      "attempts": 1,
+      "metrics": {
+        "subs": {
+          "total": 1,
+          "done": 1
+        },
+        "words": 0,
+        "per_chapter": true
+      },
+      "module": "editor",
+      "task_id": null,
+      "error": null,
+      "subs": {
+        "chapters": {
+          "42": {
+            "status": "PASS",
+            "attempts": 1,
+            "module": "editor",
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "edited_text": "# Capítulo 1\n\n## Introducción\n\nEl cosmos es un término que ha sido objeto de fascinación y misterio durante siglos. Desde las antiguas civilizaciones hasta los científicos contemporáneos, el universo ha sido el escenario de innumerables preguntas sobre su origen, composición y destino. Este capítulo explora la naturaleza del cosmos, sus principales características y cómo nuestra comprensión de él ha evolucionado a lo largo del tiempo.\n\n## Historia del conocimiento cosmológico\n\nLa historia del conocimiento cosmológico es un viaje fascinante que atraviesa el tiempo, desde las teorías antiguas hasta los descubrimientos modernos. Las primeras concepciones del cosmos provienen de culturas prehistóricas y religiosas, donde el universo era a menudo personificado como una entidad viviente o un lugar sagrado.\n\nEn la antigua Grecia, filósofos como Aristarco de Samos propusieron que la Tierra gira sobre su eje, una idea que desafiaba las creencias tradicionales y fue rechazada por el consenso científico durante siglos. A lo largo del siglo XVIII, científicos como Isaac Newton desarrollaron la física clásica, que proporcionó un marco teórico para entender el movimiento de los cuerpos celestes.\n\nEl descubrimiento del universo cósmico en el siglo XX fue un revolucionario cambio. En 1927, Edwin Hubble demostró que las galaxias distantes se alejan de nosotros a velocidades crecientes, lo que implica que estamos experimentando la expansión del universo. Este descubrimiento abrió nuevas perspectivas sobre el origen y destino del cosmos.\n\n## Características fundamentales del cosmos\n\nEl cosmos es un vasto y diverso entorno compuesto por una gran variedad de objetos astronómicos, desde estrellas hasta planetas y galaxias. Cada uno de estos elementos tiene sus propias características únicas que contribuyen a la complejidad del universo.\n\nLas estrellas son el principal componente del cosmos, siendo las fuentes de energía y luz en muchas galaxias. El sol es una estrella similar a nuestra, pero su tamaño y edad lo hacen distintos. Las galaxias son sistemas gravitacionales que contienen millones o incluso billones de estrellas y otros objetos celestes.\n\nLos planetas son cuerpos rocosos o gaseosos orbitando alrededor de un cuerpo central, como una estrella. La Tierra es el único planeta conocido con vida, pero la búsqueda de planetas habitables en otras galaxias ha sido un objetivo importante para los científicos espaciales.\n\n## Exploración del cosmos\n\nLa exploración del cosmos ha sido una parte integral de la historia humana desde tiempos inmemoriales. Desde las misiones espaciales soviéticas hasta las misiones norteamericanas, el viaje en el espacio ha sido un desafío tecnológico y científico.\n\nLa misión Apollo 11 marcó un hito importante en la historia de la exploración espacial, al ser la primera aterrizar en la Luna. Desde entonces, han habido numerosas misiones que han investigado diferentes aspectos del cosmos, desde la investigación científica hasta la búsqueda de vida extraterrestre.\n\nLos satélites y observatorios espaciales también han desempeñado un papel crucial en la exploración del universo. Estos vehículos nos permiten observar el cosmos a gran distancia y con mayor precisión que nunca antes.\n\n## Futuro del cosmos\n\nEl futuro del cosmos es un campo de estudio fascinante, lleno de posibilidades y desafíos. La búsqueda de vida extraterrestre, la colonización espacial y la exploración de nuevos planetas son solo algunas de las áreas en las que se espera avances significativos.\n\nLa tecnología ha avanzado rápidamente en los últimos años, permitiendo a los científicos realizar descubrimientos más precisos y a los astronautas explorar el espacio de formas nunca antes vistas. La colaboración internacional es clave para estos proyectos, ya que requieren recursos y conocimientos de todo el mundo.\n\n## Conclusión\n\nEl cosmos es un vasto y complejo entorno que ha sido objeto de fascinación y misterio durante siglos. Desde las antiguas civilizaciones hasta los científicos contemporáneos, la comprensión del universo ha evolucionado a lo largo del tiempo. A medida que nuestra tecnología avanza, podemos esperar descubrimientos aún más sorprendentes y reveladores sobre el cosmos.\n\n## Fuentes utilizadas\n\n- Cosmos: Un viaje personal (web_wikipedia)\n- Cosmos (satélite) (web_wikipedia)\n- Cosmos bipinnatus (web_wikipedia)\n- Cosmos sulphureus (web_wikipedia)",
+              "editorial_notes": [
+                "El capítulo ha sido revisado y editado para asegurar que esté completo, claro y coherente. Se han mantenido todas las secciones originales sin reducir su contenido ni modificar los hechos verificados.",
+                "Salida demasiado corta (657 palabras, mínimo 1500). Se conserva el original."
+              ],
+              "changes_summary": [
+                "No se realizaron cambios significativos en el texto original. El capítulo ha sido revisado para garantizar su integridad y coherencia.",
+                "Fallback por longitud insuficiente."
+              ],
+              "input_words": 657,
+              "output_words": 657,
+              "placeholder_detected": false,
+              "quality_gate": "FAIL",
+              "execution_mode": "fallback"
+            }
+          }
+        },
+        "total": 1,
+        "done": 1
+      }
+    },
+    {
+      "id": "quality_gate",
+      "label": "QUALITY GATE",
+      "capability": "final_quality_control",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:58:33",
+      "completed_at": "2026-08-14 16:58:33",
+      "duration": 0.033,
+      "attempts": 1,
+      "metrics": {
+        "overall_status": "WARNING",
+        "is_complete": true,
+        "book_checks": [
+          {
+            "status": "PASS",
+            "message": "Libro existe"
+          },
+          {
+            "status": "PASS",
+            "message": "Metadatos completos"
+          },
+          {
+            "status": "PASS",
+            "message": "Índice presente (se generará a partir de los capítulos)"
+          },
+          {
+            "status": "PASS",
+            "message": "Capítulos presentes"
+          }
+        ],
+        "chapter_checks": [
+          {
+            "status": "PASS",
+            "message": "Capítulos suficientes: 1"
+          },
+          {
+            "status": "PASS",
+            "message": "No excede máximo configurado: 1 <= 1"
+          },
+          {
+            "status": "PASS",
+            "message": "Números de capítulo únicos"
+          },
+          {
+            "status": "PASS",
+            "message": "Todos los capítulos están numerados"
+          },
+          {
+            "status": "PASS",
+            "message": "Ningún capítulo vacío"
+          }
+        ],
+        "language_checks": [
+          {
+            "status": "PASS",
+            "message": "Español solicitado"
+          },
+          {
+            "status": "PASS",
+            "message": "Inglés no solicitado"
+          },
+          {
+            "status": "PASS",
+            "message": "Español completo en todos los capítulos"
+          }
+        ],
+        "source_checks": [
+          {
+            "status": "WARNING",
+            "message": "Investigación faltante en capítulos: [1]"
+          },
+          {
+            "status": "PASS",
+            "message": "Fuentes presentes en todos los capítulos"
+          },
+          {
+            "status": "PASS",
+            "message": "URLs válidas"
+          },
+          {
+            "status": "PASS",
+            "message": "Sin fuentes inventadas"
+          }
+        ],
+        "image_checks": [
+          {
+            "status": "PASS",
+            "message": "Sin imágenes requeridas"
+          },
+          {
+            "status": "PASS",
+            "message": "Todos los archivos de imagen existen"
+          },
+          {
+            "status": "PASS",
+            "message": "Imágenes legibles"
+          },
+          {
+            "status": "PASS",
+            "message": "Metadata presente en imágenes"
+          }
+        ],
+        "document_checks": [
+          {
+            "status": "WARNING",
+            "message": "Ruta DOCX no proporcionada"
+          },
+          {
+            "status": "PASS",
+            "message": "PDF no requerido"
+          }
+        ]
+      },
+      "module": "quality_control",
+      "task_id": 28,
+      "error": null
+    },
+    {
+      "id": "docx",
+      "label": "DOCUMENT BUILDER",
+      "capability": "build_book_docx",
+      "status": "PASS",
+      "started_at": "2026-08-14 16:58:33",
+      "completed_at": "2026-08-14 16:58:33",
+      "duration": 0.121,
+      "attempts": 1,
+      "metrics": {
+        "docx_path": "output\\docx\\book_12_es.docx",
+        "book_id": 12,
+        "language": "es",
+        "chapter_count": 1,
+        "image_count": 0
+      },
+      "module": "document_builder",
+      "task_id": 29,
+      "error": null
+    }
+  ],
+  "docx_path": "output\\docx\\book_12_es.docx",
+  "error": null,
+  "data": {
+    "sources": [
+      {
+        "title": "Cosmos: Un viaje personal",
+        "url": "https://es.wikipedia.org/wiki/Cosmos%3A_Un_viaje_personal",
+        "source_type": "web_wikipedia",
+        "content": "Cosmos: un viaje personal es una serie documental de divulgación científica escrita por Carl Sagan, Ann Druyan y Steven Soter, cuyos objetivos fundamentales fueron:Difundir la historia de la astronomía y de la ciencia, así como sobre el origen de la vida.\nHacer conciencia sobre el lugar que ocupa nuestra especie y nuestro planeta en el universo, y presentar las modernas visiones de la cosmología y las últimas noticias de la exploración espacial, y en particular, las misiones Voyager.",
+        "accessed_at": "2026-08-14T16:57:16.789780+00:00"
+      },
+      {
+        "title": "Cosmos (satélite)",
+        "url": "https://es.wikipedia.org/wiki/Cosmos_(sat%C3%A9lite)",
+        "source_type": "web_wikipedia",
+        "content": "Cosmos es la designación dada a un gran número de satélites artificiales operados desde 1962 por la Unión Soviética y, tras su disolución, por Rusia hasta la actualidad. Los satélites que obtienen esta denominación no forman un único programa sino que se refieren a distintos satélites sobre los cuales, en ocasiones, las autoridades no proporcionaron información específica.",
+        "accessed_at": "2026-08-14T16:57:16.972489+00:00"
+      },
+      {
+        "title": "Cosmos bipinnatus",
+        "url": "https://es.wikipedia.org/wiki/Cosmos_bipinnatus",
+        "source_type": "web_wikipedia",
+        "content": "Cosmos bipinnatus, comúnmente llamado cosmos, mirasol, coreopsis o girasol púrpura es una especie de plantas de la familia Asteraceae nativa de México.",
+        "accessed_at": "2026-08-14T16:57:17.163581+00:00"
+      },
+      {
+        "title": "Cosmos sulphureus",
+        "url": "https://es.wikipedia.org/wiki/Cosmos_sulphureus",
+        "source_type": "web_wikipedia",
+        "content": "Cosmos sulphureus, cosmos, cosmos azufrado, cosmos amarillo, mata piojos, es una especie fanerogámica endémica de América Central.",
+        "accessed_at": "2026-08-14T16:57:17.778351+00:00"
+      }
+    ],
+    "source_count": 4
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "mcp_external",
+  "name": "MCP Externo",
+  "description": "Módulo que actúa como cliente de un servidor MCP externo.",
+  "type": "mcp",
+  "version": "0.1.0",
+  "capabilities": ["external_tool"],
+  "requires_human_approval": false,
+  "mcp": {
+    "transport": "http",
+    "server_url": "http://localhost:9999/mcp",
+    "serve": false,
+    "headers": {}
+  },
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 30
+  }
+}

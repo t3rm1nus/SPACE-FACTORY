@@ -1,0 +1,9 @@
+{
+  "id": "word_counter",
+  "name": "Contador de palabras",
+  "description": "Cuenta palabras y caracteres de un texto. No usa IA.",
+  "type": "tool",
+  "capabilities": ["count_words"],
+  "requires_human_approval": false,
+  "config": {"priority": 5, "timeout_seconds": 10}
+}

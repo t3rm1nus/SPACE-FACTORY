@@ -1,0 +1,1 @@
+"""Space Lair - Núcleo del sistema."""

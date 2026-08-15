@@ -1,0 +1,18 @@
+{
+  "id": "mcp_demo",
+  "name": "Demo MCP Server",
+  "description": "Módulo de ejemplo que se expone como servidor MCP (herramienta: reverse_text).",
+  "type": "mcp",
+  "version": "0.1.0",
+  "capabilities": ["reverse_text"],
+  "requires_human_approval": false,
+  "mcp": {
+    "transport": "http",
+    "serve": true,
+    "headers": {}
+  },
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 10
+  }
+}

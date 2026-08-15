@@ -1,0 +1,18 @@
+{
+  "failed_stage": null,
+  "error_type": "pytest_fail",
+  "error_message": "E2E completado (status=completed).",
+  "relevant_logs": [
+    "e2e stage: None wc=1668"
+  ],
+  "suspected_files": [
+    "echo_ok"
+  ],
+  "suspected_root_cause": "E2E completado (status=completed).",
+  "confidence": 0.6,
+  "recommended_action": "revisar logs de pytest en attempt_dir",
+  "evidence": [
+    "e2e stage: None wc=1668"
+  ],
+  "reason": "E2E completado (status=completed)."
+}

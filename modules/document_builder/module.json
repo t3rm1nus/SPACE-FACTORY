@@ -1,0 +1,21 @@
+{
+  "id": "document_builder",
+  "name": "Document Builder",
+  "description": "Genera un DOCX profesional de un libro completo a partir de la estructura de libro, capítulos e imágenes.",
+  "type": "agent",
+  "capabilities": [
+    "build_book_docx"
+  ],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 180,
+    "page_size": "A4",
+    "margins_mm": {
+      "top": 25.4,
+      "bottom": 25.4,
+      "left": 25.4,
+      "right": 25.4
+    }
+  }
+}

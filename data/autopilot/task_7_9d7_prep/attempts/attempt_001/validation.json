@@ -1,0 +1,32 @@
+{
+  "pytest": null,
+  "e2e": {
+    "e2e_status": "FAIL",
+    "status": "error",
+    "failed_stage": "chapter",
+    "error": "quality gate FAIL: ['menos de 1500 palabras (732)', 'duplicación potencial detectada en una continuación', 'una continuación fue rechazada por ser una repetición']",
+    "word_count": 732,
+    "placeholder_detected": false,
+    "docx_path": null,
+    "docx_status": "PENDING",
+    "last_checkpoint": "data\\checkpoints\\1001\\book\\draft\\v0059.json",
+    "report_path": "C:\\proyectos\\SPACE LAIR\\e2e_001_report.json"
+  },
+  "quality_gate": "FAIL",
+  "commands_run": [
+    {
+      "name": "probe_readiness",
+      "cmd": [
+        "python",
+        "-c",
+        "import os,sys\ncks={'modules/chapter_writer/main.py':os.path.isfile('modules/chapter_writer/main.py'),'modules/editor':os.path.isdir('modules/editor'),'modules/research':os.path.isdir('modules/research'),'modules/fact_checker':os.path.isdir('modules/fact_checker'),'tests/test_autopilot.py':os.path.isfile('tests/test_autopilot.py')}\nok=True\nfor k,v in cks.items():\n print(('OK  ' if v else 'FAIL')+' '+k)\n ok=ok and v\nprint('READY' if ok else 'NOT_READY')\nsys.exit(0 if ok else 1)"
+      ],
+      "returncode": 0,
+      "ok": true,
+      "timed_out": false,
+      "duration_sec": 0.03,
+      "stdout": "OK   modules/chapter_writer/main.py\nOK   modules/editor\nOK   modules/research\nOK   modules/fact_checker\nOK   tests/test_autopilot.py\nREADY\n",
+      "stderr": ""
+    }
+  ]
+}
