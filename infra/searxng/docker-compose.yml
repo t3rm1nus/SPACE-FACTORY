@@ -1,0 +1,16 @@
+# SearXNG — orquestación de la instancia (infraestructura aislada de prueba).
+# Uso: docker compose -f infra/searxng/docker-compose.yml up -d
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng-test
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    volumes:
+      # Config completa montada desde el host (evita tener que `exec` dentro).
+      - ./settings.yml:/etc/searxng/settings.yml
+    environment:
+      SEARXNG_SETTINGS_PATH: /etc/searxng/settings.yml
+      SEARXNG_BASE_URL: http://localhost:8081/

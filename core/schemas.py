@@ -187,7 +187,7 @@ class ResearchPayload(TaskPayload):
     query: Optional[str] = Field(default=None, max_length=5000)
     topic: Optional[str] = Field(default=None, max_length=5000)
     idea: Optional[str] = Field(default=None, max_length=5000)
-    max_sources: int = Field(default=5, ge=1, le=20)
+    max_sources: int = Field(default=8, ge=1, le=20)
     min_sources: int = Field(default=3, ge=1, le=20)
     timeout: int = Field(default=20, ge=5, le=120)
     research_required: bool = Field(default=True)

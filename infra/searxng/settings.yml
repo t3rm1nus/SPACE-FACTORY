@@ -1,0 +1,25 @@
+# SearXNG — configuración de la instancia (infraestructura aislada de prueba).
+# Base y documentación: https://docs.searxng.org/admin/settings/
+
+# Se heredan todas las opciones por defecto del paquete y solo se sobrescribe
+# lo que necesita esta instancia.
+use_default_settings: true
+
+server:
+  secret_key: "a76fc907845d1be9"
+  image_proxy: true
+
+  # Limiter desactivado: no hay base valkey/redis y el contenedor es de uso
+  # interno. Con `limiter: false`, searx.botdetection NO bloquea peticiones:
+  # NO hace falta enviar cabecera X-Forwarded-For / X-Real-IP en cada request.
+  limiter: false
+  # Acceso directo (sin reverse proxy delante): el ProxyFix de SearXNG resuelve
+  # la IP real desde el socket (REMOTE_ADDR) del cliente que llama. No se
+  # configuran `botdetection.trusted_proxies` ni `limiter.toml` porque ambos
+  # solo aplican cuando `server.limiter: true` (exigen valkey DB).
+
+search:
+  formats:
+    - html
+    - json
+    - rss

@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -15,12 +16,52 @@ from typing import Any, Optional
 
 from core.book.source_manager import SourceManager
 from core.logger import get_logger, log
+from core.providers import get as get_provider
+from core.providers.base import LLMInvalidResponseError
 
 logger = get_logger(__name__)
 
 WIKI_BASE = "https://es.wikipedia.org/w/api.php"
 WIKI_REST_BASE = "https://es.wikipedia.org/api/rest_v1/page/summary"
+WIKIDATA_BASE = "https://www.wikidata.org/w/api.php"
 USER_AGENT = "SpaceLair/1.0 (research agent)"
+
+# --- Timeouts y presupuesto de la capa multi-fuente (PASO 3) ------------------
+# Mismos principios que el editor (modules/editor/main.py): acotamos el horizonte
+# de la llamada al proveedor en una instancia LOCAL nueva (registry.get() crea una
+# instancia por llamada -> seguro de mutar), de forma que un LLM lento/bloqueado
+# active el fallback determinista antes de que el timeout del scheduler mate la tarea.
+RESEARCH_PROVIDER_TIMEOUT = 40
+RESEARCH_MAX_RETRIES = 1
+RESEARCH_TOTAL_TIME_BUDGET = 90.0
+# Curación con LLM: "1" por defecto (mismo patrón que CHAP_USE_LLM). Cualquier
+# valor distinto de "1" fuerza el ranking determinista sin LLM.
+RESEARCH_USE_LLM = os.environ.get("RESEARCH_USE_LLM", "1")
+# archive.org está implementado pero DESHABILITADO por defecto: solo se activa
+# con la variable de entorno RESEARCH_ARCHIVE_ENABLED="1".
+RESEARCH_ARCHIVE_ENABLED = os.environ.get("RESEARCH_ARCHIVE_ENABLED", "0") == "1"
+RESEARCH_ROUTER_MODEL = os.environ.get("RESEARCH_ROUTER_MODEL") or os.environ.get(
+    "ROUTER_MODEL", "qwen-agent:latest"
+)
+# Umbral mínimo de overlap de keywords (query ↔ fuente). Fuentes por debajo de
+# este umbral se descartan ANTES de persistirse: no cuentan para source_count
+# ni para el gate de PASS/FAIL. Evita que research almacene fuentes irrelevantes
+# (p.ej. "Crozet, Virginia" para "Los Dooms") y marque falsamente PASS. El
+# gate de 8H.3 en core/autopilot.py captura source_count=0 → FAIL automáticamente.
+# Configurable vía env var RESEARCH_RELEVANCE_MIN_OVERLAP.
+RELEVANCE_MIN_OVERLAP = float(os.environ.get("RESEARCH_RELEVANCE_MIN_OVERLAP", "0.15"))
+
+# Prioridad de fuente para el ranking determinista (Wikipedia > Wikidata = SearXNG > archive).
+# web_searxng a 2 (mismo nivel que web_wikidata): con el default de producción
+# max_sources=8, Wikipedia(3)+Wikidata(2) llenan los primeros 5 huecos; a partir del 6
+# entra SearXNG (prioridad 2), dando diversidad sin despulsar la prioridad máxima de
+# Wikipedia. Antes (max_sources=5) SearXNG quedaba fuera por orden de llegada.
+SOURCE_PRIORITY = {
+    "web_wikipedia": 3,
+    "web_wikidata": 2,
+    "web_searxng": 2,
+    "web_archiveorg": 1,
+}
 
 PLACEHOLDER_PATTERNS = [
     r"Desarrollar el nucleo",
@@ -145,11 +186,439 @@ def _store_source(title: str, url: str, content: str, source_type: str = "web") 
         return None
 
 
-def research_web(query: str, max_sources: int = 5, timeout: int = 20) -> dict[str, Any]:
-    results: list[dict[str, Any]] = []
-    stored: list[dict[str, Any]] = []
+# ----------------------------------------------------------------------------
+# Capa multi-fuente (PASO 3): normalización, dedupe determinista y backends.
+# ----------------------------------------------------------------------------
+def _normalize_url(url: str) -> str:
+    """Normaliza una URL para deduplicación determinista:
+    esquema y host en minúsculas, sin fragmento ni slash final, query ordenada."""
+    url = (url or "").strip()
+    if not url:
+        return url
     try:
-        search_items = _wiki_search(query, limit=max_sources)
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return url
+    scheme = (parts.scheme or "").lower()
+    netloc = (parts.netloc or "").lower()
+    path = (parts.path or "").rstrip("/")
+    query = parts.query
+    if query:
+        query = "&".join(sorted(query.split("&")))
+    return urllib.parse.urlunsplit((scheme, netloc, path, query, ""))
+
+
+def _candidate_key(cand: dict[str, Any]) -> str:
+    """Clave de dedupe: URL normalizada + título en minúsculas."""
+    return "|".join(
+        (_normalize_url(cand.get("url", "")), (cand.get("title") or "").strip().lower())
+    )
+
+
+def _backend_wikipedia(query: str, per_backend_limit: int, timeout: int) -> list[dict[str, Any]]:
+    """Backend Wikipedia (es): búsqueda + extracción real del resumen introductorio."""
+    out: list[dict[str, Any]] = []
+    try:
+        items = _wiki_search(query, limit=per_backend_limit)
+    except Exception as e:
+        logger.warning("Backend wikipedia falló durante búsqueda multi-fuente: %s", e)
+        return out
+    for item in items[:per_backend_limit]:
+        title = str(item.get("title") or "")
+        extract_data = _wiki_rest_summary(title) or _wiki_extract(title)
+        if not extract_data:
+            continue
+        text = str(extract_data.get("extract") or "").strip()
+        if _is_placeholder(text):
+            continue
+        out.append({
+            "title": str(extract_data.get("title") or title),
+            "url": str(extract_data.get("url") or item.get("url") or ""),
+            "snippet": str(item.get("snippet") or ""),
+            "content": text,
+            "source_type": "web_wikipedia",
+        })
+        if len(out) >= per_backend_limit:
+            break
+    return out
+
+
+def _backend_wikidata(query: str, per_backend_limit: int, timeout: int) -> list[dict[str, Any]]:
+    """Backend Wikidata: búsqueda de entidades (wbsearchentities)."""
+    params = urllib.parse.urlencode({
+        "action": "wbsearchentities",
+        "search": query,
+        "language": "es",
+        "format": "json",
+        "limit": str(per_backend_limit),
+    })
+    url = f"{WIKIDATA_BASE}?{params}"
+    out: list[dict[str, Any]] = []
+    try:
+        status, body = _request(url, timeout=timeout)
+        if status != 200:
+            return out
+        data = json.loads(body.decode("utf-8", errors="replace"))
+    except Exception as e:
+        logger.warning("Backend wikidata falló durante búsqueda multi-fuente: %s", e)
+        return out
+    for it in (data.get("search") or [])[:per_backend_limit]:
+        qid = str(it.get("id") or "")
+        label = str(it.get("label") or qid or "Wikidata")
+        desc = str(it.get("description") or "")
+        if not qid:
+            continue
+        out.append({
+            "title": label,
+            "url": f"https://www.wikidata.org/wiki/{qid}",
+            "snippet": desc,
+            "content": label + (f" — {desc}" if desc else ""),
+            "source_type": "web_wikidata",
+        })
+        if len(out) >= per_backend_limit:
+            break
+    return out
+
+
+def _backend_archive(query: str, per_backend_limit: int, timeout: int) -> list[dict[str, Any]]:
+    """Backend archive.org (implementado, pero deshabilitado por defecto)."""
+    params = urllib.parse.urlencode({
+        "q": query,
+        "fl[]": "identifier,title",
+        "rows": str(per_backend_limit),
+        "output": "json",
+    })
+    url = f"https://archive.org/advancedsearch.php?{params}"
+    out: list[dict[str, Any]] = []
+    try:
+        status, body = _request(url, timeout=timeout)
+        if status != 200:
+            return out
+        data = json.loads(body.decode("utf-8", errors="replace"))
+    except Exception as e:
+        logger.warning("Backend archive.org falló durante búsqueda multi-fuente: %s", e)
+        return out
+    for doc in (data.get("response", {}).get("docs") or [])[:per_backend_limit]:
+        ident = str(doc.get("identifier") or "")
+        if not ident:
+            continue
+        out.append({
+            "title": str(doc.get("title") or ident),
+            "url": f"https://archive.org/details/{ident}",
+            "snippet": "",
+            "content": str(doc.get("title") or ident),
+            "source_type": "web_archiveorg",
+        })
+        if len(out) >= per_backend_limit:
+            break
+    return out
+
+
+def _search_searxng(query: str, limit: int = 5, timeout: int = 7) -> list[dict[str, Any]]:
+    """Consulta la instancia local de SearXNG (infra/searxng) y devuelve fuentes
+    con la MISMA estructura que los demás backends (title/url/snippet/content/
+    source_type).
+
+    - URL base desde la variable de entorno ``SEARXNG_BASE_URL`` (default
+      ``http://localhost:8081``) para no hardcodear el puerto.
+    - Timeout corto (7s; servicio local).
+    - Si SearXNG está caído/no responde/devuelve error, loguea warning y devuelve
+      lista vacía SIN lanzar excepción: el job de research no debe romperse si el
+      contenedor no está corriendo.
+    """
+    base = os.environ.get("SEARXNG_BASE_URL", "http://localhost:8081").rstrip("/")
+    params = urllib.parse.urlencode({"q": query, "format": "json"})
+    url = f"{base}/search?{params}"
+    out: list[dict[str, Any]] = []
+    try:
+        status, body = _request(url, timeout=timeout)
+        if status != 200:
+            logger.warning("SearXNG respondió HTTP %s para la consulta: %r", status, query)
+            return out
+        data = json.loads(body.decode("utf-8", errors="replace"))
+    except Exception as e:
+        logger.warning("SearXNG no disponible (consulta %r): %s", query, e)
+        return out
+    for item in (data.get("results") or [])[:limit]:
+        title = str(item.get("title") or "").strip()
+        url = str(item.get("url") or "").strip()
+        if not title or not url:
+            continue
+        content = str(item.get("content") or "").strip()
+        out.append({
+            "title": title,
+            "url": url,
+            "snippet": content[:200],
+            "content": content,
+            "source_type": "web_searxng",
+        })
+    return out
+
+
+def _multi_source_search(query: str, max_sources: int, timeout: int) -> list[dict[str, Any]]:
+    """Búsqueda multi-backend con dedupe determinista y tope duro por backend.
+
+    Cada backend aporta a lo sumo ``per_backend_limit`` resultados (tope duro por
+    backend) y RESEARCH_TOTAL_TIME_BUDGET frena el proceso si se agota.
+    """
+    per_backend_limit = max(max_sources, 1)
+    started = time.monotonic()
+    collected: list[dict[str, Any]] = []
+
+    backends: list[tuple] = [
+        (_backend_wikipedia, "wikipedia"),
+        (_backend_wikidata, "wikidata"),
+        (_search_searxng, "searxng"),
+    ]
+    if RESEARCH_ARCHIVE_ENABLED:
+        backends.append((_backend_archive, "archive.org"))
+
+    for fn, label in backends:
+        if time.monotonic() - started >= RESEARCH_TOTAL_TIME_BUDGET:
+            break
+        try:
+            results = fn(query, per_backend_limit, timeout=timeout)
+        except Exception as e:
+            logger.warning("Backend %s lanzó excepción durante búsqueda multi-fuente: %s", label, e)
+            results = []
+        for cand in results[:per_backend_limit]:
+            if cand.get("url"):
+                collected.append(cand)
+
+    # Dedupe determinista global (URL normalizada + título), en el orden de llegada
+    # (primera ocurrencia gana). Cada backend aporta hasta su propio per_backend_limit
+    # antes de cualquier corte: NO se corta aquí por max_sources. El corte decisivo a
+    # max_sources pasa SOLO al final, tras rankear por prioridad/overlap. Si se cortara
+    # durante la recolección (comportamiento previo), un backend de mayor prioridad
+    # implícita 0 (p.ej. web_searxng) quedaba fuera por orden de llegada bajo el
+    # default max_sources=5: Wikipedia llenaba los huecos antes de que SearXNG entrara
+    # a rankear (bug de starvation por orden de llegada). Ver FASE 8M.2.
+    seen: set[str] = set()
+    unique: list[dict[str, Any]] = []
+    for cand in collected:
+        key = _candidate_key(cand)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(cand)
+
+    # Corte a max_sources SOLO tras dedupe + ranking determinista (prioridad de fuente
+    # + overlap léxico). _deterministic_curate hace sorted(by score, reverse=True)[:max_sources].
+    # Cada backend lleva su propio timeout; el try/except por-backend sigue intacto arriba.
+    return _deterministic_curate(query, unique, max_sources)
+
+
+# ----------------------------------------------------------------------------
+# Curación y ranking (PASO 3)
+# ----------------------------------------------------------------------------
+# Stopwords en español (y inglés para fallback es→en). Se mantiene lista mínima para
+# evitar duplicar lo que ya exista en otro sitio del proyecto; amplíe si es necesario.
+_STOPWORDS_ES = {
+    "el", "la", "los", "las", "de", "del", "en", "un", "una", "unos", "unas",
+    "y", "o", "que", "con", "para", "por", "se", "es", "su", "sus", "al", "lo",
+    # Inglés común (fallback es→en)
+    "the", "a", "an", "and", "or", "but", "if", "then", "else", "for", "nor",
+    "on", "at", "by", "of", "to", "from", "in", "out", "over", "under",
+}
+
+def _keyword_overlap(query: str, cand: dict[str, Any]) -> float:
+    """Fracción de keywords (>=2 chars) de la query que aparecen en la fuente.
+
+    Se tokeniza el haystack en palabras reales (set membership) y se excluyen
+    las stopwords de la lista de keywords antes del cálculo de overlap, para
+    evitar falsos positivos con palabras comunes en español/inglés.
+    """
+    # Extraer keywords de la query (palabras >=2 chars)
+    all_keywords = [w for w in re.findall(r"\w+", (query or "").lower()) if len(w) >= 2]
+    # Filtrar stopwords para evitar coincidencias false positive
+    keywords = [w for w in all_keywords if w not in _STOPWORDS_ES]
+    if not keywords:
+        return 0.0
+    # Tokenizar haystack en palabras reales (set membership, NO substring)
+    haystack_words = set(re.findall(r"\w+", str(cand.get("title") or "").lower() + " " +
+                                  str(cand.get("snippet") or "").lower() + " " +
+                                  str(cand.get("content") or "").lower()))
+    hits = sum(1 for w in keywords if w in haystack_words)
+    return hits / len(keywords) if keywords else 0.0
+
+
+def _has_anchor_keyword(topic: str, cand: dict[str, Any]) -> bool:
+    """True si el candidato se ancla al TEMA del libro (topic), no solo a la query.
+
+    Reutiliza la misma tokenización y _STOPWORDS_ES de _keyword_overlap (no
+    duplica lógica). Devuelve True (no ancla / no bloquea) si:
+
+    - topic es None/"" ; o
+    - tras quitar stopwords no queda ninguna keyword útil en topic.
+
+    Esto preserva compatibilidad total con las llamadas que no pasan topic
+    (el anclaje es aditivo: solo añade restricción cuando hay tema real).
+    """
+    if not topic:
+        return True
+    # Extraer keywords del topic (palabras >=2 chars, sin stopwords)
+    topic_keywords = [
+        w for w in re.findall(r"\w+", str(topic).lower())
+        if len(w) >= 2 and w not in _STOPWORDS_ES
+    ]
+    if not topic_keywords:
+        return True
+    # Tokenizar haystack en palabras reales (set membership, igual que _keyword_overlap)
+    haystack_words = set(re.findall(
+        r"\w+",
+        str(cand.get("title") or "").lower() + " " +
+        str(cand.get("snippet") or "").lower() + " " +
+        str(cand.get("content") or "").lower(),
+    ))
+    return any(w in haystack_words for w in topic_keywords)
+
+
+def _content_length(cand: dict[str, Any]) -> int:
+    return len(str(cand.get("content") or "").split())
+
+
+def _source_priority(cand: dict[str, Any]) -> int:
+    return SOURCE_PRIORITY.get(str(cand.get("source_type")), 0)
+
+
+def _deterministic_curate(
+    query: str, candidates: list[dict[str, Any]], max_sources: int
+) -> list[dict[str, Any]]:
+    """Ranking sin LLM: keywords + longitud de contenido + prioridad de fuente."""
+    def _score(cand: dict[str, Any]) -> float:
+        overlap = _keyword_overlap(query, cand)
+        length_factor = min(1.0, _content_length(cand) / 200.0)
+        return (
+            overlap * 3.0
+            + length_factor
+            + _source_priority(cand) * 0.5
+            + _content_length(cand) / 10000.0
+        )
+    ranked = sorted(candidates, key=_score, reverse=True)
+    return ranked[:max_sources]
+
+
+def _build_curation_prompt(
+    query: str, candidates: list[dict[str, Any]], language: str, max_sources: int
+) -> str:
+    lines: list[str] = []
+    for idx, cand in enumerate(candidates):
+        snippet = str(cand.get("snippet") or cand.get("content") or "")[:200]
+        lines.append(
+            f'{idx}. URL: {cand.get("url")} | Título: {cand.get("title")} '
+            f'| Tipo: {cand.get("source_type")} | Extracto: {snippet}'
+        )
+    body = "\n".join(lines) or "(sin candidatos)"
+    return (
+        "Eres un curador editorial profesional. Idioma destino: " + str(language) + "\n"
+        "Consulta a investigar: " + str(query) + "\n\n"
+        f"Selecciona las {max_sources} mejores fuentes de la siguiente lista. "
+        'Devuelve ÚNICAMENTE JSON con la clave "sources" (un array de objetos con '
+        '"url" y "rank"). Cada URL DEBE ser exactamente una de las URLs de la lista; '
+        "no inventes URLs.\n\n"
+        "Candidatos:\n" + body
+    )
+
+
+def _parse_json_response(text: str) -> Optional[dict[str, Any]]:
+    """Parsea JSON tolerando bloques fenced (```json ... ```). None si es inválido."""
+    if not isinstance(text, str):
+        return None
+    t = text.strip()
+    if not t:
+        return None
+    m = re.search(r"```(?:json)?\s*(.*?)\s*```", t, re.DOTALL)
+    if m:
+        t = m.group(1).strip()
+    try:
+        parsed = json.loads(t)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _curate_with_llm(
+    query: str, candidates: list[dict[str, Any]], language: str, max_sources: int
+) -> tuple[list[dict[str, Any]], str]:
+    """Curación con LLM con anti-alucinación. Devuelve (sources, execution_mode).
+
+    - Muta provider.timeout / provider.max_retries ANTES de generate() (igual que editor).
+    - Ante CUALQUIER fallo (timeout, conexión, JSON inválido, proveedor ausente) devuelve
+      el ranking determinista con execution_mode="deterministic".
+    - Cada URL devuelta por el LLM debe existir en los candidatos reales; si no, se
+      descarta y se rellena con el siguiente del ranking determinista.
+    """
+    deterministic = _deterministic_curate(query, candidates, max_sources)
+
+    if RESEARCH_USE_LLM != "1":
+        return deterministic, "deterministic"
+    if not candidates:
+        return deterministic, "deterministic"
+
+    real_by_url: dict[str, dict[str, Any]] = {
+        _normalize_url(str(cand.get("url") or "")): cand for cand in candidates
+    }
+
+    try:
+        provider = get_provider()
+        provider.timeout = RESEARCH_PROVIDER_TIMEOUT
+        provider.max_retries = RESEARCH_MAX_RETRIES
+        prompt = _build_curation_prompt(query, candidates, language, max_sources)
+        result = provider.generate(
+            prompt,
+            system="Eres un curador editorial. Devuelve solo JSON.",
+            model=RESEARCH_ROUTER_MODEL,
+            max_tokens=800,
+            temperature=0.1,
+        )
+        data = _parse_json_response(getattr(result, "text", "") or "")
+        if data is None:
+            raise LLMInvalidResponseError("Respuesta del LLM no válida en curación de fuentes")
+        selected = data.get("sources") or data.get("source_urls") or []
+        if not isinstance(selected, list):
+            raise LLMInvalidResponseError("La clave sources del LLM no es una lista")
+    except Exception as e:
+        log(logger, logging.WARNING, f"Falla la curación con LLM; se usa ranking determinista: {e}")
+        return deterministic, "deterministic"
+
+    curated: list[dict[str, Any]] = []
+    used_keys: set[str] = set()
+
+    def _add(cand: dict[str, Any]) -> None:
+        key = _candidate_key(cand)
+        if key in used_keys:
+            return
+        used_keys.add(key)
+        curated.append(cand)
+
+    for sel in selected:
+        if len(curated) >= max_sources:
+            break
+        url = None
+        if isinstance(sel, str):
+            url = sel
+        elif isinstance(sel, dict):
+            url = sel.get("url") or sel.get("link")
+        if not url:
+            continue
+        cand = real_by_url.get(_normalize_url(str(url)))
+        if cand is None:
+            continue  # URL inventada por el LLM: se descarta.
+        _add(cand)
+
+    # Rellenar con el siguiente del ranking determinista (nunca inventado).
+    for cand in deterministic:
+        if len(curated) >= max_sources:
+            break
+        _add(cand)
+
+    return curated[:max_sources], "llm"
+
+
+def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: str = "es",
+                 topic: Optional[str] = None) -> dict[str, Any]:
+    try:
+        candidates = _multi_source_search(query, max_sources, timeout)
     except Exception as e:
         return {
             "query": query,
@@ -157,26 +626,74 @@ def research_web(query: str, max_sources: int = 5, timeout: int = 20) -> dict[st
             "execution_mode": "failed",
             "sources": [],
             "stored_sources": [],
+            "source_count": 0,
             "error": str(e),
+            "quality_gate": "FAIL",
         }
 
-    for item in search_items[:max_sources]:
-        title = item["title"]
-        extract_data = _wiki_rest_summary(title) or _wiki_extract(title)
-        if not extract_data:
+    if not candidates:
+        return {
+            "query": query,
+            "status": "FAIL",
+            "execution_mode": "deterministic",
+            "sources": [],
+            "stored_sources": [],
+            "source_count": 0,
+            "error": "No se obtuvieron fuentes reales.",
+            "quality_gate": "FAIL",
+        }
+
+    # Curación: LLM (con anti-alucinación) salvo que RESEARCH_USE_LLM != "1",
+    # en cuyo caso entra directo el ranking determinista.
+    try:
+        if RESEARCH_USE_LLM == "1":
+            curated, execution_mode = _curate_with_llm(query, candidates, language, max_sources)
+        else:
+            curated = _deterministic_curate(query, candidates, max_sources)
+            execution_mode = "deterministic"
+    except Exception as e:
+        log(logger, logging.WARNING, f"Falla la curación; se usa ranking determinista: {e}")
+        curated = _deterministic_curate(query, candidates, max_sources)
+        execution_mode = "deterministic"
+
+    # --- Filtro de relevancia (PASO 4): criterio compuesto. Se descartan las
+    # fuentes cuyo overlap de keywords con la query es inferior al umbral, o que
+    # no se ANCLAN al tema del libro (topic) cuando hay topic real disponible
+    # (ver _has_anchor_keyword). No se persisten ni cuentan para source_count /
+    # PASS/FAIL; el gate de 8H.3 en core/autopilot.py falla automáticamente si
+    # source_count queda por debajo de min_sources.
+    _pre = len(curated)
+    curated = [
+        c for c in curated
+        if _keyword_overlap(query, c) >= RELEVANCE_MIN_OVERLAP
+        and _has_anchor_keyword(topic, c)
+    ]
+    if _pre - len(curated):
+        log(
+            logger,
+            logging.INFO,
+            f"Relevance filter: descartadas {_pre - len(curated)} "
+            f"fuentes irrelevantes (min_overlap={RELEVANCE_MIN_OVERLAP}, "
+            f"topic_anchor={bool(topic)})",
+        )
+
+    results: list[dict[str, Any]] = []
+    stored: list[dict[str, Any]] = []
+    for cand in curated[:max_sources]:
+        title = str(cand.get("title") or "")
+        url = str(cand.get("url") or "")
+        content = str(cand.get("content") or cand.get("snippet") or "")
+        source_type = str(cand.get("source_type") or "web")
+        if not url:
             continue
-        text = extract_data["extract"]
-        if _is_placeholder(text):
-            continue
-        url = extract_data["url"]
-        source = _store_source(title, url, text, source_type="web_wikipedia")
+        source = _store_source(title, url, content, source_type=source_type)
         if source:
             stored.append(source)
             results.append({
                 "title": title,
                 "url": url,
-                "source_type": "web_wikipedia",
-                "content": text,
+                "source_type": source_type,
+                "content": content,
                 "accessed_at": datetime.now(timezone.utc).isoformat(),
             })
 
@@ -184,11 +701,12 @@ def research_web(query: str, max_sources: int = 5, timeout: int = 20) -> dict[st
     return {
         "query": query,
         "status": status,
-        "execution_mode": "real",
+        "execution_mode": execution_mode,
         "sources": results,
         "stored_sources": stored,
         "source_count": len(stored),
         "error": None if status == "PASS" else "No se obtuvieron fuentes reales.",
+        "quality_gate": "PASS" if status == "PASS" else "FAIL",
     }
 
 
@@ -262,7 +780,7 @@ def validate_payload(capability: str, payload: dict) -> dict[str, Any]:
             raise ValueError("El payload de research_web requiere 'query', 'topic' o 'idea'.")
         return {
             "query": query,
-            "max_sources": int(payload.get("max_sources", 5)),
+            "max_sources": int(payload.get("max_sources", 8)),
             "min_sources": int(payload.get("min_sources", 3)),
             "timeout": int(payload.get("timeout", 20)),
             "research_required": bool(payload.get("research_required", True)),
@@ -283,10 +801,15 @@ def validate_payload(capability: str, payload: dict) -> dict[str, Any]:
 def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
     validated = validate_payload(capability, payload)
     query = validated["query"]
-    max_sources = validated.get("max_sources", 5)
+    max_sources = validated.get("max_sources", 8)
     min_sources = validated.get("min_sources", 3)
     timeout = validated.get("timeout", 20)
     research_required = validated.get("research_required", True)
+    # topic: ancla de relevancia tomada del PAYLOAD CRUDO (el campo ya llega desde
+    # editorial.build_payload y lo preserva el schema ResearchPayload). Se usa
+    # SOLO para anclar el filtro de relevancia; NO se toca validate_payload ni
+    # su dict de retorno.
+    topic = payload.get("topic")
 
     # Capability fetch_url y extract_text no requieren research_required
     if capability == "fetch_url":
@@ -309,7 +832,7 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
         }
 
     try:
-        result = research_web(query, max_sources=max_sources, timeout=timeout)
+        result = research_web(query, max_sources=max_sources, timeout=timeout, topic=topic)
     except Exception as e:
         result = {
             "query": query,
@@ -319,6 +842,7 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
             "stored_sources": [],
             "source_count": 0,
             "error": str(e),
+            "quality_gate": "FAIL",
         }
 
     result.setdefault("execution_mode", "real")
@@ -327,6 +851,7 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
     result.setdefault("stored_sources", [])
     result.setdefault("source_count", 0)
     result.setdefault("error", None)
+    result.setdefault("quality_gate", "PASS")
 
     source_count = result.get("source_count", 0) or 0
     if research_required and source_count < min_sources:
@@ -339,6 +864,7 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
     elif not research_required and source_count == 0:
         result["status"] = "PASS"
         result["error"] = None
+        result["quality_gate"] = "PASS"
 
     log(
         logger,
