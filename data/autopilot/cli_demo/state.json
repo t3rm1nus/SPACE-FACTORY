@@ -65,8 +65,8 @@
       }
     }
   ],
-  "created_at": "2026-08-14 23:12:01",
-  "updated_at": "2026-08-14 23:12:01",
+  "created_at": "2026-08-15 23:07:31",
+  "updated_at": "2026-08-15 23:07:31",
   "last_validation": {
     "pytest": null,
     "e2e": {
@@ -78,7 +78,7 @@
       "placeholder_detected": false,
       "docx_path": "output\\docx\\book_1001_es.docx",
       "docx_status": "PASS",
-      "last_checkpoint": "data\\checkpoints\\1001\\book\\final_qc\\v0036.json",
+      "last_checkpoint": "data\\checkpoints\\1001\\book\\final_qc\\v0037.json",
       "report_path": "C:\\proyectos\\SPACE LAIR\\e2e_001_report.json"
     },
     "quality_gate": "PASS",
