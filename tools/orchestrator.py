@@ -12,7 +12,6 @@ import argparse
 import sys
 import os
 import json
-import re
 
 # Permitir importar el paquete tools.dev aunque no esté en PYTHONPATH.
 _THIS = os.path.dirname(os.path.abspath(__file__))

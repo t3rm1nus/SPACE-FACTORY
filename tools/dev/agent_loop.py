@@ -15,7 +15,7 @@ import datetime
 import os
 from typing import Any, Optional
 
-from . import config, parsers, runner, state
+from . import parsers, runner, state
 
 
 def _now() -> str:

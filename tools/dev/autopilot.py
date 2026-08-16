@@ -14,7 +14,7 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from . import config, parsers, runner, security
 from .autonomous import backup_file  # reuse existing rollback helper

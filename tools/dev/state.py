@@ -26,7 +26,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "LAST_CHANGE": "(inicial)",
     "FILES_MODIFIED": [],
     "KNOWN_GOOD": [
-        "379 tests pasan",
+        "Suite de tests pasando (conteo exacto dinámico por checkpoint)",
         "7.9D.5 preservada",
         "7.9D.6 estructura H1/H2 correcta",
     ],

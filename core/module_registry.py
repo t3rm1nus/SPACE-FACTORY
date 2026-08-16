@@ -12,7 +12,7 @@ import os
 from typing import Any, Callable, Optional
 
 from core.logger import get_logger, log
-from core.mcp_bridge import MCPError, get_mcp_config, is_mcp_module
+from core.mcp_bridge import MCPError, get_mcp_config
 
 logger = get_logger(__name__)
 

@@ -14,7 +14,6 @@ los métodos esenciales del protocolo:
 """
 
 import json
-import logging
 import urllib.error
 import urllib.request
 from typing import Any, Optional

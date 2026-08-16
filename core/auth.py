@@ -7,7 +7,6 @@ las operaciones de aprobación/rechazo de tareas (CLI y API).
 import hashlib
 import hmac
 import json
-import logging
 import os
 import time
 from functools import wraps

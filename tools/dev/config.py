@@ -53,6 +53,9 @@ OUT_OF_SCOPE_MODULES = [
     "translator",
     "text_summarizer",
     "word_counter",
+    "image_planner",
+    "mcp_demo",
+    "mcp_external",
 ]
 
 

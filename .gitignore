@@ -90,4 +90,6 @@ integ_*.ps1
 data/checkpoints/
 data/dev_ops/
 data/images/
+data/artifacts/
+data/autopilot/jobs/
 
