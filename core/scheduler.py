@@ -43,7 +43,9 @@ def _requires_approval(module: dict[str, Any]) -> bool:
 def _execute_with_timeout(module: dict[str, Any], payload: dict, timeout: int, capability: str = "") -> Any:
     """Ejecuta el módulo (local o MCP) con un timeout usando ThreadPoolExecutor.
 
-    - Módulos normales: llama a module["execute"](payload).
+    - Módulos normales: llama a module["execute"](payload, capability).
+      Si el módulo no acepta ``capability`` (``TypeError``), reintenta con
+      ``module["execute"](payload)`` para preservar compatibilidad.
     - Módulos MCP externos: llama a call_tool(module, capability, payload).
     """
     is_mcp = module.get("is_mcp", False)
@@ -51,7 +53,13 @@ def _execute_with_timeout(module: dict[str, Any], payload: dict, timeout: int, c
     def _run() -> Any:
         if is_mcp:
             return call_tool(module, capability, payload)
-        return module["execute"](payload)
+        # Pass capability so module dispatchers (e.g. image_generator.execute)
+        # route to the correct sub-handler.  Some legacy modules only accept
+        # (payload); fall back gracefully to preserve backwards compatibility.
+        try:
+            return module["execute"](payload, capability)
+        except TypeError:
+            return module["execute"](payload)
 
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(_run)
