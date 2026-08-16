@@ -90,21 +90,38 @@ def _check_book(book: Book) -> list[QualityControlItem]:
         )
     )
 
-    has_metadata = all(
+    # Metadatos mínimos obligatorios: `title` y `description`. author/genre/
+    # target_audience son OPCIONALES en el formulario (frontend) y `create_book`
+    # nunca los inventa, por lo que su ausencia NO debe bloquear el Quality Gate.
+    # Se bajan a WARNING para conservar visibilidad de qué falta sin romper PASS.
+    has_required_metadata = all(
         [
             bool(book.title),
-            bool(book.author),
             bool(book.description),
-            bool(book.genre),
-            bool(book.target_audience),
         ]
     )
+    optional_missing = [
+        label
+        for label, value in (
+            ("autor", book.author),
+            ("género", book.genre),
+            ("público objetivo", book.target_audience),
+        )
+        if not value
+    ]
     checks.append(
         QualityControlItem(
-            status="PASS" if has_metadata else "FAIL",
-            message="Metadatos completos" if has_metadata else "Metadatos incompletos",
+            status="PASS" if has_required_metadata else "FAIL",
+            message="Metadatos completos" if has_required_metadata else "Metadatos incompletos",
         )
     )
+    if has_required_metadata and optional_missing:
+        checks.append(
+            QualityControlItem(
+                status="WARNING",
+                message="Metadatos opcionales ausentes: {}".format(", ".join(optional_missing)),
+            )
+        )
 
     checks.append(
         QualityControlItem(

@@ -180,3 +180,70 @@ def test_docx_exception_preserves_existing_failure_flow(store):
     docx_phase = next(p for p in final["phases"] if p["id"] == "docx")
     assert docx_phase["status"] == autopilot.PHASE_FAIL
     assert (docx_phase.get("attempts") or 0) >= 2
+
+
+# ---------------------------------------------------------------------------
+# CASO F — el writer/writer_en puebla chapters.sources desde SourceManager
+# ---------------------------------------------------------------------------
+def _executor_with_writer(store):
+    """Executor de producción real con un módulo falso de chapter_writer."""
+    modules = {
+        "chapter_writer": {
+            "manifest": {"id": "chapter_writer", "config": {"timeout_seconds": 30}},
+            "execute": lambda payload: {
+                "chapter_md_path": "data/artifacts/test/chapter_1/chapter.md",
+                "metadata": {
+                    "text": "Capítulo de prueba escrito por el módulo falso.",
+                    "words": 12,
+                },
+                "word_count": 12,
+                "sources_used": [],
+                "quality_gate": "PASS",
+                "execution_mode": "real",
+            },
+        }
+    }
+    cap_map = {"write_chapter_es": ["chapter_writer"]}
+    return autopilot.default_executor_factory(modules, cap_map, store=store)
+
+
+def _job_ready_at_writer(store, book_id):
+    """Job con todas las fases PASS salvo writer (quedan las per-chapter en su sitio)."""
+    job = autopilot.create_job(store, book_id)
+    for ph in job["phases"]:
+        if ph["id"] == "writer":
+            ph["status"] = autopilot.PHASE_PENDING
+            ph["attempts"] = 0
+        else:
+            ph["status"] = autopilot.PHASE_PASS
+            ph["attempts"] = 1
+    store.save(job)
+    return store.load(job["job_id"])
+
+
+def test_writer_populates_chapters_sources_in_db(store):
+    """Tras la fase writer, chapters.sources queda poblado con las URLs de SourceManager."""
+    import json
+
+    from core.database import get_db
+    from core.book.source_manager import SourceManager
+    from frontend.editorial import _get_chapters
+
+    book_id = _make_book(1)
+    cid = _get_chapters(book_id)[0]["id"]
+    SourceManager.add_source(url="https://real.example/a", title="A", chapter_ids=[cid])
+    SourceManager.add_source(url="https://real.example/b", title="B", chapter_ids=[cid])
+
+    job = _job_ready_at_writer(store, book_id)
+    final = autopilot.run_job(
+        job, store, _executor_with_writer(store), max_attempts=2, sleep_fn=_NOSLEEP
+    )
+
+    assert final["status"] == autopilot.JOB_COMPLETED
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT sources FROM chapters WHERE id = ?", (cid,)
+        ).fetchone()
+    stored = json.loads(row["sources"])
+    assert stored != []
+    assert set(stored) == {"https://real.example/a", "https://real.example/b"}

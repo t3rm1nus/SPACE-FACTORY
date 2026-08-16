@@ -10,7 +10,7 @@
   "requires_human_approval": false,
   "config": {
     "priority": 5,
-    "timeout_seconds": 180,
+    "timeout_seconds": 300,
     "provider": "ollama",
     "model": "llama3.1"
   }

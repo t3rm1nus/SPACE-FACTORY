@@ -284,3 +284,22 @@ def test_build_book_docx_layout_overrides_win(tmp_path):
     assert doc.styles["Normal"].font.name == "Courier New"
     rgb = doc.styles["Heading 1"].font.color.rgb
     assert (rgb[0], rgb[1], rgb[2]) == (0x00, 0x00, 0x00)
+
+
+def test_build_book_docx_legal_without_author_omits_line_and_uses_title(tmp_path):
+    """Cuando book.author es None, la página legal NO muestra 'Autor: Autor'
+    y el copyright usa el título del libro en vez del autor."""
+    from docx import Document
+
+    payload = _book_payload(tmp_path, with_images=False)
+    payload["book"]["author"] = None
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    texts = [p.text for p in doc.paragraphs]
+
+    # No debe aparecer el placeholder "Autor: Autor"
+    assert not any("Autor: Autor" in t for t in texts)
+    # La línea del copyright usa el título del libro
+    assert any("© 2024 El libro del espacio. Todos los derechos reservados." in t for t in texts)
+

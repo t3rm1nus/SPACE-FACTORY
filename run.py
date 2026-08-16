@@ -174,6 +174,8 @@ def serve() -> None:
 @click.option("--host", default="0.0.0.0", show_default=True, help="Host de escucha.")
 def web(host: str, port: int) -> None:
     """Arranca el servidor web (frontend 8-bit + API + SSE)."""
+    import os
+    os.environ.setdefault("CHAP_FORCE_MIN", "1")
     from frontend.frontend_api import run_server
 
     click.echo(f"🚀 Space Lair - Servidor Web (puerto {port})")

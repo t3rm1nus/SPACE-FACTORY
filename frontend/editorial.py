@@ -12,7 +12,6 @@ import json
 from typing import Any, Optional
 
 from core.database import get_db, init_db
-from core.schemas import validate_payload
 from core.book.source_manager import SourceManager
 
 init_db()
@@ -237,6 +236,31 @@ def persist_chapter_images(book_id: int, chapter_id: int, image_paths: list[str]
     finally:
         conn.close()
 
+def persist_chapter_sources(book_id: int, chapter_id: int, sources: list[str]) -> dict:
+    """Persiste las URLs de fuentes asociadas a chapters.sources (JSON).
+
+    Serializa la lista como JSON. Usado por el autopilot tras writer/writer_en PASS
+    para poblar `chapters.sources` a partir de SourceManager (fuente de verdad única:
+    `sources.chapter_ids`). Una vez por capítulo, en el momento del writer.
+    """
+    sources_json = json.dumps(sources, ensure_ascii=False)
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE chapters SET sources = ?, updated_at = datetime('now') "
+            "WHERE id = ? AND book_id = ?",
+            (sources_json, chapter_id, book_id),
+        )
+        conn.commit()
+        return {
+            "updated": cur.rowcount > 0,
+            "book_id": book_id,
+            "chapter_id": chapter_id,
+            "sources_count": len(sources),
+        }
+    finally:
+        conn.close()
+
 def _latest_task(book_id: int, capability: str) -> Optional[dict]:
     """Devuelve la tarea más reciente de una capability asociada al libro."""
     from core.task_queue import all_tasks
@@ -280,7 +304,8 @@ def create_book(data: dict) -> dict:
 
     chapters_count = int(data.get("target_chapters") or 1)
     chapters_count = max(1, min(50, chapters_count))
-    image_count = int(data.get("image_count") or 3)
+    image_count = data.get("image_count")
+    image_count = 3 if image_count is None else int(image_count)
     image_count = max(0, min(20, image_count))
     layout_config = data.get("layout_config")
     layout_config_json = json.dumps(layout_config, ensure_ascii=False) if layout_config else None
@@ -371,7 +396,7 @@ def load_book(book_id: int) -> dict:
             "languages": book["languages"],
             "target_audience": book["target_audience"],
             "target_chapters": book["target_chapters"],
-            "image_count": book.get("image_count") or 3,
+            "image_count": book["image_count"] if book.get("image_count") is not None else 3,
             "layout_config": _parse_layout_config(book.get("layout_config")),
             "status": book["status"],
         },
@@ -433,7 +458,7 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
             "query": data.get("query") or data.get("idea") or book.get("title"),
             "topic": data.get("topic") or book.get("title"),
             "idea": data.get("idea") or book.get("description"),
-            "max_sources": int(data.get("max_sources") or 5),
+            "max_sources": int(data.get("max_sources") or 8),
             "min_sources": int(data.get("min_sources") or 3),
             "timeout": int(data.get("timeout") or 20),
             "research_required": True,
@@ -514,7 +539,7 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
             "chapter_text": text or "Capítulo sin texto todavía.",
             "chapter_title": chapter.get("title"),
             "visual_style": data.get("style") or "realistic",
-            "num_images": int(data.get("num_images") or 3),
+            "num_images": int(data.get("num_images") if data.get("num_images") is not None else 3),
             "language": language,
         }
     elif phase_id == "image_gen":
@@ -526,7 +551,7 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
             "chapter_number": int(chapter.get("number") or 1),
             "chapter_text": text or "Capítulo sin texto todavía.",
             "chapter_title": chapter.get("title"),
-            "num_images": int(data.get("num_images") or 3),
+            "num_images": int(data.get("num_images") if data.get("num_images") is not None else 3),
             "language": language,
             "provider": data.get("provider"),
             "model": data.get("model"),
@@ -596,7 +621,7 @@ def _build_book_dict(book: dict, chapters: list[dict]) -> dict:
         "genre": book.get("genre"),
         "languages": [book.get("languages") or "es"],
         "target_chapters": book.get("target_chapters"),
-        "image_count": book.get("image_count") or 3,
+        "image_count": 3 if book.get("image_count") is None else int(book.get("image_count")),
         "layout_config": _parse_layout_config(book.get("layout_config")),
         "status": book.get("status"),
         "chapters": [

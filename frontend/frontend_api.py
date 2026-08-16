@@ -10,7 +10,7 @@ import os
 import queue
 import threading
 import time
-from typing import Any, Optional
+from typing import Optional
 
 from flask import (
     Flask,
@@ -51,7 +51,7 @@ sse_lock = threading.Lock()
 _modules = {}
 _cap_map = {}
 # ---------------------------------------------------------------------------
-# Autopilot editorial (Fase 8B): estado del worker (singleton proceso-local)
+# Autopilot editorial: estado del worker (singleton proceso-local)
 # ---------------------------------------------------------------------------
 # El worker del autopilot se arranca UNA única vez por proceso vía
 # ensure_autopilot_worker_started(), aunque se llame a create_app() varias
@@ -295,7 +295,7 @@ def create_app() -> Flask:
         total_tokens_in = sum(t.get("tokens_input", 0) or 0 for t in tasks)
         total_tokens_out = sum(t.get("tokens_output", 0) or 0 for t in tasks)
 
-        # Fase 8B: estado real del autopilot editorial (derivado del BookJobStore,
+        # Estado real del autopilot editorial (derivado del BookJobStore,
         # nunca mock). Si no hay job, se devuelven valores vacíos en lugar de inventar.
         job = _autopilot_active_job()
         stats_payload = {
@@ -699,8 +699,8 @@ def create_app() -> Flask:
             result.append({"id": p["id"], "label": p["label"], "capability": p["capability"], "per_chapter": p["per_chapter"]})
         return jsonify(result)
 
-# ============================================
-    # Autopilot editorial (Fase 8B)
+    # ============================================
+    # Autopilot editorial
     # ============================================
     # Todos los endpoints leen/escriben SOLO vía BookJobStore / el motor real de
     # core.autopilot. No se duplica persistencia ni estados; no hay mock data.
@@ -723,10 +723,11 @@ def create_app() -> Flask:
             return jsonify(_serialize_job(existing)), 200
 
         # Leer image_count del libro para pasarlo al job data
-        from frontend.editorial import load_book as _load_book
         try:
-            book_data = _load_book(book_id)
-            img_count = (book_data.get("book") or {}).get("image_count") or 3
+            book_data = load_book(book_id)
+            img_count = (book_data.get("book") or {}).get("image_count")
+            if img_count is None:
+                img_count = 3
         except Exception:
             img_count = 3
 
@@ -796,9 +797,6 @@ def create_app() -> Flask:
           no debe contener '..' ni absolutizar fuera de la base.
         - NO genera un DOCX nuevo, NO copia a ubicación falsa, NO simula.
         """
-        import os
-        import posixpath
-
         store = get_autopilot_store()
         job = store.load_by_book(book_id)
         if job is None:
@@ -846,8 +844,6 @@ def create_app() -> Flask:
             mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         )
 
-    # ============================================
-    # Workflow Endpoints
     # ============================================
     # Workflow Endpoints
     # ============================================

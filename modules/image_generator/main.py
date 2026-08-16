@@ -169,7 +169,7 @@ def _normalize_specs(image_plan: Optional[dict]) -> list[ImageSpec]:
 
 def _build_simple_plan(chapter_text: str, chapter_title: str, num_images: int) -> list[ImageSpec]:
     """Plan determinista de imágenes cuando no hay plan LLM (mock)."""
-    num = max(0, min(int(num_images or 3), 20))
+    num = max(0, min(int(num_images) if num_images is not None else 3, 20))
     roles = ["hero", "detail", "closing"]
     specs = []
     for i in range(num):
@@ -262,7 +262,8 @@ def generate_chapter_images(payload: dict[str, Any]) -> dict[str, Any]:
     if not image_plan or not image_plan.get("images"):
         chapter_text = data.get("chapter_text", "")
         chapter_title = data.get("chapter_title") or ""
-        num_images = int(data.get("num_images") or 3)
+        _num = data.get("num_images")
+        num_images = int(_num) if _num is not None else 3
         specs = _build_simple_plan(chapter_text, chapter_title, num_images)
         image_plan = {"images": [s.model_dump() for s in specs]}
         data["image_plan"] = image_plan

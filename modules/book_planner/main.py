@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any
+from typing import Any, Optional
 
 from core.schemas import BookPlanChapter, BookPlanOutput
 from core.logger import get_logger, log
@@ -106,6 +106,61 @@ def _resolve_explicit_image_count(payload: dict) -> Any:
     return None
 
 
+# Secciones canónicas de respaldo por defecto (fallback determinista de outline).
+# Se usan SOLO cuando el LLM no devuelve secciones o las devuelve vacías/inválidas,
+# garantizando que la fase outline SIEMPRE emita una lista de secciones no vacía
+# (mismo patrón de fallback determinista que writer/editor). Nunca se inventan
+# fuentes; estas secciones solo estructuran el capítulo por defecto.
+_DEFAULT_SECTION_HEADINGS: dict[str, list[tuple[str, str]]] = {
+    "es": [
+        ("Introducción", "Presentar el capítulo, el tema y su objetivo."),
+        ("Desarrollo", "Desarrollar los puntos clave del tema de manera ordenada y rigurosa."),
+        ("Conclusión", "Sintetizar las ideas principales y preparar la transición."),
+    ],
+    "en": [
+        ("Introduction", "Present the chapter, its topic and purpose."),
+        ("Development", "Develop the chapter's key points clearly and rigorously."),
+        ("Conclusion", "Synthesize the main ideas and set up the transition."),
+    ],
+}
+
+
+def _default_sections(language: Optional[str]) -> list[dict]:
+    """Lista de secciones canónicas por defecto deterministas para un capítulo."""
+    lang = (language or "es").lower()
+    if lang.startswith("en") or lang.startswith("ing"):
+        headings = _DEFAULT_SECTION_HEADINGS["en"]
+    else:
+        headings = _DEFAULT_SECTION_HEADINGS["es"]
+    return [{"heading": heading, "objective": objective} for heading, objective in headings]
+
+
+def _ensure_sections(ch: dict, language: str) -> dict:
+    """Garantiza que un capítulo tenga una lista de secciones no vacía y bien formada.
+
+    Si el LLM devolvió ``sections`` como lista utilizable (con ``heading`` presente),
+    la conserva (filtrando entradas sin heading). En caso contrario (ausente, None,
+    vacía o inválida) inyecta las secciones canónicas por defecto de forma
+    determinista, para que el writer SIEMPRE disponga de un outline no vacío.
+    """
+    raw_sections = ch.get("sections")
+    if isinstance(raw_sections, list):
+        valid = [
+            {
+                "heading": str(s.get("heading", "")).strip(),
+                "objective": s.get("objective") or "",
+            }
+            for s in raw_sections
+            if isinstance(s, dict) and str(s.get("heading", "")).strip()
+        ]
+        if valid:
+            ch["sections"] = valid
+            return ch
+        # lista vacía o todo inválido: se falla a las secciones por defecto
+    ch["sections"] = _default_sections(language)
+    return ch
+
+
 def _normalize_plan(plan_data: dict, payload: dict) -> dict:
     """Normaliza el plan crudo del LLM ANTES de construir BookPlanOutput.
 
@@ -115,9 +170,15 @@ def _normalize_plan(plan_data: dict, payload: dict) -> dict:
 
     Además, corrige ``estimated_words`` inválidos: si el LLM devuelve un valor
     numérico menor que 500, lo eleva a 500 y deja traza en el log.
+
+    Por último, garantiza que cada capítulo tenga una lista de ``sections`` no
+    vacía (fallback determinista de outline), ya que el writer depende de ella
+    para estructurar contenido y continuar (de otro modo dispara
+    NO_TARGET_SECTION y nunca alcanza el mínimo de palabras).
     """
     plan_data = dict(plan_data or {})
     explicit = _resolve_explicit_image_count(payload)
+    language = plan_data.get("language") or payload.get("language") or "es"
     chapters = plan_data.get("chapters")
     if not isinstance(chapters, list):
         return plan_data
@@ -140,9 +201,11 @@ def _normalize_plan(plan_data: dict, payload: dict) -> dict:
             log(
                 logger,
                 logging.WARNING,
-                f"estimated_words inválido ({ew}) en capítulo; corregido a 500",
+                f"estimated_words inválido (<500) en capítulo; corregido a 500",
             )
             ch["estimated_words"] = 500
+
+        ch = _ensure_sections(ch, language)
 
         normalized.append(ch)
     plan_data["chapters"] = normalized
@@ -199,9 +262,61 @@ def _build_prompt(validated: BookPlanPayload) -> str:
         "Salida JSON válida con exactamente estas claves:\n"
         '{"title":"...","subtitle":"...","description":"...","target_audience":"...",'
         '"chapters":[{"number":1,"title":"...","objective":"...","key_questions":[],'
-        '"estimated_words":3000,"research_requirements":[],"image_requirements":3}]}\n\n'
+        '"estimated_words":3000,"research_requirements":[],"image_requirements":3,'
+        '"sections":[{"heading":"...","objective":"..."}]}]}\n\n'
+        "- IMPORTANTE: cada capítulo DEBE incluir el campo \"sections\" con al menos 2-3 secciones.\n"
+        "- Cada sección debe ser un objeto con \"heading\" (título) y \"objective\" (objetivo).\n"
+        "- Nunca omitas sections ni las dejes vacías. Esto es obligatorio.\n"
         "Devuelve SOLO el JSON, sin texto adicional."
     )
+
+
+# Keywords para inferencia determinista de género desde la idea.
+# Ordenadas de más específica a menos específica. Solo devuelve un género
+# cuando encuentra un término clave reconocible en la idea; si no, None
+# (nunca inventa).
+_GENRE_KEYWORDS: list[tuple[str, str]] = [
+    ("ciencia ficción", "Ciencia ficción"),
+    ("science fiction", "Ciencia ficción"),
+    ("sci-fi", "Ciencia ficción"),
+    ("ciência ficção", "Ciencia ficción"),
+    ("novela negra", "Novela negra"),
+    ("noir", "Novela negra"),
+    ("fantasía", "Fantasía"),
+    ("fantasy", "Fantasía"),
+    ("misterio", "Misterio"),
+    ("suspense", "Suspenso"),
+    ("terror", "Terror"),
+    ("horror", "Terror"),
+    ("romance", "Romance"),
+    ("romántica", "Romance"),
+    ("autoayuda", "Autoayuda"),
+    ("self-help", "Autoayuda"),
+    ("self help", "Autoayuda"),
+    ("biografía", "Biografía"),
+    ("biography", "Biografía"),
+    ("ensayo", "Ensayo"),
+    ("essay", "Ensayo"),
+    ("política", "Política"),
+    ("negocio", "Negocio"),
+    ("business", "Negocio"),
+]
+
+
+def _infer_genre(idea: str) -> Optional[str]:
+    """Infiere un género editorial desde la idea mediante coincidencia de keywords.
+
+    Es determinista y conservador: solo devuelve un género cuando la idea
+    contiene un término clave reconocible. Si no hay coincidencia clara,
+    devuelve None — nunca inventa un género.
+    """
+    if not idea:
+        return None
+    text = idea.lower().strip()
+    for keyword, genre in _GENRE_KEYWORDS:
+        if keyword in text:
+            return genre
+    return None
 
 
 def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
@@ -228,6 +343,8 @@ def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
         "description": validated.idea,
         "target_audience": validated.target_audience or "",
         "chapters": chapters,
+        "language": validated.language,
+        "genre": _infer_genre(validated.idea),
     }
 
 
@@ -305,6 +422,11 @@ def execute(payload: dict) -> dict:
         except Exception:
             cost = 0.0
 
+        # Propagar language (del payload, default "es") y genre (inferido de la idea).
+    # author se omite: no hay forma honesta de derivarlo de una idea.
+    plan_language = model_validated.language
+    plan_genre = plan_data.get("genre") or _infer_genre(model_validated.idea)
+
     log(
         logger,
         logging.INFO,
@@ -317,6 +439,8 @@ def execute(payload: dict) -> dict:
         "description": validated_output.description,
         "target_audience": validated_output.target_audience,
         "chapters": [c.model_dump() for c in validated_output.chapters],
+        "language": plan_language,
+        "genre": plan_genre,
         "provider": provider_name,
         "model": model_name,
         "tokens_input": input_tokens,

@@ -9,16 +9,18 @@
 const API_BASE = '';
 const USE_MOCK = false;
 
-// Pipeline editorial REAL — espejo exacto de core.autopilot.AUTOPILOT_PHASES (8 fases).
+// Pipeline editorial REAL — espejo exacto de core.autopilot.AUTOPILOT_PHASES (10 fases).
 const AUTOPILOT_PHASES = [
-  { id: 'planner',      capability: 'create_book_plan',      label: 'BOOK PLANNER',      tool: 'plan' },
-  { id: 'research',     capability: 'research_web',          label: 'RESEARCH',          tool: 'search' },
-  { id: 'outline',      capability: 'create_book_plan',      label: 'OUTLINE',           tool: 'plan' },
-  { id: 'writer',       capability: 'write_chapter_es',      label: 'CHAPTER WRITER',    tool: 'write' },
-  { id: 'fact_check',   capability: 'fact_check_chapter',    label: 'FACT CHECK',        tool: 'check' },
+  { id: 'planner',      capability: 'create_book_plan',      label: 'PLANIFICADOR',      tool: 'plan' },
+  { id: 'research',     capability: 'research_web',          label: 'INVESTIGACIÓN',          tool: 'search' },
+  { id: 'outline',      capability: 'create_book_plan',      label: 'ESQUEMA',           tool: 'plan' },
+  { id: 'writer',       capability: 'write_chapter_es',      label: 'REDACCIÓN',    tool: 'write' },
+  { id: 'fact_check',   capability: 'fact_check_chapter',    label: 'VERIFICACIÓN',        tool: 'check' },
   { id: 'editor',       capability: 'edit_chapter',          label: 'EDITOR',            tool: 'edit' },
-  { id: 'quality_gate', capability: 'final_quality_control', label: 'QUALITY GATE',    tool: 'gate' },
-  { id: 'docx',         capability: 'build_book_docx',       label: 'DOCUMENT BUILDER',  tool: 'doc' },
+  { id: 'image_plan',   capability: 'create_chapter_image_plan', label: 'PLAN DE IMÁGENES',    tool: 'image' },
+  { id: 'image_gen',    capability: 'generate_chapter_images',   label: 'GENERACIÓN DE IMÁGENES', tool: 'image' },
+  { id: 'quality_gate', capability: 'final_quality_control', label: 'CONTROL DE CALIDAD',    tool: 'gate' },
+  { id: 'docx',         capability: 'build_book_docx',       label: 'GENERADOR DE DOCUMENTO',  tool: 'doc' },
 ];
 const JOB_STATUS_LABEL = {
   PENDING: 'ESPERANDO', RUNNING: 'EN EJECUCIÓN', CANCELLED: 'CANCELADO',
@@ -235,6 +237,7 @@ function workerToolSvg(tool, css) {
     gate:   '<path d="M33 17l8 6-8 6-8-6z" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="33" y1="17" x2="33" y2="29" stroke="currentColor" stroke-width="1.4"/>',
     doc:    '<rect x="30" y="18" width="9" height="14" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="32" y1="22" x2="37" y2="22" stroke="currentColor"/>',
     plan:   '<rect x="29" y="18" width="12" height="8" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="31" y1="21" x2="39" y2="21" stroke="currentColor"/>',
+    image:  '<rect x="28" y="18" width="11" height="12" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M28 29l4-5 3 4 5-6v5H28z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="37" cy="23" r="1.3" fill="currentColor"/>',
   };
   const svg = tools[tool] || tools.doc;
   return '<svg class="worker-svg" viewBox="0 0 48 48" aria-hidden="true">'
@@ -418,11 +421,11 @@ function renderCurrentBook() {
     + '<span>Duración: ' + Number(duration).toFixed(2) + 's</span>'
     + '</div>'
     + '<div class="phase-counts">'
-    + '<span class="c-pending">PENDING: ' + counts.pending + '</span>'
-    + '<span class="c-running">RUNNING: ' + counts.running + '</span>'
-    + '<span class="c-retry">RETRY: ' + counts.retry + '</span>'
-    + '<span class="c-pass">PASS: ' + counts.pass + '</span>'
-    + '<span class="c-fail">FAIL: ' + counts.fail + '</span>'
+    + '<span class="c-pending">' + PHASE_STATUS_LABEL.PENDING + ': ' + counts.pending + '</span>'
+    + '<span class="c-running">' + PHASE_STATUS_LABEL.RUNNING + ': ' + counts.running + '</span>'
+    + '<span class="c-retry">' + PHASE_STATUS_LABEL.RETRY + ': ' + counts.retry + '</span>'
+    + '<span class="c-pass">' + PHASE_STATUS_LABEL.PASS + ': ' + counts.pass + '</span>'
+    + '<span class="c-fail">' + PHASE_STATUS_LABEL.FAIL + ': ' + counts.fail + '</span>'
     + '</div>';
   if (err) html += '<div class="station-error">' + err + '</div>';
   if (docx) html += '<div class="cb-docx"><span class="cb-label">DOCX:</span> <code class="docx-path">' + esc(docx) + '</code></div>';
@@ -471,13 +474,13 @@ function renderBookReady() {
 
   banner.style.display = '';
   banner.innerHTML = '<div class="book-ready-card">'
-    + '<div class="book-ready-title">📦 BOOK READY</div>'
+    + '<div class="book-ready-title">📦 LIBRO LISTO</div>'
     + '<div class="book-ready-meta">Libro #' + esc(job.book_id) + ' · ' + esc(JOB_STATUS_LABEL.COMPLETED) + '</div>'
     + '<div class="book-ready-grid">'
       + '<div><span class="book-ready-label">Título</span><div class="book-ready-value">' + esc(title) + '</div></div>'
       + '<div><span class="book-ready-label">Capítulos</span><div class="book-ready-value">' + esc(chapters) + '</div></div>'
       + '<div><span class="book-ready-label">Palabras</span><div class="book-ready-value">' + esc(words) + '</div></div>'
-      + '<div><span class="book-ready-label">Quality Gate</span><div class="book-ready-value">' + esc(qgLabel) + '</div></div>'
+      + '<div><span class="book-ready-label">Control de calidad</span><div class="book-ready-value">' + esc(qgLabel) + '</div></div>'
       + '<div><span class="book-ready-label">Duración</span><div class="book-ready-value">' + esc(duration) + 's</div></div>'
       + '<div><span class="book-ready-label">Fecha/Hora</span><div class="book-ready-value">' + esc(dateTime) + '</div></div>'
     + '</div>'
@@ -604,13 +607,13 @@ function renderMetrics() {
   const lastMetrics = (job.latest_metrics || (cp && cp.metrics) || {});
   const stat = state.currentStats;
   const rows = [
-    { label: 'Job status', value: JOB_STATUS_LABEL[job.status] || job.status, cls: 'running' },
+    { label: 'Estado del job', value: JOB_STATUS_LABEL[job.status] || job.status, cls: 'running' },
     { label: 'Duración (s)', value: Number(job.duration || 0).toFixed(2), cls: '' },
     { label: 'Intentos', value: job.attempts || 0, cls: '' },
     { label: 'Fase actual', value: phaseLabel(job.current_phase), cls: '' },
     { label: 'Última métrica word_count', value: lastMetrics.word_count != null ? lastMetrics.word_count : '—', cls: '' },
-    { label: 'Quality status', value: lastMetrics.quality_status ? String(lastMetrics.quality_status) : '—', cls: (lastMetrics.quality_status === 'FAIL' ? 'error' : '') },
-    { label: 'placeholders detect.', value: lastMetrics.placeholder_detected != null ? (lastMetrics.placeholder_detected ? 'SÍ' : 'NO') : '—', cls: (lastMetrics.placeholder_detected ? 'error' : '') },
+    { label: 'Estado de calidad', value: lastMetrics.quality_status ? String(lastMetrics.quality_status) : '—', cls: (lastMetrics.quality_status === 'FAIL' ? 'error' : '') },
+    { label: 'marcadores detectados', value: lastMetrics.placeholder_detected != null ? (lastMetrics.placeholder_detected ? 'SÍ' : 'NO') : '—', cls: (lastMetrics.placeholder_detected ? 'error' : '') },
     { label: 'Libros totales', value: stat.total_books != null ? stat.total_books : '—', cls: '' },
   ];
   container.innerHTML = rows.map(r =>
@@ -646,7 +649,7 @@ function updateStatusIndicator() {
   const live = document.getElementById('live-modules');
   if (live) {
     const phasePass = state.autopilot ? state.autopilot.phases.filter(p => p.status === 'PASS').length : 0;
-    live.textContent = 'BOOKS ' + state.books.length + ' · FASE PASS ' + phasePass + '/' + AUTOPILOT_PHASES.length;
+    live.textContent = 'LIBROS ' + state.books.length + ' · FASES OK ' + phasePass + '/' + AUTOPILOT_PHASES.length;
   }
 }
 

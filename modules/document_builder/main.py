@@ -368,12 +368,17 @@ def _add_cover(doc: Document, book: Book) -> None:
 
 def _add_legal(doc: Document, book: Book) -> None:
     year = book.created_at.year if book.created_at else 2024
-    author = book.author or "Autor"
+    author = book.author
     title = book.title or "Sin título"
+    # Si no hay autor, se omite la línea "Autor: X" (igual que _add_cover) y
+    # el copyright usa el título del libro en vez del autor.
+    legal_lines = [f"Título: {title}"]
+    if author:
+        legal_lines.append(f"Autor: {author}")
+    copyright_holder = author or title
     legal_text = (
-        f"Título: {title}\n"
-        f"Autor: {author}\n"
-        f"© {year} {author}. Todos los derechos reservados.\n"
+        "\n".join(legal_lines)
+        + f"\n© {year} {copyright_holder}. Todos los derechos reservados.\n"
         "Queda prohibida la reproducción total o parcial de esta obra, "
         "por cualquier medio o procedimiento, sin permiso expreso del autor."
     )

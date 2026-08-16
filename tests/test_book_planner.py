@@ -469,3 +469,60 @@ def test_execute_normalizes_low_estimated_words_from_llm(
 
     out = execute(_payload())
     assert out["chapters"][0]["estimated_words"] >= 500
+
+
+def test_normalize_plan_guarantees_sections_systematic() -> None:
+    """FASE 1 (outline vacío): sections debe quedar NO vacía en TODO capítulo.
+
+    El writer depende de chapter_outline.sections para estructurar y continuar;
+    cuando el planner/outline devuelve sections=None, ausente o [], el pipeline
+    dispara NO_TARGET_SECTION y nunca alcanza el mínimo de palabras. Este test
+    garantiza que _normalize_plan siempre deje una lista de secciones no vacía.
+    """
+    plan = {
+        "title": "Test",
+        "language": "es",
+        "chapters": [
+            {"number": 1, "title": "A", "objective": "O", "sections": None},
+            {"number": 2, "title": "B", "objective": "O"},  # clave ausente
+            {"number": 3, "title": "C", "objective": "O", "sections": []},
+            {"number": 4, "title": "D", "objective": "O", "sections": [{}]},
+        ],
+    }
+    out = _normalize_plan(plan, {"language": "es"})
+    for ch in out["chapters"]:
+        sections = ch.get("sections")
+        assert isinstance(sections, list) and sections, f"ch{ch['number']} sin sections"
+        for s in sections:
+            assert (s.get("heading") or "").strip()
+
+
+def test_normalize_plan_keeps_custom_sections() -> None:
+    """Si el LLM devuelve secciones válidas (con heading), se conservan tal cual."""
+    plan = {
+        "title": "Test",
+        "language": "es",
+        "chapters": [
+            {
+                "number": 1,
+                "title": "A",
+                "objective": "O",
+                "sections": [
+                    {"heading": "Orígenes", "objective": "Historia"},
+                    {"heading": "Impacto", "objective": "Consecuencias"},
+                ],
+            },
+        ],
+    }
+    out = _normalize_plan(plan, {"language": "es"})
+    headings = [s["heading"] for s in out["chapters"][0]["sections"]]
+    assert headings == ["Orígenes", "Impacto"]
+
+
+def test_prompt_requires_sections_field() -> None:
+    """El prompt del planner debe pedir sections por capítulo (fallback determinista)."""
+    import modules.book_planner.main as main
+
+    prompt = _build_prompt(BookPlanPayload(**_payload()))
+    assert "sections" in prompt
+    assert "Nunca omitas sections" in prompt

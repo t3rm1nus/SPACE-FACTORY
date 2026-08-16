@@ -221,6 +221,24 @@ def test_run_image_plan_with_chapter(client):
     assert resp.get_json()["capability"] == "create_chapter_image_plan"
 
 
+def test_build_payload_preserves_num_images_zero(client):
+    # Bug "or 3" (#4): num_images=0 se convertía silenciosamente en 3.
+    # Ahora 0 se conserva; solo el valor ausente (None) cae al default 3.
+    from frontend import editorial
+    book = _create_book(client).get_json()
+    ch = _make_chapter(book["book_id"], 1, "Texto para imágenes.")
+
+    plan = editorial.build_payload(book["book_id"], "image_plan", {"num_images": 0}, ch)
+    assert plan["num_images"] == 0
+
+    gen = editorial.build_payload(book["book_id"], "image_gen", {"num_images": 0}, ch)
+    assert gen["num_images"] == 0
+
+    # Ausente (None) sigue usando el default 3
+    plan_default = editorial.build_payload(book["book_id"], "image_plan", {}, ch)
+    assert plan_default["num_images"] == 3
+
+
 def test_run_image_gen_requires_chapter(client):
     book = _create_book(client).get_json()
     resp = client.post(f"/api/books/{book['book_id']}/run", data=json.dumps({

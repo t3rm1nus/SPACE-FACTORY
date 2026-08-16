@@ -115,3 +115,22 @@ def test_e_author_is_persisted_and_reaches_quality_gate():
     assert d["author"] == "Autor/a real"  # llega al dict que consume el QC
     qc = final_quality_control({"book": d, "language": "es"})
     assert _metadata_item(qc)["status"] == "PASS"
+
+
+# F) payload mínimo real (solo título + idea) SIN author/genre/target_audience:
+#    el Quality Gate debe dar "Metadatos completos" == PASS (campos opcionales).
+def test_f_minimal_payload_without_author_genre():
+    payload = {
+        "title": "Libro mínimo",
+        "target_chapters": 1,
+        "idea": "Descripción/idea editorial de prueba",
+    }
+    b = create_book(payload)
+    d = _book_dict(b["book_id"])
+    # En la ruta real author/genre/target_audience quedan None (nunca se inventan)
+    assert d["author"] is None
+    assert d["genre"] is None
+    assert d["target_audience"] is None
+    # Y aún así el QC no bloquea el PASS de "Metadatos completos"
+    qc = final_quality_control({"book": d, "language": "es"})
+    assert _metadata_item(qc)["status"] == "PASS"
