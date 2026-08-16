@@ -1,4 +1,4 @@
-"""Autopilot editorial de Space Lair (Fase 8).
+"""Autopilot editorial de Space Lair.
 
 Motor orquestador que, dado un libro, ejecuta TODAS las fases del pipeline
 editorial en orden, persistiendo el estado de cada fase y del job en disco
@@ -816,8 +816,27 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             elif phase["id"] == "fact_check":
                 st = str(result.get("status", "")).upper()
                 qg = str(result.get("quality_gate", "")).upper()
-                if st == "FAIL" or qg == "FAIL":
+                # Gate real de fact_check = quality_gate (integridad del proceso de
+                # verificación). "status" es un hallazgo informativo de claims que el
+                # módulo NO eleva a gate (quality_gate=FAIL eleva status a FAIL, no al
+                # revés). autopilot solo aborta la fase si el GATE falla, manteniendo
+                # st en el mensaje solo por trazabilidad.
+                if qg == "FAIL":
                     gate_fail = f"fact_check#status={st} quality_gate={qg}"
+            elif phase["id"] == "research":
+                # La fase research debe traducir su gate REAL a ok=True/False igual
+                # que quality_gate/fact_check: FAIL por status, quality_gate o por
+                # no alcanzar el mínimo de fuentes exigido por el payload. Sin esto,
+                # una research con 0 fuentes paseaba a outline/writer silenciosamente.
+                st = str(result.get("status", "")).upper()
+                qg = str(result.get("quality_gate", "")).upper()
+                source_count = int(result.get("source_count") or 0)
+                min_sources = int(payload.get("min_sources") or 3)
+                if st == "FAIL" or qg == "FAIL" or source_count < min_sources:
+                    gate_fail = (
+                        f"research#status={st} quality_gate={qg} "
+                        f"source_count={source_count} (min={min_sources})"
+                    )
             if gate_fail:
                 return PhaseResult(
                     ok=False,
@@ -856,6 +875,13 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                     text = str((result.get("metadata") or {}).get("text", ""))
                 field = "draft_es" if phase["id"] == "writer" else "draft_en"
                 editorial.persist_chapter_result(chapter["book_id"], cid, field, text)
+                # Poblar chapters.sources con las URLs REALES de SourceManager
+                # (fuente de verdad única: sources.chapter_ids). Se ejecuta una única
+                # vez por capítulo, aquí en el writer/writer_en (las fases posteriores
+                # per-chapter como editor/image_gen no reescriben la columna).
+                editorial.persist_chapter_sources(
+                    chapter["book_id"], cid, editorial._chapter_source_urls(cid)
+                )
             elif phase["id"] == "editor":
                 text = str(result.get("edited_text") or "")
                 editorial.persist_chapter_result(chapter["book_id"], cid, "edited_es", text)
