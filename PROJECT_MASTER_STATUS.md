@@ -78,9 +78,10 @@ DOCX (output/docx/book_{book_id}_{language}.docx)
 ```
 
 **NOTA:** El flujo real encontrado en el código del **Autopilot** (`core/autopilot.py`
-`AUTOPILOT_PHASES`) incluye las 10 fases de arriba. El Frontend y el runner E2E
-(`run_e2e_001_editorial.py`) muestran/ejecutan 8 fases (sin `image_plan`/`image_gen`,
-porque el E2E usa `image_count=0`).
+`AUTOPILOT_PHASES`) incluye las 10 fases de arriba. El **Frontend** (`app.js`) ya las
+muestra desde FASE 8F.3 (incluye `image_plan`/`image_gen`, ver §16). El runner E2E 001
+(`run_e2e_001_editorial.py`), en cambio, sigue ejecutando efectivamente sin esas 2 fases
+porque usa `image_count=0` — esto sigue siendo cierto.
 
 ---
 
@@ -542,12 +543,11 @@ Campos: **Título***, **Capítulos objetivo** (`new-book-chapters`, default 1, m
 (editorial/moderno/clásico/académico/dossier), Fuente, Color títulos, Alineación.
 
 ### Pipeline visual (`AUTOPILOT_PHASES` en `app.js`)
-`planner, research, outline, writer, fact_check, editor, quality_gate, docx` →
-**8 fases** (espejo del backend **pero sin** `image_plan`/`image_gen`).
+`planner, research, outline, writer, fact_check, editor, image_plan, image_gen,
+quality_gate, docx` → **10 fases** (espejo exacto del backend desde FASE 8F.3).
 
-> ⚠️ **Discrepancia de IDs:** el frontend representa 8 fases y el Autopilot tiene 10
-> (`image_plan`, `image_gen` faltan en el front). No es un error sino una omisión
-> consciente; documentar si se amplía el front para imágenes.
+> **Nota histórica:** entre la 8E.x y 8F.2 el front mostraba solo 8 fases (pipeline -->
+> `image_plan`/`image_gen` omitidas). La discrepancia se cerró en FASE 8F.3 (ver §16).
 
 ### Estados que muestra
 - Job: `PENDING/RUNNING/FAILED/COMPLETED/CANCELLED` (mostrados como ESPERANDO/EN
@@ -557,9 +557,8 @@ Campos: **Título***, **Capítulos objetivo** (`new-book-chapters`, default 1, m
   `central_ai_decision`.
 
 ### Limitaciones conocidas del front
-- Solo en español/parcialmente; algunos textos en inglés ("NEW BOOK", etc.).
+- Textos de interfaz en español. Se mantienen intencionalmente en inglés los siguientes términos (nombres de marca, formatos de archivo, abreviaturas técnicas y niveles de log): `SSE`, `DOCX`, `Autopilot`, `job`, `QC`, `Preset`, `LOG`/`INFO`/`WARN`/`ERR`, iconos simbólicos (`[OK]`), y nombres de fuentes (`Georgia`, `Arial`, `Times New Roman`, `Garamond`, `Calibri`).
 - No expone la configuración de imágenes IA (proveedor) en la UI.
-- Pipe visual no incluye las 2 fases de imagen.
 
 
 ---
@@ -587,14 +586,13 @@ Campos: **Título***, **Capítulos objetivo** (`new-book-chapters`, default 1, m
 | E2E runner | tests/test_runner_e2e_001.py | PASS | see estado | E2E (mocked) |
 | E2E CLI real | `run_e2e_001_editorial.py` | **completed, PASS** | 2026-08-14 23:23:41 | E2E real |
 
-### LAST KNOWN FULL SUITE (registrado, NO re-ejecutado aquí)
+### LAST KNOWN FULL SUITE
 ```text
-571 passed, 0 failed, 0 errors   (tests/ + modules/, incl. E2E runner)
+601 passed, 0 failed, 0 errors   (tests/ + modules/, incl. E2E runner) — 2026-08-16 (checkpoint 8K.3: fix tokenización/stopwords en _keyword_overlap, 142.61s)
 ```
-También referenciado: "503 tests verdes" excluyendo el E2E pesado
-(`test_runner_e2e_001.py`).
-
----
+Incrementos desde 8K.1: +1 test (`test_real_query_los_dooms_stopwords_filtro` en `tests/test_research_sources.py`, FASE 8K.3).
+También referenciado: "503 tests verdes" excluyendo el E2E pesado (`test_runner_e2e_001.py`).
+Prueba focalizada research (8K.2/8K.3): 36/36 PASSED (`test_research_sources.py`, `test_research_multisource.py`, `test_research_curation.py`, `test_quality_gates.py`).
 
 # 15. EVIDENCIA E2E
 
@@ -638,19 +636,51 @@ Validado por tests de integración (`tests/test_frontend_api_autopilot.py`,
 | Fuentes globales no se propagaban (Q gate #3) | QC usaba fuentes de job en vez de asociaciones reales | `_chapter_source_urls()` desde SourceManager; `_build_book_dict` incluye `sources` por capítulo | frontend/editorial.py | test_editorial_sources (8D.2) | **FIXED + VALIDATED** |
 | Umbrales QC usaban defaults 20/30/40 | build_phase_payload no pasaba min/target/max del libro | `build_phase_payload` propaga min/target/max reales | core/autopilot.py | test_autopilot_quality_gate_payload (8E.1) | **FIXED + VALIDATED** |
 | Título de capítulo duplicado en DOCX | Speaker/LLM duplicaba heading | parseo controlado de markdown + headings canónicos | modules/document_builder/main.py | tests | **FIXED + VALIDATED** |
+| Metadata opcional (author/genre/target_audience) bloqueaba Quality Gate + placeholder "Autor: Autor" en DOCX legal | QC exigía bool(author)/bool(genre) como obligatorios pese a ser opcionales en la UI (frontend/editorial.py nunca los inventa); document_builder usaba fallback genérico "Autor" | quality_control/main.py: author/genre/target_audience bajan de FAIL a WARNING en _check_book (title+description siguen obligatorios); document_builder/main.py: _add_legal omite la línea "Autor: X" si no hay autor y usa book.title en el copyright | modules/quality_control/main.py, modules/document_builder/main.py | test_editorial_metadata.py::test_f_minimal_payload_without_author_genre + test_document_builder.py::test_build_book_docx_legal_without_author_omits_line_and_uses_title + regresión focalizada (test_quality_gates.py 15/15, test_autopilot_quality_gate_payload.py 1/1, test_document_builder.py 12/12) | **FIXED + VALIDATED** |
+| chapters.sources quedaba '[]' tras el writer (columna nunca poblada) | chapter_writer no escribía sources; nadie más lo hacía tampoco, pese a que SourceManager ya tenía las asociaciones reales desde la fase research | core/autopilot.py::_persist_chapter (rama writer/writer_en) llama a nuevo helper frontend/editorial.py::persist_chapter_sources, que persiste las URLs reales obtenidas de SourceManager vía _chapter_source_urls. No se tocó chapter_writer/main.py (PROTECTED) ni ningún módulo OUT_OF_SCOPE | core/autopilot.py, frontend/editorial.py | test_writer_populates_chapters_sources_in_db (nuevo) + regresión focalizada (test_autopilot_document_output.py 6/6, test_autopilot_editorial.py 23/23) | **FIXED + VALIDATED** |
+| Frontend solo mostraba 8/10 fases del pipeline (image_plan/image_gen ausentes en AUTOPILOT_PHASES de app.js, pese a que el backend ya las emitía por SSE) | app.js tenía su propio array AUTOPILOT_PHASES desincronizado del real en core/autopilot.py; nunca se actualizó al añadirse las fases de imagen | Se añadieron las 2 fases al array de app.js en la posición exacta del backend (entre editor y quality_gate), más un icono SVG nuevo 'image' en workerToolSvg. index.html no requirió cambios (renderizado 100% dinámico vía renderLivingPipeline) | frontend/app.js | Comparación línea a línea de ambos arrays (backend vs frontend, orden idéntico confirmado) + test_frontend_api_autopilot.py 17/17 PASS + node --check (sintaxis OK) | **FIXED + VALIDATED** |
+| Bug `or 3` ignoraba `images_per_chapter=0` (5 puntos: frontend/frontend_api.py:729, frontend/editorial.py:399/542/554, image_generator/main.py:172/265) | el patrón `data.get("num_images") or 3` (o equivalente) convertía 0 en 3 | se sustituyó por comprobación explícita de `None` (solo ausente → 3; 0 se conserva); `image_planner` no se tocó (ya manejaba 0) | frontend/frontend_api.py, frontend/editorial.py, modules/image_generator/main.py | test nuevo test_build_payload_preserves_num_images_zero (editorial build_payload: image_plan/image_gen 0→0, ausente→3) + comprobación manual generate_chapter_images (0→0, ausente→3) + regresión focalizada 60 PASS (test_image_generator.py, test_editorial_panel.py, test_frontend_api_autopilot.py 17/17, test_image_planner.py) | **FIXED + VALIDATED** |
+| Sin cobertura de orquestación real para editor/image_gen en `_persist_chapter` | El único test de orquestación real cubría solo la rama writer/writer_en (persist_chapters/sources); editor e image_gen solo tenían tests de módulo aislado o payload-only con harness (test_autopilot_editorial.py), sin ejecutar `_persist_chapter` vía scheduler | tests/test_autopilot_persist_chapters.py (nuevo) copia el patrón del test writer: executor real (default_executor_factory + scheduler) + módulo editor STUB + módulo REAL image_generator (LocalImageProvider, sin LLM); verifica que `_persist_chapter` persiste edited_es e images reales en BD | tests/test_autopilot_persist_chapters.py (nuevo); NO se editó core/autopilot.py ni ningún módulo | test_autopilot_persist_chapters.py 2/2 PASS + sanity test_autopilot_document_output.py 6/6 PASS (mismo patrón reutilizado) | **FIXED + VALIDATED** |
 
 
+
+| Textos de interfaz en inglés (labels de fases del pipeline, banner 'BOOK READY', métricas, conteo de fases con enum crudo) | Cadenas sin traducir + líneas 424-428 usaban valores crudos del enum en vez del mapeo PHASE_STATUS_LABEL ya existente | 10 labels de fases + banner + métricas + card traducidos; 424-428 ahora usan PHASE_STATUS_LABEL para consistencia con el resto de la UI | frontend/app.js | node --check (sintaxis OK) + comparación manual de cadenas (grep) confirmando ausencia de las cadenas en inglés originales | **FIXED + VALIDATED** |
+| Código muerto/redundante en frontend_api.py (import Any sin uso, posixpath muerto, import os local redundante, import load_book duplicado, comentario 'Workflow Endpoints' repetido, indentación de comentario anómala) | Acumulación de imports y comentarios sin limpiar; microdiagnóstico confirmó que NO había código inaccesible ni rutas Flask duplicadas (todas las 31 rutas y funciones a nivel módulo están referenciadas) | 5 limpiezas puntuales aplicadas: Any eliminado de imports, posixpath y os locales eliminados de api_book_docx, load_book local redundante eliminado (se usa el import global), comentario duplicado eliminado, indentación corregida | frontend/frontend_api.py | ast.parse OK + pytest tests/test_frontend_api*.py 48/48 PASS | **FIXED + VALIDATED** |
+| Gap de orquestación: la fase research nunca traducía su resultado real (status=FAIL/quality_gate=FAIL/source_count<min_sources) a fallo de fase; _run_single solo lo hacía para quality_gate y fact_check | research quedaba marcada PASS con solo que la tarea terminara sin excepción, aunque sus propias metrics reportaran FAIL. Afectó a 4/9 libros observados (books 8, 9, 16, 17) — el writer escribía sin fuentes reales | core/autopilot.py::_run_single ahora traduce también la fase research al mismo patrón ya usado en quality_gate/fact_check (gate_fail si status/quality_gate=FAIL o source_count < min_sources) | core/autopilot.py | 58/58 tests focalizados (test_autopilot*.py) PASS, sin bajar ningún requisito | **FIXED + VALIDATED** |
+| Calidad insuficiente de research: solo consultaba Wikipedia en español, fallando por completo en temas sin cobertura (ej. videojuegos recientes), forzando al writer a escribir sin material real | modules/research/main.py solo implementaba _wiki_search/_wiki_extract acoplados a es.wikipedia.org, sin fuentes alternativas ni fallback de idioma | Autorización explícita del usuario (módulo OUT_OF_SCOPE) para implementar búsqueda multi-fuente (Wikipedia es→en + Wikidata, archive.org disponible pero deshabilitado por defecto) + curación opcional con LLM (RESEARCH_USE_LLM, timeout/budget acotados igual que writer/editor: RESEARCH_PROVIDER_TIMEOUT=40, RESEARCH_TOTAL_TIME_BUDGET=90) con fallback determinista _deterministic_curate() y validación anti-alucinación de URLs (descarta URLs inventadas por el LLM que no estén en los candidatos reales). DDG Instant Answer y GDELT evaluados y descartados (poco valor / rate_limited) | modules/research/main.py, tests/test_research_multisource.py (nuevo), tests/test_research_curation.py (nuevo), tests/test_research_sources.py (nuevo) | 22/22 tests específicos PASS + 37/37 incluyendo test_quality_gates.py; shape de retorno consumido por autopilot sin cambios; gate_fail de la Tarea 1 confirmado intacto | **FIXED + VALIDATED (pendiente confirmación en checkpoint de suite completa)** |
+| `book_planner.execute` no emitía `language`/`genre` en su salida; `author` no derivable honestamente de la idea | `modules/book_planner/main.py:execute()` (retorno) construía el dict sin `language` ni `genre`; `BookPlanOutput` (core/schemas.py:112-119) no los declaraba; `BookPlanPayload` tenía `language` (default "es") pero no se propagaba | `execute()` ahora incluye `language` (del payload, default "es") y `genre` (inferido keyword-based desde la `idea`; None si no hay keyword claro); `_fallback_plan` también emitidos; `author` intencionalmente omitido (no hay dato real) | `modules/book_planner/main.py` | 53/53 PASS (test_book_planner.py + test_editorial_metadata.py + test_autopilot_quality_gate_payload.py) | **FIXED + VALIDATED** |
+
+| outline.sections vacío en book_planner (FASE 1/outline) | El prompt del LLM del planner no solicitaba el campo `sections` por capítulo y no existía fallback determinista (a diferencia de writer/editor); el outline con `sections=None`/`[]` provocaba NO_TARGET_SECTION en el writer y falla del mínimo de palabras | (1) `_build_prompt` exige `sections` (heading + objective) por capítulo; (2) `_DEFAULT_SECTION_HEADINGS`, `_default_sections()` y `_ensure_sections()` proveen fallback determinista; (3) `_normalize_plan` aplica `_ensure_sections` a cada capítulo | `modules/book_planner/main.py` | 49/49 PASS en `tests/test_book_planner.py` (3 tests nuevos). Suite completa: 596 passed, 0 failed, 0 errors | **FIXED + VALIDATED** |
+| Falso positivo en gate de relevancia research (FASE 8K.3): `_keyword_overlap` usaba substring (`w in haystack`) y no filtraba stopwords; query real `"Los Dooms: El Último"` extraía keywords `['los','dooms','el','último']` y `'el'` coincidía dentro de `"... por el censo."` → overlap=0.250 ≥ umbral 0.15; las 3 fuentes irrelevantes del libro #18 (Crozet, Crimora, Sam Porter Bridges) PASABAN el filtro | Substring matching + ausencia de stopwords ES/EN en keywords de query | (1) Tokenización del haystack en set de palabras (`re.findall` + membership); (2) `_STOPWORDS_ES` con lista mínima ES + EN común; (3) keywords efectivas = palabras ≥2 chars excluyendo stopwords; (4) test `test_real_query_los_dooms_stopwords_filtro` con query/candidatos reales del libro #18 | `modules/research/main.py`, `tests/test_research_sources.py` (nuevo, untracked) | Evidencia real: Crozet/Crimora/Sam Porter Bridges ANTES overlap=0.250 (PASABAN) → DESPUÉS overlap=0.000 (FILTRADAS). Suite completa: **601 passed, 0 failed, 0 errors (142.61s)**. Diagnóstico libro #19: FAIL legítimo (0 candidatos en backends, no culpa del filtro) | **FIXED + VALIDATED** |
+| Anchor de relevancia en research insuficiente (después de 8K.3): el filtro por FRACCIÓN de palabras de la query (`_keyword_overlap >= 0.15`) aceptaba fuentes temáticamente ajenas al libro, sobre todo con queries de pocas palabras o con muchas palabras genéricas — 1 sola coincidencia podía superar el umbral 0.15 aunque la fuente no tuviera relación con el tema (evidencia real: book_23 "La Historia de los Dooms" con fuentes sobre Latveria, Kornbluth, Tannehill, Dončić). | El overlap por fracción de palabras de la query no distingue palabra-ancla (tema del libro) de palabras genéricas/modificadoras de capítulo; se agrava con queries cortas pero no se limita a ellas. | Nueva `_has_anchor_keyword(topic, cand)`: exige que al menos una keyword del "topic" (tema del libro, ya viajaba en el payload sin usarse) aparezca como token real en el candidato. Filtro compuesto: `_keyword_overlap >= 0.15 AND _has_anchor_keyword`. `topic=None/""` preserva compatibilidad total (no bloquea). `research_web()` recibe `topic` opcional (retrocompatible); `execute()` lo lee del payload. | modules/research/main.py, tests/test_research_sources.py (3 tests nuevos + 1 fixture ajustada: título "Libro"→"Gato" en `test_source_count_ge_min_keeps_gate_fail_none`, para coherencia temática con la nueva semántica de anclaje) | 25/25 PASS (test_research_sources.py, test_research_multisource.py, test_research_curation.py) | **FIXED + VALIDATED** |
+| Gate espurio en fact_check: la fase del Autopilot se marcaba FAILED aunque el módulo devolviera `quality_gate=PASS`, siempre que `status=FAIL` (hallazgo de 1+ claim con severidad ERROR). Afectó 5 libros reales en producción (books 9, 18, 19, 23, 25) con job FAILED espurio. | `core/autopilot.py::_run_single`, bloque fact_check, usaba `if st=="FAIL" or qg=="FAIL"`. `modules/fact_checker/main.py` distingue `status` (hallazgo de claims, informativo) de `quality_gate` (integridad del proceso, el gate real); el propio módulo ya refleja esa jerarquía (`quality_gate=FAIL` eleva `status`, nunca al revés). El bloque research (mismo patrón OR) SÍ es correcto por diseño de 8H.3 y no se tocó. | Condición cambiada a `if qg=="FAIL"` únicamente; `st` se conserva solo en el mensaje de error para trazabilidad. | core/autopilot.py (bloque fact_check únicamente), tests/test_autopilot_fact_check_gate.py (nuevo, 2 tests) | 8/8 (test_autopilot_fact_check_gate.py) + 32/32 (test_autopilot_fact_check_gate.py + test_autopilot_editorial.py + test_autopilot_quality_gate_payload.py + test_autopilot_document_output.py) | **FIXED + VALIDATED** |
+
+### Mantenimiento / Limpieza (checkpoint 2026-08-16)
+
+Limpieza de inventario (solo lectura → aprobada y ejecutada, Parte A) + alineación de protección:
+
+| Categoría | Acción | Resultado |
+|---|---|---|
+| **Cat 1 — Huérfanos/temporales** | ~45 archivos de diagnóstico/logs/temporales borrados en la raíz y `tools/dev/`; 3 `.md` históricos archivados en `tools/dev/archive/` (`propuesta_reconciliacion.md`, `checkpoint_8d2_result.md`, `checkpoint_8d2_sources.md`) | Raíz y `tools/dev/` limpios; `e2e_001_report.json`, `e2e_book_workflow.py`, `e2e_docx_demo.py` intactos |
+| **Cat 2 — Imports sin usar** | 9 imports sin uso eliminados: `core/auth.py`, `core/mcp_bridge.py`, `core/module_registry.py`, `core/workflow.py`; `tools/orchestrator.py`, `tools/dev/runner.py`, `tools/dev/autonomous.py`, `tools/dev/autopilot.py`, `tools/dev/agent_loop.py`; `frontend/editorial.py` | Collect-only limpio + 46/46 PASS en archivos afectados |
+| **Cat 5 — Comentarios obsoletos** | Docstrings/comentarios de fase antigua y contador de tests hardcodeado actualizados: `core/autopilot.py` (docstring), `frontend/frontend_api.py` (54/298/703), `tools/dev/state.py` ("379 tests"→genérico) | Actualizado |
+| **Cat 7 — Protección** | `OUT_OF_SCOPE_MODULES` alineado a los módulos reales en `tools/dev/config.py` y §21: +`image_planner`, `mcp_demo`, `mcp_external` | Config y documento maestro sincronizados |
+
+**Validación (en cada paso):** `pytest tests/ -k "not e2e" -q --co` → 551/580 recolectados (29 deselected), sin roturas de import/colección; `test_autopilot_editorial.py` + `test_frontend_api.py` → 46 passed, 0 failed.
+
+- **Cat 3 (código muerto/inaccesible)**: `core/image_providers/comfyui.py` documentado como deuda conocida (ver §19); sin acción en este checkpoint.
+- **Cat 4 (patrón `or <default>`)**: verificado contra schemas — `min_sources` (`core/schemas.py:191`, `ge=1`) y `relevance` (`core/book/book_schema.py:105`, `ge=1`) ya prohíben `0` ⇒ el patrón restante es **inofensivo** y NO requiere acción.
 ---
-
 # 17. PROBLEMAS ABIERTOS
 
 > Solo problemas **realmente detectados** en código/repositorio, no supuestos.
 
 | # | Problema | Impacto | Estado | Prioridad | Evidencia | Próximo paso |
 |---|---|---|---|---|---|---|
-| 1 | **`chapters.sources` no se puebla** por el chapter_writer (la columna existe, `database.py`, pero queda `'[]'`). `_build_book_dict` obtiene fuentes reales desde `SourceManager`, no de esta columna. | El QC `_check_sources` depende de `chapters[].sources`; en el autómata real (no runner) podría dar FAIL si `_chapter_source_urls` no recuperara las asociaciones. En el E2E pasa porque el runner construye `book_dict` manual con fuentes. | OPEN (propuesta PROB 3 de `tools/dev/propuesta_reconciliacion.md`) | Alta | `propuesta_reconciliacion.md` §Cambio #1; `frontend/editorial.py` | Persistir `json.dumps(sources)` en `chapters.sources` tras writer; requiere aprobación (PROTECTED) |
-| 2 | **`book_planner.execute` no devuelve `author`/`genre`/`language`** → en el autómata real, `create_book` INSERTa NULL y el QC "Metadatos completos" podría FAIL. El E2E pasa porque inyecta metadata explícita. | QC metadata FAIL en pipeline autómata real (no runner). | OPEN (propuesta PROB 1) | Alta | `propuesta_reconciliacion.md`; `modules/book_planner/main.py` (salida); `modules/quality_control/main.py` `_check_book` | Alinear planner o la ruta de creación de book_dict |
+| 1 | **`chapters.sources` no se puebla** por el chapter_writer (la columna existe, `database.py`, pero quedaba `'[]'`). | El riesgo de FAIL en QC descrito originalmente era una lectura incorrecta del código: en la ruta autómata real el QC `_check_sources` consume `chapters[].sources` desde el book dict armado por `_build_book_dict`/`_chapter_source_urls` (SourceManager), no desde la columna `chapters.sources`. El impacto real era solo inconsistencia del modelo de datos (columna sin poblar pese a existir en schema), sin impacto funcional en QC/DOCX. Corregido igualmente por consistencia. | CLOSED (ver §16). Corrección de premisa: el diagnóstico de esta sesión confirmó que el QC (_check_sources) en la ruta autómata real NUNCA dependió de chapters.sources — ya consumía las fuentes reales vía SourceManager a través de _build_book_dict/_chapter_source_urls. El problema real era solo inconsistencia del modelo de datos (columna sin poblar pese a existir en schema), no un riesgo de FAIL en QC. Corregido igualmente por consistencia. | Baja | `propuesta_reconciliacion.md` §Cambio #1; `frontend/editorial.py` | Resuelto — ver §16 (FASE 8F.2) |
+| 2 | **`book_planner.execute` no devuelve `author`/`genre`/`language`** → en el autómata real, `create_book` INSERTa NULL y el QC "Metadatos completos" podría FAIL. El E2E pasa porque inyecta metadata explícita. | Antes de 8F.1: QC metadata FAIL en pipeline autómata real si book_planner no emite author/genre (el E2E pasaba porque inyecta metadata explícita). Desde 8F.1 (ver §16): QC ya no falla por esto (WARNING, no FAIL) y el DOCX ya no muestra placeholder — el único impacto restante es que el libro queda sin autor/género visible en portada/legal si el usuario no los rellena en la UI (comportamiento esperado, no bug). | CLOSED — causa raíz resuelta: `book_planner.execute()` ahora emite `language` (del payload, default "es") y `genre` (inferido keyword-based desde la idea); `author` omitido intencionalmente (no derivable honestamente). Ver §16 FASE 8J.1. | Baja | `propuesta_reconciliacion.md`; `modules/book_planner/main.py` (salida); `modules/quality_control/main.py` `_check_book` | Resuelto — ver §16 FASE 8J.1 |
 | 3 | **PDF builder usa `book_{language}.pdf`** (colisión análoga a la del DOCX pre-8E.6). | Colisión de entregables si se generan varios libros PDF con el mismo idioma. | DEBT / OUT OF SCOPE | Baja (no bloqueante) | `state.json`/`PROJECT_STATUS.md` KNOWN_BAD | Corregir a `book_{book_id}_{lang}.pdf` cuando se retome PDF |
+| 4 | **Bug `or 3` ignora `images_per_chapter=0`**: en `frontend/frontend_api.py:729`, `frontend/editorial.py:399/542/554` y `modules/image_generator/main.py:265`, el patrón `data.get("num_images") or 3` convierte silenciosamente 0 en 3. Descubierto durante el diagnóstico de §19 P2 (2026-08-15). | Un usuario que elige explícitamente "0 imágenes" en la UI (opción válida, radios 0/1/3/5 según §13) verá el Autopilot real generar 3 imágenes de todas formas, contradiciendo su elección. `modules/image_planner/main.py::_resolve_num_images` ya maneja 0 correctamente — el problema es que 0 nunca le llega, se transforma antes en la capa de frontend/editorial. | CLOSED (ver §16, FASE 8F.4) | Media | Diagnóstico de sesión 2026-08-15 (ver §19 P2) | Resuelto en FASE 8F.4 — ver §16 |
 
 ---
 
@@ -664,26 +694,30 @@ Distinción **LIMITATION** (diseño/entorno) vs **BUG**.
 | **PDF** fuera de alcance / deuda (pdf_builder). | LIMITATION / OUT OF SCOPE |
 | **Dependencia de Ollama** (LLM local) para planner/research/writer/fact_check/editor/image_plan; si no está activo se usa fallback determinista (writer/editor), pero la calidad nominal del LLM se pierde. | LIMITATION |
 | Requiere **worker/server activo** (scheduler/ap formativo) para procesar tareas. | LIMITATION |
-| Frontend expone solo 8 fases (no image_plan/image_gen). | LIMITATION (UX) |
+| Frontend muestra las 10 fases del pipeline (image_plan/image_gen incluidas), pero sin UI para elegir proveedor/modelo de imagen IA (queda el local placeholder). | LIMITATION (UX) |
 | El LLM puede devolver continuaciones duplicadas (se detectan y rechazan como avisos, no fallos). | LIMITATION (calidad LLM, acotada) |
 | Document Builder no renderiza listas Markdown numeradas como listados nativos de Word (las trata como párrafos). | LIMITATION |
-| Textos de interfaz parcialmente en inglés. | LIMITATION |
+| Textos de interfaz parcialmente en inglés. | RESUELTO (ver §16, FASE 8H.1) — quedan solo términos técnicos/intencionales en inglés (SSE, DOCX, Autopilot, QC, etc.). | LIMITATION → RESUELTO |
+| El filtro de relevancia de research (`_keyword_overlap`) se basa en solapamiento léxico de palabras clave, no en relevancia semántica/temática. Puede dar falsos positivos cuando existe coincidencia léxica casual (ej.: existe un lugar real "Dooms, Virginia" cuyo nombre coincide con un título ficticio "Los Dooms", haciendo que artículos geográficos irrelevantes pasen el filtro). Mitigado en profundidad por fact_check, que rechaza afirmaciones sin respaldo real independientemente de si la fuente pasó el filtro de research. No se aborda ahora: requeriría relevancia semántica, cambio de alcance mayor. | LIMITATION |
 
 
 
+| **P3** | `core/image_providers/comfyui.py`: sintaxis rota (dict `DEFAULT_WORKFLOW` sin cerrar en la línea 43). **Sin impacto en runtime**: su import está silenciado por `try/except` en `core/image_providers/registry.py` y el provider activo por defecto es `local`. Cerrar la llave arregla la sintaxis (trivial), pero hacerlo **funcional** requiere reconstruir el workflow real de ComfyUI (nodos + conexiones + nodo `SaveImage`, actualmente ausente) — fuera de alcance de la limpieza 2026-08-16. | Diagnóstico 2026-08-16 |
 # 19. DEUDA TÉCNICA
 
 Priorizada (no estética como P0):
 
 | Prioridad | Deuda | Nota |
 |---|---|---|
-| **P1** | Persistir `chapters.sources` y completar metadatos (author/genre) en la ruta autómata real, para que el Quality Gate no dependa de la ruta manual del runner E2E. | Problemas Abiertos #1 y #2 |
+| **P2** | Que `book_planner` emita `author`/`genre`/`language` en la ruta autómata real. **Mejora, no bug**: el sistema ya funciona correctamente sin ello (QC/DOCX aceptan su ausencia por diseño, ver §16). | **CLOSED** — resuelto en FASE 8J.1 (ver §16): `book_planner.execute()` emite `language` (del payload, default "es") y `genre` (inferido keyword-based desde la idea); `author` omitido (no derivable honestamente) |
 | **P2** | PDF: renombrar a `book_{book_id}_{lang}.pdf` y validar. | Problema Abierto #3 |
-| **P2** | Frontend: exponer las fases `image_plan`/`image_gen` para reflejar el pipeline real de 10 fases. | Sec. 13 |
-| **P2** | Traducir textos de interfaz que quedan en inglés. | Sec. 13 |
-| **P3** | Eliminar código duplicado/inaccesible en `frontend_api.py`. | MANUAL_USUARIO §27 |
+| **P2** | Traducir textos de interfaz que quedan en inglés. | Sec. 13 | CLOSED (ver §16, FASE 8H.1) — textos de interfaz traducidos; lo que queda en inglés es intencional (términos técnicos, marcas, formatos). |
+| **P3** | Eliminar código duplicado/inaccesible en `frontend_api.py`. | CLOSED (ver §16, FASE 8H.2). Microdiagnóstico confirmó que no había código inaccesible real, solo imports/comentarios redundantes de bajo riesgo. |
 | **P3** | Reconexión SSE robusta si se implementa. | MANUAL_USUARIO §27 |
 | **P3** | Conectar un proveedor de imágenes IA real (p.ej. ComfyUI) por defecto. | Sec. 8 |
+| **P3** | (opcional, no urgente) Extraer helper de validación común para los pares approve/reject y cancel/retry en frontend_api.py (patrón fetch→validate→acción→broadcast repetido, pero con estados/retornos distintos; riesgo medio si se toca, valor bajo) | Diagnóstico 8H.2 §1.3 |
+| **P3** | El runner E2E real (`run_e001_editorial.py`) no ejercita el camino real de outline→writer con LLM activo: corre en `chapter_execution_mode=deterministic` con editor `fallback`, por lo que no detecta bugs como outline.sections vacío (8K.1). | `run_e2e_001_editorial.py`; deuda de cobertura E2E — se necesita un test focalizado que invoque el outline con LLM real y verifique `sections` non-empty antes del writer |
+| **P2** | Patrón recurrente: fixes de código validados en repo/tests no llegan al proceso real del servidor hasta reinicio manual (visto en 8L.1/8L.2 con `CHAP_FORCE_MIN`, y de nuevo hoy con el fix de research — book_23 corrió con módulo stale pese a que el fix ya estaba en el repo ~14 min antes). No hay verificación automática de que el proceso activo corresponda al código del repo. Sin mecanismo de auto-reload ni check de versión/hash al arrancar. | Catalizador 2026-08-16: reinicio manual requerido para exponer los fixes de research (anchor) + fact_check (gate). |
 
 
 # 20. ROADMAP
@@ -691,8 +725,8 @@ Priorizada (no estética como P0):
 ```text
 COMPLETADO   — pipeline editorial → document_builder → DOCX; QC; backstop determinista
 EN CURSO     — mantener green (diagnóstico 8E.8 cerrado); nada activo pendiente de implementación mayor
-SIGUIENTE    — resolver Problemas Abiertos #1/#2 (persistencia sources + metadata en autómata real)
-FUTURO       — PDF estable, imágenes IA reales, frontend 10 fases, traducción UI
+SIGUIENTE    — Problemas Abiertos #1 y #2 cerrados (8F.1/8F.2, ver §16). Sin bloqueantes activos; deuda menor en §19.
+FUTURO       — PDF estable, imágenes IA reales, traducción UI
 OUT OF SCOPE — PDF (deuda), modificaciones a módulos OUT_OF_SCOPE sin nueva evidencia
 ```
 
@@ -720,8 +754,11 @@ Fuente: `tools/dev/config.py` + `tools/dev/security.py` (real, vigente).
 
 ### TOCAR SOLO CON AUTORIZACIÓN (OUT_OF_SCOPE_MODULES)
 - `research`, `fact_checker`, `editor`, `document_builder`, `quality_control`,
-  `pdf_builder`, `image_generator`, `book_planner`, `translator`, `text_summarizer`,
-  `word_counter`.
+  `pdf_builder`, `image_generator`, `image_planner`, `book_planner`, `translator`,
+  `text_summarizer`, `word_counter`, `mcp_demo`, `mcp_external`.
+
+> `modules/research/main.py` fue modificado con autorización explícita del
+> usuario en FASE 8I.1 (multi-fuente + curación LLM) — ver §16/§24.
 
 ### LIBREMENTE MODIFICABLE (ALLOWED_AUTO_EDIT_DIRS)
 - `tools/` (infraestructura de desarrollo).
@@ -776,23 +813,157 @@ PROJECT STATUS:          KNOWN_GOOD (verificado en state.json/PROJECT_STATUS.md 
 PIPELINE STATUS:         Activo; 8/8 etapas PASS en E2E real; AUTOPILOT_PHASES = 10 fases
 EDITOR:                  IMPLEMENTED + VALIDATED (fallback determinista; E2E fallback PASS)
 WRITER:                  IMPLEMENTED + VALIDATED (backstop determinista; E2E 1668w ≥1500, sin placeholders)
+RESEARCH:                IMPLEMENTED + VALIDATED (multi-fuente Wikipedia es/en + Wikidata + curación LLM opcional con fallback determinista, 8I.1); gate de orquestación corregido (8H.3)
 IMAGES:                  Orquestación/persistencia/inserción IMPLEMENTED; proveedor activo = LOCAL PLACEHOLDER (no IA real)
 DOCUMENT BUILDER:        IMPLEMENTED + VALIDATED (book_{book_id}_{lang}.docx; comments[:255])
 LAYOUT:                  IMPLEMENTED + VALIDATED (5 presets + aliases + overrides)
-FRONT:                   IMPLEMENTED (8 fases; sin image_plan/gen; sin UI de proveedor de imagen)
-TESTS:                   Última suite registrada: 571 passed, 0 failed, 0 errors
+FRONT:                   IMPLEMENTED (10 fases; textos de interfaz traducidos, 8H.1; sin UI de proveedor de imagen IA)
+TESTS:                   pendiente de re-verificación tras reinicio (baseline previo: 601 passed, 0 failed, 0 errors en 8K.3). Se añadieron hoy 2 fixes (research anchor + fact_check gate) validados en batería focalizada: test_research_sources/multisource/curation 25/25 PASS y test_autopilot_fact_check_gate/editorial/quality_gate_payload/document_output 32/32 PASS. La suite completa se re-ejecutará y actualizará el conteo tras el reinicio.
 E2E:                     PASS (e2e_001_report.json status=completed; 8/8; DOCX PASS; QC PASS)
 DOCX:                    PASS (output/docx/book_1001_es.docx)
 PDF:                     OUT OF SCOPE / DEUDA (book_{language}.pdf sin book_id)
-MAIN BLOCKERS:           Ninguno bloqueante; pendientes: persistir chapters.sources (#1) y metadata en autómata real (#2)
-NEXT RECOMMENDED ACTION: Mantener green; alinear autómata real a los overrides del runner (persistencia sources + metadata)
-LAST VERIFIED:           2026-08-14 23:23:41 (E2E) / 2026-08-15 (este documento)
+MAIN BLOCKERS:           Ninguno bloqueante. Problemas Abiertos #1, #2 y #4 cerrados (ver §16: 8F.1/8F.2/8F.4/8J.1). Deuda de cobertura de orquestación editor/image_gen cerrada en 8G.2 (ver §16/§19).
+NEXT RECOMMENDED ACTION: Tras reiniciar el proceso con los 2 fixes (research anchor de relevancia + gate de fact_check), reintentar los libros reales con job FAILED espurio por el bug de gate: books 9, 18, 19, 23 y 25 (fact_check#status=FAIL quality_gate=PASS). Mantener green y vigilar la tasa de duplicación de continuation (book_22, 5/6) y el anclaje de relevancia en los reintentos.
+LAST VERIFIED:           2026-08-16 (checkpoint 8L.2: timeout writer ampliado a 300s + CHAP_FORCE_MIN activo en servidor real, book_22 COMPLETED 1620 palabras)
 ```
 
 
 # 24. CHANGELOG RESUMIDO (hitos)
 
 ```text
+CHECKPOINT 8Z.2 / 2026-08-16
+- (1) Anchor de relevancia en research: nueva `_has_anchor_keyword(topic, cand)` — filtro compuesto (`_keyword_overlap >= 0.15 AND _has_anchor_keyword`) que ancla la relevancia al tema del libro (topic, ya presente en el payload). `topic` opcional en `research_web()`, retrocompatible; `topic=None/""` no bloquea. 25/25 PASS (research_sources/multisource/curation). Ver §16.
+- (2) Gate espurio en fact_check: `autopilot._run_single` pasó el bloque fact_check de `if st=='FAIL' or qg=='FAIL'` a `if qg=='FAIL'`, eliminando fallos de fase espurios con `quality_gate=PASS` (books 9,18,19,23,25). Bloque research intacto (8H.3). 32/32 PASS (test_autopilot_fact_check_gate/editorial/quality_gate_payload/document_output). Ver §16.
+
+FASE 8M.2 / 2026-08-16
+- objetivo: integrar SearXNG (infraestructura 8M.1) como candidato más en el pool multi-fuente de `research` y evitar starvation bajo el default de producción (max_sources=5).
+- solución (a): `modules/research/main.py` — `_search_searxng` (HTTP a http://localhost:8081, parseo tolerante a JSON/fenced + fallback a [] en error/timeout) integrado en `_multi_source_search`; orden de backends: Wikipedia es/en → Wikidata → SearXNG → archive.org opcional (RESEARCH_ARCHIVE_ENABLED).
+- solución (b): `SOURCE_PRIORITY["web_searxng"] = 2` (mismo nivel que web_wikidata=2, > web_archiveorg=1, < web_wikipedia=3). Antes la clave ausente implicaba prioridad 0; el 2 refleja la calidad de SearXNG como agregador sin despulsar a Wikipedia (prioridad máxima).
+- solución (c) [FASE 8M.2-fix, causa raíz]: la truncatura POR ORDEN DE LLEGADA en `_multi_source_search` se reemplazó por un corte SOLO tras dedupe + ranking determinista (`_deterministic_curate`, priority+overlap). Antes, `len(candidates) >= max_sources -> break` dentro del bucle de dedupe descartaba candidatos de backends posteriores (p.ej. SearXNG) cuando Wikipedia saturaba los huecos; ahora cada backend aporta hasta `per_backend_limit` y el corte decisivo respeta prioridad/overlap (nunca el orden de llegada). try/except por-backend y timeouts se mantienen.
+- validación unitaria: `pytest tests/test_research*.py` -> 23 passed, 0 failed, 0 errors (1.35s). Ningún test requirió ajuste: los tests asercionan conteos/caps/dedupe y casos aislados por stubs (no el orden de llegada); el contrato `len <= max_sources` y `per_backend_limit` se conservan. Fixture autouse stubbea SearXNG a [] en multisource/sources; el backend real contra contenedor se valida en tests/test_research_searxng.py.
+- prueba de efectividad del fix (demo controlada): max_sources=2, Wikipedia (overlap=0) vs SearXNG (overlap=1.0 sobre "sistema solar"); OLD (arrival-order truncation) devolvía ['web_wikipedia','web_wikipedia']; NEW (priority+overlap) devuelve ['web_searxng','web_searxng'] ⇒ prioridad/overlap decide, no el orden de llegada.
+- HUMO REAL (max_sources=5, default de producción; RESEARCH_USE_LLM=0; Wikipedia/Wikidata/SearXNG en vivo contra contenedor localhost:8081, HTTP 200): `_search_searxng("sistema solar",5,20)` directo -> 5 candidatos reales y diversos (es.wikipedia.org, ucm.es, youtube.com, nasa.gov, nationalgeographic.com.es) => infra OK. `research_web("sistema solar", max_sources=5)` -> total=5, web_searxng=0, dominios=['es.wikipedia.org']. Con max_sources=30: `_multi_source_search` -> 30 (15 wikipedia + 15 searxng), dominios reales diversos (nasa.gov, esa.int, iac.es, ucm.es, twinkl.es, youtube.com, www.esa.int, ...).
+- NOTA / hallazgo abierto (no es bug de código): el fix de truncatura CORTA (priority decide; demo arriba), PERO bajo el default max_sources=5 el humo "sistema solar" sigue 0 web_searxng porque Wikipedia devuelve 5 artículos con prioridad 3 y keyword overlap ~1.0 que legítimamente ocupan el top-5 del ranking determinista. Para queries de alta cobertura de Wikipedia, searxng solo aparece si max_sources lo permite (>=6) o si su overlap supera al de Wikipedia. Palancas abiertas: (a) elevar el default de max_sources (p.ej. 8) en core/schemas.py + frontend/editorial.py, o (b) rebalancear prioridades — no aplicadas en este cierre (fuera del scope autorizado).
+- estado: CORTÉ DE TRUNCATURA CERRADO (verified, tests PASS, demo PASS); GATE DE HUMO (searxng>0 bajo max_sources=5) NO ALCANZADO para "sistema solar" por dominio de Wikipedia — requiere decisión sobre el default de max_sources (ver hallazgo abierto). Infra SearXNG verificada funcional (HTTP 200, candidatos reales).
+
+FASE 8M.2-fix / 2026-08-16
+- objetivo: elevar el default de max_sources de 5->8 para resolver el GATE DE HUMO pendiente (searxng=0 bajo max_sources=5 para "sistema solar") y dar espacio a la diversidad de fuentes sin romper prioridad de Wikipedia.
+- cambio (default 5->8, todos "duros" sin fallback al schema pydantic):
+  - core/schemas.py:190 -> `Field(default=8, ge=1, le=20)` (mantenido ge=1, le=20)
+  - frontend/editorial.py:461 -> `int(data.get("max_sources") or 8)` (or 5 -> or 8)
+  - modules/research/main.py:586 -> `research_web(..., max_sources: int = 8, ...)` (signature)
+  - modules/research/main.py:743 -> `int(payload.get("max_sources", 8))` (validate_payload)
+  - modules/research/main.py:764 -> `validated.get("max_sources", 8)` (execute, safety net)
+  - Caso research/main.py: los 3 defaults eran "duros" (hard-coded a 5, sin fallback al schema). Ajustados a 8 para consistencia.
+- motivo: con max_sources=5, Wikipedia (prioridad 3, overlap ~1.0) saturaba el top-5 y SearXNG quedaba fuera (hallazgo abierto sec. 823). Elevar a 8 da espacio a la diversidad sin despulsar la prioridad maxima de Wikipedia (prioridad 3 > SearXNG=2).
+- investigacion step 2 (módulos downstream): Select-String en modules/fact_checker/*.py, modules/editor/*.py, modules/quality_control/*.py con patron `max_sources|source.*5|5.*source` -> NO MATCHES. Ningun modulo downstream asume o valida un maximo/minimo de fuentes atado al 5. El gate de min_sources (default 3) no depende de max_sources; el gate usa `len(stored) >= 1`.
+- estimacion timeout (4 backends, peor caso todos fallan): Wikipedia(_wiki_search _request timeout=20)=20s + Wikidata(_request timeout=20)=20s + SearXNG(_request timeout=20, llamado con timeout=20)=20s + Archive(_request timeout=20)=20s. Total: 4x20=80s < RESEARCH_TOTAL_TIME_BUDGET=90 y < timeout_seconds=160 del module.json (subido 120->160; margen 40s; holgado). Con RESEARCH_USE_LLM="1" (default): +RESEARCH_PROVIDER_TIMEOUT=40 -> 80+40=120s < 160s (margen 40s, holgado). En el humo (RESEARCH_USE_LLM="0"): 80s, holgado bajo 160s. Nota: max_sources=8 no incrementa el numero de requests HTTP por backend en el escenario "todos fallan" (1 search request que falla -> 0 extracts); solo incrementa per_backend_limit en _multi_source_search.
+- validacion unitaria: `pytest tests/test_research*.py -v` -> 23 passed, 0 failed, 0 errors (1.70s). Ningun test requirio ajuste; los tests usan max_sources explicitos (no el default de la funcion).
+- HUMO REAL (max_sources=8, RESEARCH_USE_LLM=0, Wikipedia/Wikidata/SearXNG en vivo contra contenedor localhost:8081, HTTP 200): `research_web("sistema solar", max_sources=8)` -> total=8, web_searxng=1, dominios=['es.wikipedia.org', 'ecologiaverde.elperiodico.com']. Antes (max_sources=5): total=5, web_searxng=0, dominios=['es.wikipedia.org'].
+- estado: CERRADO — GATE DE HUMO ALCANZADO (web_searxng=1 > 0 bajo max_sources=8). CORTÉ DE TRUNCATURA (solucion (c) del 8M.2) sigue CERRADO. FASE 8M.2 comun finalizada.
+- ajuste timeout (FASE 8M.2-fix-cont): con RESEARCH_USE_LLM="1" (default real), peor caso = 80s (4 backends x 20s) + 40s (RESEARCH_PROVIDER_TIMEOUT) = 120s = timeout_seconds original -> margen CERO. Eleccion (b): subir timeout_seconds 120->160 en modules/research/module.json (1 linea JSON, no altera logia de negocio; solo kill-timer del scheduler). Recalculo: 120s < 160s -> margen real de 40s (33%). Comentario actualizado modules/research/main.py:54-58 (max_sources=5 -> 8 en docstring de SOURCE_PRIORITY).
+
+
+FASE 8M.1 / 2026-08-16
+- objetivo: infraestructura SearXNG como backend de descubrimiento web amplio para research (complementa Wikipedia/Wikidata/archive.org)
+- solución: infra/searxng/settings.yml + docker-compose.yml (imagen oficial searxng/searxng:latest, puerto 8081:8080, search.formats=[html,json,rss], restart=unless-stopped, contenedor aislado `searxng-test`)
+- CORRECCIÓN de diagnóstico previo (misma sesión): el 403 inicial NO era por falta de cabecera X-Forwarded-For (eso es solo un log informativo de ProxyFix, cosmético, no bloquea); era por format "json" ausente en search.formats del settings.yml (webapp.py aborta 403 si el formato no está habilitado). No hace falta trusted_proxies ni cabeceras especiales en el backend Python.
+- validación: curl sin cabeceras especiales -> HTTP 200, 27 resultados reales para "Isaac Newton" (Wikipedia en+es entre ellos), ~0.9s
+- estado: CERRADO - INFRAESTRUCTURA LISTA PARA CONSUMO
+FASE 8L.2 / 2026-08-16
+- problema: continuación de 8L.1 (timeout 180s insuficiente con backstop forzado)
+- solución: timeout_seconds 180->300 en modules/chapter_writer/module.json + CHAP_FORCE_MIN=1 reaplicado en run.py::web() (definitivo, no revertido)
+- validación real (book_22, servidor real): COMPLETED, final_word_count=1620 (>=1500), quality_gate=PASS, final_quality_gate=PASS, deterministic_used=true, writer duration=151.8s (margen ~148s bajo el nuevo techo de 300s)
+- observación (no bloqueante): 5/6 intentos de continuación rechazados por duplicación en esta corrida (successful=1, rejected=5); resultado final correcto pese a la tasa de descarte alta; vigilar si se repite
+- estado: CERRADO - VALIDADO EN SERVIDOR REAL
+
+FASE 8L.1 / 2026-08-16
+- problema: capítulo bajo mínimo de palabras en servidor real (981<1500) porque CHAP_FORCE_MIN nunca se fijaba fuera del runner E2E (ver 8K.3/7.9D.7)
+- intento 1: os.environ.setdefault("CHAP_FORCE_MIN","1") en run.py::web() -> REVERTIDO. Resultado: job FAILED (writer#79, timeout 180s), peor que el estado anterior (COMPLETED con 981 palabras). Mismo patrón que book_16.json (writer#59).
+- causa raíz identificada: timeout de tarea de 180s en fase writer es insuficiente cuando el backstop determinista debe expandir el capítulo.
+- estado: BLOQUEADO, pendiente investigar timeout (ver PASO B de esta sesión)
+- research (8K.3) confirmado intacto en esta prueba: 5 fuentes reales PASS
+
+FASE 8K.3 / 2026-08-16
+- problema: falso positivo en el gate de relevancia de research — `_keyword_overlap` usaba substring (`w in haystack`) y no filtraba stopwords ES/EN de las keywords de la query. Con la query real "Los Dooms: El Último", keywords efectivas `['los','dooms','el','último']` y `'el'` coincidía por substring dentro de "... por el censo." → overlap=0.250 ≥ umbral 0.15. Las 3 fuentes irrelevantes reales del libro #18 (Crozet Virginia, Crimora Virginia, Sam Porter Bridges) PASABAN el filtro (bug) y se persistían.
+- solución: (1) haystack tokenizado en set de palabras reales (`re.findall` + membership → coincidencia por palabra completa, no substring); (2) nueva `_STOPWORDS_ES` con lista mínima ES + EN común aplicada a las keywords candidatas extraídas de la query; (3) keywords efectivas = palabras ≥2 chars excluyendo stopwords; (4) +1 test `test_real_query_los_dooms_stopwords_filtro` en `tests/test_research_sources.py` con la query real y los candidatos irrelevantes reales del libro #18.
+- archivos: `modules/research/main.py` (_keyword_overlap + _STOPWORDS_ES), `tests/test_research_sources.py` (nuevo, untracked)
+- validación: evidencia real libro #18 — las 3 fuentes (Crozet/Crimora/Sam Porter Bridges) pasaron de overlap=0.250 (PASABAN, bug) a 0.000 (correctamente descartadas). Suite completa: 601 passed, 0 failed, 0 errors (142.61s). Diagnóstico libro #19: FAIL legítimo (0 candidatos en backends, no culpa del filtro).
+- ESTADO: CERRADO - VALIDADO (research real, sin falsos positivos, fact_check PASS). El fallo de word_count (981<1500) observado en la prueba de aceptación NO es parte de este fix; es el gap ya conocido de CHAP_FORCE_MIN (ver punto 2).
+
+FASE 8K.1 / 2026-08-15
+- problema: outline.sections vacío en book_planner — el prompt del LLM no solicitaba el campo `sections` por capítulo y no existía fallback determinista (a diferencia de writer/editor); el outline con `sections=None`/`[]` provocaba NO_TARGET_SECTION en el writer y falla del mínimo de palabras
+- solución: (1) `_build_prompt` exige `sections` (heading + objective) por capítulo; (2) `_DEFAULT_SECTION_HEADINGS`, `_default_sections()` y `_ensure_sections()` proveen fallback determinista para capítulos con sections ausentes/vacíos; (3) `_normalize_plan` aplica `_ensure_sections` a cada capítulo; (4) 3 tests de regresión nuevos en `tests/test_book_planner.py`
+- archivos: `modules/book_planner/main.py`, `tests/test_book_planner.py` (único módulo tocado; chapter_writer/editor/research fact_checker quality_control PROTECTED u OUT_OF_SCOPE)
+- validación: 49/49 PASS en test_book_planner.py; suite completa 596 passed, 0 failed, 0 errors (208.70s) — sin regresiones
+
+FASE 8J.2 / 2026-08-15
+- acción: checkpoint de integración — suite completa re-ejecutada tras 8I.1/8J.1
+- resultado: 593 passed, 0 failed, 0 errors (105.56s) — sin regresiones; sin cambios de código en este checkpoint
+- validación: pytest tests/ modules/ -q (suite completa, incl. runner E2E)
+
+FASE 8J.1 / 2026-08-15
+- problema: `book_planner.execute()` no emitía `language`/`genre` en su salida; en la ruta autómata real, `create_book` INSERTa NULL → `author`/`genre`/`language` ausentes del libro
+- solución: `execute()` propaga `language` del payload (default "es") y `genre` inferido keyword-based determinista desde la `idea` (None si no hay keyword claro); `_fallback_plan` también emitidos; `author` intencionalmente omitido (no hay dato real del que derivarlo — no se inventa)
+- validación: tests/test_book_planner.py + tests/test_editorial_metadata.py + tests/test_autopilot_quality_gate_payload.py — 53/53 PASS
+
+FASE 8H.3 / 2026-08-15
+- problema: fase research nunca fallaba aunque su resultado real fuera FAIL (gap de orquestación, detectado en prueba real con book 17 "Doom Dark Ages")
+- solución: core/autopilot.py::_run_single traduce research al mismo patrón de gate_fail que quality_gate/fact_check
+- validación: 58/58 tests focalizados PASS
+
+FASE 8I.1 / 2026-08-15
+- problema: research solo cubría Wikipedia ES, insuficiente para temas sin cobertura, forzando al writer a alucinar sin fuentes
+- solución: búsqueda multi-fuente (Wikipedia es→en + Wikidata) + curación LLM opcional con patrón de seguridad idéntico a writer/editor (timeout, budget, fallback determinista) + validación anti-alucinación de URLs; archive.org implementado pero deshabilitado por defecto; DDG/GDELT evaluados y descartados
+- archivos: modules/research/main.py (autorización explícita, OUT_OF_SCOPE) + 3 tests nuevos
+- validación: 22/22 tests específicos PASS + 37/37 con quality_gates
+
+FASE 8H.2 / 2026-08-15
+- problema: deuda P3 "código duplicado/inaccesible en frontend_api.py"
+- solución: microdiagnóstico de solo lectura confirmó que NO había código inaccesible (verificado con grep repo-wide de las 31 rutas y funciones a nivel módulo); se aplicaron 5 limpiezas de bajo riesgo: import Any sin uso, posixpath muerto, import os local redundante, import load_book duplicado, comentario "Workflow Endpoints" repetido + indentación
+- archivos: frontend/frontend_api.py (único archivo tocado); se eliminó también archivo temporal huérfano tools/_fix_indent.py
+- validación: ast.parse OK + pytest tests/test_frontend_api.py + test_frontend_api_autopilot.py + test_frontend_api_docx.py -q → 48 passed, 0 failed, 0 errors (10.48s)
+- nota: NO se tocó el patrón approve/reject ni cancel/retry (riesgo medio, ver §19 mejora opcional); NO se ejecutó la suite completa
+
+FASE 8H.1 / 2026-08-15
+- problema: textos de interfaz en inglés (deuda P2 §19) + inconsistencia 424-428 (enum crudo en vez de PHASE_STATUS_LABEL)
+- solución: traducidas 10 labels de fases, banner 'BOOK READY', 3 métricas de detalle de libro, live meta header; 424-428 migrado a PHASE_STATUS_LABEL; card de libro listo (línea 483) alineada con label de pipeline
+- archivos: frontend/app.js (único archivo tocado)
+- validación: node --check OK + grep de ausencia de cadenas originales + verificación manual de PHASE_STATUS_LABEL en 424-428 y línea 483
+- NO se tocaron módulos protegidos ni tests; NO se ejecutó suite completa (cambio de solo texto UI, sin tests automatizados de frontend)
+
+FASE 8G.3 / 2026-08-15
+- acción: checkpoint de integración — ejecución de la suite completa tras acumular 5 fases (8F.1→8G.2) validadas solo de forma focalizada
+- resultado: 577 passed, 0 failed, 0 errors (109.39s) — sin regresiones; sin cambios de código en este checkpoint
+- validación: pytest tests/ modules/ -q (suite completa)
+
+FASE 8G.2 / 2026-08-15
+- problema: sin cobertura de orquestación autopilot real para las ramas editor/image_gen de _persist_chapter (deuda P3 de §19)
+- solución: test nuevo tests/test_autopilot_persist_chapters.py que reutiliza el patrón del test writer: executor real (default_executor_factory + scheduler) con módulo editor STUB (sin tocar modules/editor/main.py) y módulo REAL image_generator (LocalImageProvider, sin LLM; rutas aisladas a tmp via IMAGE_STORAGE_ROOT/IMAGE_LOCAL_OUTPUT_DIR)
+- validación: tests/test_autopilot_persist_chapters.py 2/2 PASS (test_editor_populates_edited_es_in_db, test_image_gen_populates_images_in_db) + sanity tests/test_autopilot_document_output.py 6/6 PASS (mismo patrón reutilizado) — suite completa no re-ejecutada
+
+FASE 8F.4 / 2026-08-15
+- problema: bug "or 3" ignoraba images_per_chapter=0 (0 se convertía en 3 en frontend_api.py:729, editorial.py:399/542/554, image_generator/main.py:172/265)
+- solución: sustituido el patrón `X or 3` por comprobación explícita de None; image_planner no se tocó (ya manejaba 0); se incluyeron 2 líneas de image_generator (main.py:172 _build_simple_plan además de la 265) fuera de la lista original pero necesarias para el fix de extremo a extremo
+- validación: test nuevo test_build_payload_preserves_num_images_zero (image_plan/image_gen 0→0, ausente→3) + comprobación manual generate_chapter_images (0→0, ausente→3) + regresión focalizada 60 PASS (test_image_generator.py, test_editorial_panel.py, test_frontend_api_autopilot.py 17/17, test_image_planner.py)
+
+FASE 8F.3 / 2026-08-15
+- problema: frontend mostraba solo 8/10 fases del pipeline real (image_plan/image_gen ausentes en AUTOPILOT_PHASES de app.js)
+- solución: añadidas las 2 fases al array de app.js en la posición exacta del backend, más icono SVG nuevo; index.html sin cambios (renderizado dinámico)
+- validación: comparación de arrays backend/frontend orden idéntico + test_frontend_api_autopilot.py 17/17 PASS + node --check OK
+- hallazgo colateral: bug "or 3" que ignora images_per_chapter=0 (registrado como Problema Abierto #4, no corregido en este frente)
+
+FASE 8F.2 / 2026-08-15
+- problema: chapters.sources quedaba '[]' tras el writer (inconsistencia de modelo de datos); premisa original de §17 #1 sobreestimaba el riesgo para QC (que en realidad ya usaba SourceManager, no esta columna)
+- solución: core/autopilot.py::_persist_chapter (rama writer/writer_en) persiste chapters.sources vía nuevo helper editorial.py::persist_chapter_sources
+- validación: test nuevo PASS + regresión focalizada 29 tests PASS (test_autopilot_document_output.py, test_autopilot_editorial.py) — suite completa no re-ejecutada
+- deuda descubierta: sin cobertura de orquestación autopilot para editor/image_gen vía executor real (ver §19)
+
+FASE 8F.1 / 2026-08-15
+- problema: metadata opcional (author/genre) bloqueaba Quality Gate; document_builder mostraba "Autor: Autor" en legal si author=None
+- solución: QC baja author/genre/target_audience a WARNING (title+description siguen obligatorios); document_builder omite línea de autor ausente y usa book.title en copyright
+- validación: 2 tests nuevos PASS + regresión focalizada 28 tests PASS (test_quality_gates.py, test_autopilot_quality_gate_payload.py, test_document_builder.py) — suite completa no re-ejecutada
+
 FASE 7.9D.7 / 2026-08-11
 - problema: chapter corto (<1500) / timeout / duplicados de continuación
 - solución: control determinista del writer (backstop 100% Python, límites, guarda de duplicados)
@@ -849,8 +1020,8 @@ Current protected components:
   - LIBRE: tools/
 
 Current next priority:
-  1. Persistir chapters.sources (cierra QC sources en autómata real) — requiere aprobación.
-  2. Alinear metadata (author/genre) en la ruta autómata real.
-  3. (futuro) PDF sin colisión; imágenes IA reales; frontend 10 fases.
+  1. (P2) Alinear metadata author/genre/language en book_planner — mejora, no bug (ver Problema Abierto #2, §17).
+  2. (P2) Traducir textos de interfaz aún en inglés. → RESUELTO (8H.1, ver §16/§23).
+  3. (futuro) PDF sin colisión; proveedor de imágenes IA real.
 ```
 
