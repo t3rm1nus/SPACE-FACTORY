@@ -110,6 +110,13 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(_env(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
 def _delay_backoff(attempt: int, base: float = 0.5, cap: float = 8.0) -> float:
     """Backoff exponencial para reintentos (0.5, 1, 2, 4, 8...)."""
     return min(base * (2 ** max(attempt, 0)), cap)
@@ -148,6 +155,30 @@ def http_json(
         return _json.loads(raw.decode("utf-8"))
     except ValueError as e:
         raise ImageInvalidResponseError(f"Respuesta no JSON de {url}: {e}") from e
+
+
+def http_bytes(
+    method: str,
+    url: str,
+    *,
+    headers: Optional[dict[str, str]] = None,
+    timeout: float = 30.0,
+) -> bytes:
+    """Realiza una petición HTTP y devuelve los bytes crudos de la respuesta.
+
+    Reúne las excepciones de red/HTTP bajo la jerarquía ``ImageProviderError``
+    mediante ``map_urlerror``. Pensado para descargar binarios (p.ej. imágenes
+    desde el ``/view`` de ComfyUI) donde ``http_json`` no sirve.
+    """
+    req = Request(url, data=None, headers=dict(headers or {}), method=method.upper())
+    try:
+        resp = urlopen(req, timeout=timeout)
+    except (HTTPError, URLError, socket.timeout, TimeoutError) as e:
+        raise map_urlerror(e) from e
+    try:
+        return resp.read()
+    finally:
+        resp.close()
 
 
 def map_urlerror(e: Exception) -> ImageProviderError:

@@ -1,0 +1,19 @@
+{
+  "id": "image_search",
+  "name": "Image Search Agent",
+  "description": "Busca imágenes de un capítulo en la web (SearXNG, sin LLM), descarga los resultados y persiste archivos y metadatos con trazabilidad de fuente, devolviendo el mismo shape de salida que image_generator para ser plug-compatible.",
+  "type": "agent",
+  "capabilities": [
+    "search_chapter_images"
+  ],
+  "requires_human_approval": false,
+  "config": {
+    "priority": 5,
+    "timeout_seconds": 120,
+    "engine": "searxng",
+    "searxng_url": "http://localhost:8081",
+    "search_timeout_seconds": 15,
+    "download_timeout_seconds": 10,
+    "max_images": 20
+  }
+}

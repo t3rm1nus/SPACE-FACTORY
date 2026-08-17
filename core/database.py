@@ -255,6 +255,7 @@ def init_db() -> None:
                 target_chapters INTEGER NOT NULL DEFAULT 10,
                 image_count INTEGER NOT NULL DEFAULT 3,
                 layout_config TEXT,
+                image_search_ratio REAL NOT NULL DEFAULT 0.0,
                 status TEXT NOT NULL DEFAULT 'planned',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -293,6 +294,11 @@ def init_db() -> None:
         # Migración: añadir layout_config en bases existentes
         try:
             conn.execute("ALTER TABLE books ADD COLUMN layout_config TEXT")
+        except Exception:
+            pass  # columna ya existe
+        # Migración: añadir image_search_ratio en bases existentes
+        try:
+            conn.execute("ALTER TABLE books ADD COLUMN image_search_ratio REAL NOT NULL DEFAULT 0.0")
         except Exception:
             pass  # columna ya existe
         conn.execute(

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -22,6 +23,19 @@ from core.schemas import ImageSpec, validate_output
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_ATTEMPTS = 3
+
+# Presupuesto total (s) de la fase image_gen para TODO el loop de imágenes del
+# capítulo. Por debajo del timeout_seconds=360 del scheduler, dejando ~30s de
+# margen para la escritura de metadata y el retorno del loop. Mismo patrón de
+# backstop que WRITER_TOTAL_TIME_BUDGET / RESEARCH_TOTAL_TIME_BUDGET
+# (configurable vía env var, estilo os.environ.get del proyecto).
+IMAGE_TOTAL_TIME_BUDGET = float(os.environ.get("IMAGE_TOTAL_TIME_BUDGET", "330.0"))
+# Margen (s): si antes de empezar una imagen posterior queda MENOS que esto dentro
+# del presupuesto, se fuerza el fallback local en esa imagen y las siguientes en vez
+# de intentar el provider real (evita que el timeout duro del scheduler mate la tarea
+# a mitad del loop por generaciones legítimamente lentas, ~80s/imagen a 25 steps).
+IMAGE_BUDGET_FALLBACK_MARGIN = 90.0
+IMAGE_FALLBACK_REASON = "time_budget_exhausted"
 
 
 def _storage_root() -> str:
@@ -214,7 +228,11 @@ def generate_image(payload: dict[str, Any]) -> dict[str, Any]:
     skipped = 0
     failed = 0
 
-    for spec in specs:
+    loop_start = time.perf_counter()
+    local_provider = None
+    budget_exhausted = False
+
+    for idx, spec in enumerate(specs):
         if validated.skip_existing:
             existing = _load_metadata(images_dir, spec.image_id)
             if existing and existing.get("status") == "ok" and existing.get("image_path") and os.path.isfile(existing["image_path"]):
@@ -222,8 +240,30 @@ def generate_image(payload: dict[str, Any]) -> dict[str, Any]:
                 skipped += 1
                 continue
 
+        # Guard de presupuesto total (backstop): la primera imagen se intenta SIEMPRE
+        # con el provider real; antes de cada imagen posterior, si no queda margen
+        # suficiente dentro de IMAGE_TOTAL_TIME_BUDGET, se fuerza el fallback local
+        # para esta y las restantes del loop en vez de arriesgar que el timeout duro
+        # del scheduler (360s) mate la tarea a mitad de generación.
+        if idx > 0 and not budget_exhausted:
+            remaining = IMAGE_TOTAL_TIME_BUDGET - (time.perf_counter() - loop_start)
+            if remaining < IMAGE_BUDGET_FALLBACK_MARGIN:
+                budget_exhausted = True
+                logger.warning(
+                    "image_generator: presupuesto total casi agotado "
+                    "(remaining=%.1fs < %.1fs); fallback local para '%s' y "
+                    "restantes del capítulo",
+                    remaining, IMAGE_BUDGET_FALLBACK_MARGIN, spec.image_id,
+                )
+
+        provider_used = provider
+        if budget_exhausted:
+            if local_provider is None:
+                local_provider = get_provider("local")
+            provider_used = local_provider
+
         meta = _generate_single_image(
-            provider,
+            provider_used,
             spec,
             book_id=validated.book_id,
             chapter_number=validated.chapter_number,
@@ -231,6 +271,12 @@ def generate_image(payload: dict[str, Any]) -> dict[str, Any]:
             images_dir=images_dir,
             attempts=max_attempts,
         )
+        if budget_exhausted and meta.get("status") == "ok":
+            # Marca el fallback por presupuesto para consistencia con el shape que
+            # ya usa metadata["fallback"]/["fallback_reason"] del provider.
+            meta["fallback"] = True
+            meta["fallback_reason"] = IMAGE_FALLBACK_REASON
+            _write_metadata(images_dir, meta)
         results.append(meta)
         if meta["status"] == "ok":
             generated += 1

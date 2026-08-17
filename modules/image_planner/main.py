@@ -13,7 +13,7 @@ import json
 import logging
 import os
 import re
-from typing import Any
+from typing import Any, Optional
 
 from core.logger import get_logger, log
 from core.metrics import calculate_cost, extract_anthropic_usage
@@ -38,6 +38,24 @@ _LOCAL_NEGATIVE = (
     "deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated"
 )
 
+# Mapeo género → estilo visual, usando exactamente las 12 categorías que produce
+# book_planner._infer_genre. Solo afecta al fallback/default cuando no hay un
+# visual_style explícito en el payload.
+_GENRE_STYLE_MAP = {
+    "Ciencia ficción": "Fotografía cyberpunk, neón azulado, luces de neón, atmósfera futurista.",
+    "Novela negra": "Fotografía noir, alto contraste, luces de neón rojas, sombras profundas.",
+    "Fantasía": "Ilustración fantasy, acuarelas, colores cálidos, atmósfera mágica.",
+    "Misterio": "Fotografía de investigación, luz natural tenue, atmósfera de suspenso.",
+    "Suspenso": "Fotografía cinematográfica, diagonales dinámicas, tensión visual.",
+    "Terror": "Fotografía oscura, alto contraste, sombras dramáticas, atmósfera inquietante.",
+    "Romance": "Fotografía editorial romántica, tonos cálidos, luz suave, atmósfera íntima.",
+    "Autoayuda": "Fotografía de inspiración, luz natural brillante, colores limpios y positivos.",
+    "Biografía": "Fotografía documental, natural, colores fieles, atmósfera realista.",
+    "Ensayo": "Fotografía conceptual, limpieza visual, composición minimalista, tonos neutros.",
+    "Política": "Fotografía de reportaje, luz natural, atmósfera de debate público.",
+    "Negocio": "Fotografía corporativa, iluminación profesional, colores corporativos limpios.",
+}
+
 
 def _resolve_num_images(validated: dict) -> int:
     """Devuelve la cantidad de imágenes: configuración explícita o 3 por defecto."""
@@ -47,23 +65,96 @@ def _resolve_num_images(validated: dict) -> int:
     return max(0, int(n))
 
 
-def _make_image(role: str, index: int, title: str, style: str, chapter_text: str) -> dict[str, Any]:
-    """Construye una especificación de imagen para un rol concreto."""
+# Palabras con mayúscula inicial que NO son términos temáticos (ruido en la
+# extracción de topics).
+_GENERIC_CAPS_WORDS = {
+    "Esta", "Este", "Estas", "Estos", "Ese", "Esa", "Esos", "Esas", "Aquel",
+    "Aquella", "Aquellos", "Aquellas", "Una", "Un", "Unas", "Unos",
+}
+
+# Frases/tokens con mayúscula inicial: "Pong", "Atari", "Space Invaders",
+# "Grand Theft Auto", "Magic: The Gathering".
+_CAPITALIZED_PHRASE = re.compile(
+    r"\b([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:[:\s][A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+)*)"
+)
+
+
+def _extract_chapter_topics(
+    chapter_text: str, exclude: Optional[str] = None, max_terms: int = 2
+) -> list[str]:
+    """Extrae 1-2 términos/frases concretos del texto del capítulo (100% Python).
+
+    Heurística basada en regex que captura palabras o frases con mayúscula
+    inicial (propios, nombres de obras/consolas/personajes...), ignorando:
+      - la primera palabra de cada oración (mayúscula por gramática, no por ser
+        un nombre propio);
+      - los términos que aparecen en ``exclude`` (normalmente el título del
+        capítulo), para no alimentar el guard de título literal ni repetir el
+        título;
+      - palabras genéricas de uso corriente.
+
+    Devuelve [] si no encuentra nada (el fallback vuelve entonces al
+    comportamiento previo: título + estilo).
+    """
+    if not chapter_text:
+        return []
+
+    def _norm(s: str) -> str:
+        return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+    excluded_norms = {_norm(m.group(0)) for m in _CAPITALIZED_PHRASE.finditer(exclude or "")}
+    topics: list[str] = []
+    seen: set[str] = set()
+    sentences = re.split(r"(?<=[.!?])\s+", chapter_text.strip())
+    for sent in sentences:
+        # Quitar la primera palabra de la oración (inicio de frase) y signos.
+        remainder = re.sub(r"^\S+\s", "", sent.strip()).rstrip(".,;:()")
+        for m in _CAPITALIZED_PHRASE.finditer(remainder):
+            term = m.group(0).strip().rstrip(".,;:")
+            norm = _norm(term)
+            if not norm or norm in seen or norm in excluded_norms:
+                continue
+            if term in _GENERIC_CAPS_WORDS:
+                continue
+            # Descartar siglas/términos de 1 palabra y <= 3 letras.
+            if len(term.split()) == 1 and len(norm) <= 3:
+                continue
+            topics.append(term)
+            seen.add(norm)
+            if len(topics) >= max_terms:
+                return topics
+    return topics
+
+
+def _make_image(
+    role: str,
+    index: int,
+    title: str,
+    style: str,
+    chapter_text: str,
+    topic: str = "",
+) -> dict[str, Any]:
+    """Construye una especificación de imagen para un rol concreto.
+
+    ``topic`` es una extracción determinista de términos concretos del texto del
+    capítulo (ver ``_extract_chapter_topics``). Al estar presente, el prompt se
+    ancla en contenido real en vez de quedar genérico.
+    """
     if role == "hero":
         purpose = f"Imagen de apertura que presenta el capítulo '{title}' y su ambiente visual."
-        subject = "El tema central y el entorno definidos por el capítulo, sin texto."
+        subject = f"Tema central del capítulo ({topic}), sin texto." if topic else "El tema central y el entorno definidos por el capítulo, sin texto."
         environment = "Escenario general sugerido por el contenido del capítulo."
         lighting = "Luz natural suave, con contraste moderado y profundidad de campo."
         composition = "Composición amplia, punto de interés centrado, horizonte en tercios."
     elif role == "diagram":
         purpose = "Esquema conceptual que aclara una relación, proceso o estructura del capítulo."
-        subject = "Elementos abstractos y organizativos que representan conceptos clave."
+        subject = f"Representación conceptual de {topic}, organizada y legible." if topic else "Elementos abstractos y organizativos que representan conceptos clave."
         environment = "Fondo neutro limpio para legibilidad del esquema."
         lighting = "Iluminación plana y uniforme, sin sombras que distraigan."
         composition = "Estructura centrada y equilibrada, elementos bien separados."
     else:  # scene
         purpose = "Escena ilustrativa que apoya un punto concreto del texto sin sustituirlo."
-        subject = "Una situación o instante concreto aludido en el capítulo."
+        subject = f"Instante concreto del capítulo ({topic}), sin texto." if topic else "Una situación o instante concreto aludido en el capítulo."
         environment = "Entorno contextual que refuerza la escena descrita."
         lighting = "Luz direccional expresiva acorde a la atmósfera del capítulo."
         composition = "Primer plano o plano medio, líneas guía que dirigen la mirada."
@@ -102,14 +193,28 @@ def _build_fallback_plan(validated: dict) -> dict[str, Any]:
     """Plan determinista: exactamente num_images con funciones distintas."""
     num = _resolve_num_images(validated)
     title = validated.get("chapter_title") or "el capítulo"
-    style = validated.get("visual_style") or "Fotografía editorial, paleta coherente, detalle realista"
+    # Estilo visual: prioriza visual_style explícito; si no hay, intenta mapear
+    # genre a un estilo; si no hay genre o no está en el mapeo, usa el default
+    # actual preservado exactamente (sin regresión).
+    explicit_style = validated.get("visual_style")
+    if explicit_style:
+        style = explicit_style
+    else:
+        genre = validated.get("genre")
+        style = _GENRE_STYLE_MAP.get(genre, "realistic")
     chapter_text = validated.get("chapter_text", "")
+
+    # Términos concretos extraídos del texto: el fallback (usado cuando el LLM es
+    # rechazado por el guard de título literal) ancla su prompt en contenido real
+    # y deja de ser idéntico y genérico en todos los capítulos. Se excluye el
+    # chapter_title para no alimentar el guard ni repetir el título literal.
+    topic = ", ".join(_extract_chapter_topics(chapter_text, exclude=title))
 
     roles = [r[0] for r in _DEFAULT_ROLES]
     images = []
     for i in range(num):
         role = roles[i % len(roles)]
-        images.append(_make_image(role, i + 1, title, style, chapter_text))
+        images.append(_make_image(role, i + 1, title, style, chapter_text, topic=topic))
 
     return {
         "images": images,
@@ -140,6 +245,11 @@ def _build_prompt(validated: dict) -> str:
         "- Deben complementar el texto, no sustituir información que debe aparecer escrita.\n"
         "- Evitar material visual redundante.\n"
         "- Prompts compatibles con generadores locales (sin marcas de agua, sin texto en la imagen).\n"
+        "- El SUJETO de cada imagen debe ser una ESCENA VISUAL concreta (objetos, entorno, "
+        "personajes, acción) relacionada con el tema del capítulo.\n"
+        "- NO usar el título del capítulo de forma literal como sujeto de la imagen.\n"
+        "- NO describir la imagen como una página, portada, revista, artículo, maquetación "
+        "editorial, diagrama con texto ni ningún contenido que implique texto legible.\n"
                 "- Mantener una identidad visual consistente entre imágenes y capítulos.\n\n"
         "REGLAS ESTRICTAS:\n"
         "- NO cambiar hechos verificables.\n"
@@ -181,12 +291,30 @@ def _parse_llm_output(text: str) -> dict[str, Any]:
         return {}
 
 
+def _normalize_title(text: Optional[str]) -> str:
+    """Normaliza un texto para comparación case-insensitive y de espacios."""
+    return re.sub(r"\s+", " ", (text or "").strip().lower())
+
+
 def _normalize_images(result_data: dict[str, Any], validated: dict) -> dict[str, Any]:
-    """Valida, recorta/rellena imágenes al número exacto y completa campos."""
+    """Valida, recorta/rellena imágenes al número exacto y completa campos.
+
+    - El ``negative_prompt`` final SIEMPRE incluye ``_LOCAL_NEGATIVE`` (determinista, en
+      Python): si el LLM propone un negativo adicional se concatena, pero la base robusta de
+      ``_LOCAL_NEGATIVE`` nunca es opcional (no depende de que el LLM \"se acuerde\").
+    - Si el ``prompt`` propuesto por el LLM contiene el título del capítulo como substring
+      (comparación case-insensitive y con espacios normalizados), ESA imagen se descarta y
+      se sustituye por su homóloga del plan fallback (patrón de rechazo del duplicate-guard
+      del writer).
+    """
     num = _resolve_num_images(validated)
     raw_images = result_data.get("images")
+    fallback_plan = _build_fallback_plan(validated)
     if not isinstance(raw_images, list) or not raw_images:
-        return _build_fallback_plan(validated)
+        return fallback_plan
+
+    title_norm = _normalize_title(validated.get("chapter_title") or "el capítulo")
+    fb_images = fallback_plan["images"]
 
     images = []
     for raw in raw_images[:num]:
@@ -198,20 +326,46 @@ def _normalize_images(result_data: dict[str, Any], validated: dict) -> dict[str,
         }
         if img["aspect_ratio"] not in ("16:9", "3:2", "4:3", "1:1", "2:3", "9:16"):
             img["aspect_ratio"] = "4:3"
+
+        # Cambio 1: negative_prompt determinista (siempre _LOCAL_NEGATIVE presente).
+        llm_neg = img["negative_prompt"].strip().strip(",")
+        combined_neg = _LOCAL_NEGATIVE
+        if llm_neg and llm_neg not in _LOCAL_NEGATIVE:
+            combined_neg = f"{_LOCAL_NEGATIVE}, {llm_neg}"
+        img["negative_prompt"] = combined_neg
+
+        # Guard: prompt del LLM con el título literal del capítulo -> rechazar ESA imagen.
+        if title_norm and title_norm in _normalize_title(img["prompt"]):
+            fb_img = fb_images[len(images) % len(fb_images)]
+            log(
+                logger,
+                logging.WARNING,
+                f"image_planner: prompt del LLM para '{img.get('image_id')}' contiene el "
+                f"título del capítulo (texto literal); se usa el plan fallback en su lugar. "
+                f"Prompt descartado: {img['prompt'][:120]!r}",
+            )
+            images.append(fb_img)
+            continue
+
         images.append(img)
 
     if len(images) < num:
         # Completar con el fallback para alcanzar la cantidad exacta
-        fallback = _build_fallback_plan(validated)
-        for extra in fallback["images"]:
+        for extra in fb_images:
             if len(images) >= num:
                 break
             images.append(extra)
 
+    # Estilo visual: prioriza visual_style explícito; si no, mapea genre; si no, default.
+    explicit_style = result_data.get("visual_style") or validated.get("visual_style")
+    if explicit_style:
+        final_style = explicit_style
+    else:
+        genre = validated.get("genre")
+        final_style = _GENRE_STYLE_MAP.get(genre, "realistic")
     return {
         "images": images,
-        "visual_style": str(result_data.get("visual_style") or validated.get("visual_style")
-                           or "Fotografía editorial, paleta coherente, detalle realista"),
+        "visual_style": str(final_style),
         "identity_notes": [str(n) for n in (result_data.get("identity_notes") or [])]
         or ["Mantener paleta, iluminación y estilo consistentes entre capítulos."],
     }

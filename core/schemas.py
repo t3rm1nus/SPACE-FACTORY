@@ -397,6 +397,17 @@ class ImageGeneratePayload(TaskPayload):
     max_attempts: int = Field(default=3, ge=1, le=10)
 
 
+class ImageSearchPayload(TaskPayload):
+    """Payload para search_chapter_images (capability: search_chapter_images)."""
+
+    book_id: int = Field(..., ge=1)
+    chapter_number: int = Field(..., ge=1)
+    language: str = Field(..., min_length=2, max_length=10)
+    chapter_title: Optional[str] = Field(default=None)
+    chapter_text: Optional[str] = Field(default=None)
+    num_images: Optional[int] = Field(default=None, ge=0, le=20)
+
+
 class ImageGenerateOutput(BaseModel):
     """Salida de la generación de imágenes."""
 
@@ -496,6 +507,7 @@ PAYLOAD_SCHEMAS = {
     "create_chapter_image_plan": ImagePlanPayload,
     "generate_image": ImageGeneratePayload,
     "generate_chapter_images": ImageGeneratePayload,
+    "search_chapter_images": ImageSearchPayload,
     "build_book_docx": BookDocxPayload,
     "build_book_pdf": BookPdfPayload,
     "final_quality_control": QualityControlPayload,
@@ -516,6 +528,7 @@ OUTPUT_SCHEMAS = {
     "create_chapter_image_plan": ImagePlanOutput,
     "generate_image": ImageGenerateOutput,
     "generate_chapter_images": ImageGenerateOutput,
+    "search_chapter_images": ImageGenerateOutput,
     "build_book_docx": BookDocxOutput,
     "build_book_pdf": BookPdfOutput,
     "final_quality_control": QualityControlOutput,

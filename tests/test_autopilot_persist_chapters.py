@@ -30,7 +30,7 @@ import os
 
 import pytest
 
-from core import autopilot
+from core import autopilot, task_queue
 from core.database import get_db, init_db
 from frontend.editorial import _get_chapters, create_book, persist_chapter_result
 from modules.image_generator import main as img_main
@@ -181,3 +181,125 @@ def test_image_gen_populates_images_in_db(store, tmp_path, monkeypatch):
     assert len(stored) >= 1
     for p in stored:
         assert os.path.isfile(p), f"la imagen persistida no existe en disco: {p}"
+
+
+def test_image_gen_ratio_zero_delegates_to_run_single(store, tmp_path, monkeypatch):
+    """No-regresión: image_search_ratio=0.0 => _run_image_gen_split delega EXACTO a
+    _run_single: una sola task (generate_chapter_images), sin encolar search_chapter_images."""
+    monkeypatch.setenv("IMAGE_PROVIDER", "local")
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path / "images_root"))
+    monkeypatch.setenv("IMAGE_LOCAL_OUTPUT_DIR", str(tmp_path / "local_out"))
+
+    book_id = _make_book(1)
+    cid = _first_chapter_id(book_id)
+
+    # Requisito de build_payload (image_gen): capítulo con texto no vacío.
+    persist_chapter_result(book_id, cid, "draft_es", _DRAFT_ES)
+
+    # Campo presente con valor 0.0 (inactivo) => passthrough a _run_single.
+    with get_db() as conn:
+        conn.execute("UPDATE books SET image_search_ratio = 0.0 WHERE id = ?", (book_id,))
+
+    enqueued = []
+    real_enqueue = task_queue.enqueue_task
+
+    def _capture_enqueue(cap, payload, max_attempts=1):
+        enqueued.append(cap)
+        return real_enqueue(cap, payload, max_attempts=max_attempts)
+
+    monkeypatch.setattr(task_queue, "enqueue_task", _capture_enqueue)
+
+    job = _job_ready_at_phase(store, book_id, "image_gen")
+    final = autopilot.run_job(
+        job, store, _real_image_gen_executor(store), max_attempts=2, sleep_fn=_NOSLEEP
+    )
+
+    assert final["status"] == autopilot.JOB_COMPLETED
+    # Passthrough exacto: exactamente una task, de generación, sin search.
+    assert enqueued == ["generate_chapter_images"], f"tasks encoladas: {enqueued}"
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ?", (cid,)
+        ).fetchone()
+    stored = json.loads(row["images"] or "[]")
+    assert len(stored) >= 1
+
+
+def test_image_gen_ratio_positive_splits_into_two_tasks(store, tmp_path, monkeypatch):
+    """Ratio>0: _run_image_gen_split encola 2 tasks (search + generate) y fusiona results."""
+    import core.scheduler as scheduler
+
+    monkeypatch.setenv("IMAGE_PROVIDER", "local")
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path / "images_root"))
+    monkeypatch.setenv("IMAGE_LOCAL_OUTPUT_DIR", str(tmp_path / "local_out"))
+
+    book_id = _make_book(1)
+    cid = _first_chapter_id(book_id)
+    persist_chapter_result(book_id, cid, "draft_es", _DRAFT_ES)
+
+    with get_db() as conn:
+        conn.execute("UPDATE books SET image_search_ratio = 0.5 WHERE id = ?", (book_id,))
+
+    img_dir = tmp_path / "imgs"
+    img_dir.mkdir(exist_ok=True)
+
+    def _stub(prefix):
+        def _execute(payload, capability=""):
+            n = int(payload.get("num_images") or 0)
+            results = []
+            for i in range(n):
+                p = os.path.join(str(img_dir), f"{prefix}_{i}.png")
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write("x")
+                results.append({"status": "ok", "image_path": p, "image_id": f"{prefix}_{i}"})
+            return {"results": results}
+
+        return _execute
+
+    modules = {
+        "image_search": {
+            "manifest": {"id": "image_search", "config": {"timeout_seconds": 30}},
+            "execute": _stub("search"),
+        },
+        "image_generator": {
+            "manifest": {"id": "image_generator", "config": {"timeout_seconds": 30}},
+            "execute": _stub("gen"),
+        },
+    }
+    cap_map = {
+        "search_chapter_images": ["image_search"],
+        "generate_chapter_images": ["image_generator"],
+    }
+
+    enqueued = []
+    real_enqueue = task_queue.enqueue_task
+
+    def _capture(cap, payload, max_attempts=1):
+        enqueued.append(cap)
+        return real_enqueue(cap, payload, max_attempts=max_attempts)
+
+    monkeypatch.setattr(task_queue, "enqueue_task", _capture)
+
+    job = _job_ready_at_phase(store, book_id, "image_gen")
+    job["data"] = {"num_images": 4}
+    store.save(job)
+
+    executor = autopilot.default_executor_factory(modules, cap_map, store=store)
+    final = autopilot.run_job(job, store, executor, max_attempts=2, sleep_fn=_NOSLEEP)
+
+    assert final["status"] == autopilot.JOB_COMPLETED
+    # Exactamente 2 tasks, una de cada capability.
+    assert enqueued == ["search_chapter_images", "generate_chapter_images"], f"tasks: {enqueued}"
+    # num_images=4, ratio=0.5 => n_search=2, n_generate=2 (suman 4) y se fusionan
+    # los results de ambos orígenes en chapters.images.
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ?", (cid,)
+        ).fetchone()
+    stored = json.loads(row["images"] or "[]")
+    assert len(stored) == 4
+    for p in stored:
+        assert os.path.isfile(p), f"imagen no existe: {p}"
+    # Ambas fuentes están representadas (search y generate).
+    assert any("search_" in os.path.basename(p) for p in stored)
+    assert any("gen_" in os.path.basename(p) for p in stored)

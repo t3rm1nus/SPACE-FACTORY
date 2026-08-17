@@ -716,6 +716,8 @@ async function createNewBook() {
   const target_audience = ((document.getElementById('new-book-audience') || {}).value || '').trim();
   const imageCountRadio = document.querySelector('input[name="images_per_chapter"]:checked');
   const image_count = imageCountRadio ? parseInt(imageCountRadio.value, 10) : 3;
+  const imageSourceRadio = document.querySelector('input[name="image_search_ratio"]:checked');
+  const image_search_ratio = imageSourceRadio ? parseFloat(imageSourceRadio.value) : 0.0;
   const layout_preset = ((document.getElementById('layout-preset') || {}).value || 'editorial').trim();
   const layout_font = ((document.getElementById('layout-font') || {}).value || 'Georgia').trim();
   const layout_color = ((document.getElementById('layout-heading-color') || {}).value || '#1F3A5F').trim();
@@ -730,7 +732,7 @@ async function createNewBook() {
   };
   if (!title) { _showError('Indica un título'); return; }
   try {
-    const book = await apiFetch('/api/books', { method: 'POST', body: JSON.stringify({ title, target_chapters: chapters || 1, idea, author, genre, target_audience, image_count, layout_config }) });
+    const book = await apiFetch('/api/books', { method: 'POST', body: JSON.stringify({ title, target_chapters: chapters || 1, idea, author, genre, target_audience, image_count, image_search_ratio, layout_config }) });
     const id = book.book_id || book.id;
     closeCreateBook();
     state.selectedBookId = id;

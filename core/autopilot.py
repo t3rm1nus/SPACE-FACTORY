@@ -859,6 +859,91 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             task_id=task_id,
         )
 
+    def _run_image_gen_split(phase: dict, job: dict, chapter_id=None) -> PhaseResult:
+        """Fase image_gen con split por books.image_search_ratio (SearXNG vs generar).
+
+        - ratio == 0.0 / None / ausente => passthrough EXACTO a ``_run_single``
+          (comportamiento actual, sin encolar tasks extra).
+        - ratio > 0.0 => reparte ``num_images`` en ``n_search`` (capability
+          ``search_chapter_images``) y ``n_generate`` (capability
+          ``generate_chapter_images``), encola las tasks con el mismo mecanismo
+          que ``_run_single`` y fusiona los ``results`` de ambas en un único
+          ``PhaseResult`` con el MISMO shape que hoy produce ``_run_single`` para
+          image_gen (``metrics={"results": [...]}``), de modo que
+          ``_persist_chapter`` no necesita cambios.
+        - Si una task falla => ok=False con el error propagado (igual que
+          ``_run_single``), sin dejar el capítulo a medias silenciosamente.
+        """
+        from core import scheduler as _sched
+        from core import task_queue as _tq
+        from frontend import editorial
+
+        # Lectura del libro (mismo patrón que build_payload).
+        book = editorial._get_book(job["book_id"])
+        ratio = float((book or {}).get("image_search_ratio") or 0.0)
+        if not ratio or ratio <= 0.0:
+            return _run_single(phase, job, chapter_id=chapter_id)
+
+        # Misma fuente de num_images que build_payload/generate_chapter_images.
+        base = build_phase_payload(phase, job["book_id"], job.get("data"), chapter_id)
+        _num = base.get("num_images")
+        num_images = int(_num) if _num is not None else 3
+        num_images = max(0, min(num_images, 20))
+        n_search = max(0, min(round(num_images * ratio), num_images))
+        n_generate = num_images - n_search
+
+        # Evita tasks vacías; si no hay nada que repartir, comportamiento normal.
+        if n_search <= 0 and n_generate <= 0:
+            return _run_single(phase, job, chapter_id=chapter_id)
+
+        tasks: list[tuple[str, dict]] = []
+        if n_search > 0:
+            tasks.append((
+                "search_chapter_images",
+                {
+                    "book_id": base.get("book_id"),
+                    "chapter_number": base.get("chapter_number"),
+                    "chapter_title": base.get("chapter_title"),
+                    "chapter_text": base.get("chapter_text", ""),
+                    "num_images": n_search,
+                    "language": base.get("language", "es"),
+                },
+            ))
+        if n_generate > 0:
+            gen_payload = dict(base)
+            gen_payload["num_images"] = n_generate
+            tasks.append(("generate_chapter_images", gen_payload))
+
+        merged: dict[str, Any] = {"results": []}
+        task_ids: list[int] = []
+        module_id = None
+        for capability, payload in tasks:
+            task_id = _tq.enqueue_task(capability, payload, max_attempts=1)
+            module = _pick_module(modules, cap_map, capability)
+            task = _tq.get_task(task_id)
+            _sched._process_task(task, module, capability)
+            task = _tq.get_task(task_id)
+            task_ids.append(task_id)
+            if task["status"] != "done":
+                return PhaseResult(
+                    ok=False,
+                    error=f"image_gen_split#{capability}: {task.get('error') or 'Sin detalle de error'}",
+                    task_id=task_id,
+                )
+            try:
+                res = json.loads(task.get("result") or "{}") if task.get("result") else {}
+            except (json.JSONDecodeError, TypeError):
+                res = {}
+            merged["results"].extend(res.get("results") or [])
+            module_id = task.get("module_id") or module_id
+
+        return PhaseResult(
+            ok=True,
+            metrics=merged,
+            module=module_id,
+            task_id=task_ids[-1] if task_ids else None,
+        )
+
     def _persist_chapter(phase: dict, chapter: dict, result: dict) -> None:
         """Persiste el resultado real de la fase en la BD ANTES de marcar PASS."""
         from frontend import editorial
@@ -926,7 +1011,11 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                 continue  # capítulo ya completado: terminal, no se re-ejecuta
             csub["attempts"] = csub.get("attempts", 0) + 1
 
-            res = _run_single(phase, job, chapter_id=chapter["id"])
+            res = (
+                _run_image_gen_split(phase, job, chapter["id"])
+                if phase["id"] == "image_gen" else
+                _run_single(phase, job, chapter_id=chapter["id"])
+            )
             csub["module"] = res.module
             csub["duration"] = res.metrics.get("duration") if res.ok else None
             csub["error"] = res.error

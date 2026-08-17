@@ -244,6 +244,14 @@
                 <label class="radio-inline"><input type="radio" name="images_per_chapter" value="3" checked> 3</label>
                 <label class="radio-inline"><input type="radio" name="images_per_chapter" value="5"> 5</label>
             </div>
+            <label for="new-book-image-source">Origen de imágenes</label>
+            <div class="radio-group" id="new-book-image-source">
+                <label class="radio-inline"><input type="radio" name="image_search_ratio" value="0.0" checked> Solo IA (100%)</label>
+                <label class="radio-inline"><input type="radio" name="image_search_ratio" value="0.25"> 75% IA / 25% Web</label>
+                <label class="radio-inline"><input type="radio" name="image_search_ratio" value="0.5"> 50% IA / 50% Web</label>
+                <label class="radio-inline"><input type="radio" name="image_search_ratio" value="0.75"> 25% IA / 75% Web</label>
+                <label class="radio-inline"><input type="radio" name="image_search_ratio" value="1.0"> Solo Web (100%)</label>
+            </div>
             <h4 style="margin:14px 0 6px;">MAQUETACIÓN</h4>
             <label for="layout-preset">Preset</label>
             <select id="layout-preset" class="enqueue-input">

@@ -20,7 +20,7 @@ from typing import Type
 from core.image_providers.base import ImageProvider, ImageProviderNotFoundError
 
 # Proveedor por defecto si IMAGE_PROVIDER no está definido.
-DEFAULT_PROVIDER = "local"
+DEFAULT_PROVIDER = "comfyui"
 
 
 class ImageProviderRegistry:
@@ -90,15 +90,17 @@ def _register_defaults(registry: ImageProviderRegistry) -> None:
     """Registra los proveedores incluidos con el paquete."""
     from core.image_providers.local import LocalImageProvider
 
-    registry.register(LocalImageProvider, default=True)
-    # ComfyUI se registra bajo demanda para evitar importar requests de red.
+    # ComfyUI es el proveedor por defecto (decisión de flip de DEFAULT_PROVIDER).
+    # Se importa bajo demanda para evitar dependencias de red; si no está disponible,
+    # local queda como default.
     try:
         from core.image_providers.comfyui import ComfyUiProvider
 
-        registry.register(ComfyUiProvider)
+        registry.register(ComfyUiProvider, default=True)
     except Exception as e:  # pragma: no cover - el provider es opcional
         logger = _lazy_logger()
         logger.debug("ComfyUiProvider no disponible al registrar: %s", e)
+    registry.register(LocalImageProvider)
 
 
 def _lazy_logger():

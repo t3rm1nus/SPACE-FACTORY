@@ -121,6 +121,7 @@ SPACE LAIR/
 │   ├── editor/            # edit_chapter
 │   ├── image_planner/     # create_chapter_image_plan
 │   ├── image_generator/   # generate_image / generate_chapter_images
+│   ├── image_search/      # search_chapter_images (SearXNG, standalone, NO wired aún)
 │   ├── quality_control/   # final_quality_control (QC reglas, sin LLM)
 │   ├── document_builder/  # build_book_docx
 │   ├── pdf_builder/       # build_book_pdf  (DEUDA OUT OF SCOPE)
@@ -271,6 +272,7 @@ Representa una tarea encolada. Campos: `id`, `capability`, `payload` (JSON), `st
 Campos: `id`, `title`, `subtitle`, `description`, `image_count` (default 3, migrado),
 `layout_config` (JSON, migrado), `status`, `languages`, `target_chapters`, `author`,
 `genre`, `target_audience`, `created_at`, `updated_at`.
+- `image_search_ratio` | REAL, default 0.0 | Proporción de imágenes por capítulo a buscar (SearXNG) vs generar (ComfyUI/local). 0.0 = comportamiento actual sin cambios. Escrito por: create_book (futuro). Consumido por: core/autopilot.py::_run_image_gen_split (IMPLEMENTED+VALIDATED, ratio=0.0 = passthrough exacto). BLOCKED para ratio>0 en producción real: search_chapter_images no está registrada en PAYLOAD_SCHEMAS/OUTPUT_SCHEMAS (core/schemas.py) — próximo paso antes de poder usar ratio>0.
 - **Escribe:** `frontend/editorial.py::create_book` (creación) y fases.
 - **Consume:** Autopilot, Document Builder, Quality Gate, Frontend.
 
@@ -355,7 +357,7 @@ Cinco presets en `PRESETS` (ver sección 9).
 ORCHESTRATION (image_plan → image_gen):  IMPLEMENTED
 PERSISTENCE (archivos + metadata + chapters.images): IMPLEMENTED (+ persist_chapter_images)
 DOCX INSERTION (figuras con caption): IMPLEMENTED
-REAL AI IMAGE PROVIDER: NO — el proveedor activo por defecto es LOCAL PLACEHOLDER
+REAL AI IMAGE PROVIDER: SÍ — ComfyUI (SDXL Base+Refiner) es DEFAULT_PROVIDER desde 2026-08-17; fallback automático a local si ComfyUI no responde (timeout de conexión 10s + guard de presupuesto interno 330s)
 ```
 
 ### Detalle
@@ -369,20 +371,30 @@ REAL AI IMAGE PROVIDER: NO — el proveedor activo por defecto es LOCAL PLACEHOL
   `generate_chapter_images`). Persiste PNG + `*.metadata.json` en
   `data/images/books/{book_id}/chapters/{chapter_number}/images/`.
 - **Proveedor activo:** `core/image_providers/registry.py` con
-  `DEFAULT_PROVIDER = "local"` → `LocalImageProvider`
-  (`core/image_providers/local.py`). **Este proveedor genera un PNG placeholder de
-  color sólido (derivado de semilla/hash del prompt) usando SOLO stdlib — NO es una
-  imagen IA real.** Opcional: `ComfyUiProvider` (requiere servidor ComfyUI; se registra
-  bajo demanda).
+  `DEFAULT_PROVIDER = "comfyui"` → `ComfyUiProvider`
+  (`core/image_providers/comfyui.py`) que genera **imagen IA real** (SDXL Base+Refiner).
+  Si ComfyUI no responde (timeout de conexión 10s, `COMFYUI_CONNECT_TIMEOUT`) o se agota el
+  presupuesto interno de la fase (330s), cae automáticamente a `LocalImageProvider`
+  (`local.py`, placeholder sin dependencias, SOLO stdlib) como fallback limpio.
 - **Persistencia en capítulo:** `frontend/editorial.py::persist_chapter_images` escribe
   las rutas en `chapters.images`.
 - **Consumo en DOCX:** `document_builder` inserta cada ruta de imagen en su capítulo con
   caption.
+- **Proveedor ComfyUI (2026-08-17, ACTIVADO POR DEFECTO):** `core/image_providers/comfyui.py`
+  reescrito — workflow **SDXL Base+Refiner real** (dos pasadas, `DEFAULT_WORKFLOW`), sustituciones
+  por imagen, `COMFYUI_CONNECT_TIMEOUT` corto (10s) para el POST de encolado, poll con
+  `IMAGE_TIMEOUT=120` (`COMFYUI_POLL_MAX_WAIT=300` para el bucle), guard de presupuesto interno
+  (330s) y fallback limpio. Validado con servidor ComfyUI real (0.33.1) y script
+  `tools/validate_comfyui.py`: imagen real (189k colores), 1:1 y 16:9 OK, ~72–95 s/imagen;
+  fallback sin excepción. **`DEFAULT_PROVIDER = "comfyui"`** y en `_register_defaults`
+  `ComfyUiProvider` se registra con `default=True` (local queda como fallback si no está
+  disponible). Resolución por default (`get(None)`) confirmada contra servidor real. Ver §16.
 
-> **MUY IMPORTANTE:** No "imágenes implementadas" a secas. La **orquestación**, la
-> **persistencia** y la **inserción DOCX** están implementadas, pero el
-> **proveedor de imágenes real activo genera placeholders** (no IA real). No hay un
-> proveedor de imágenes IA real conectado por defecto.
+> **NOTA:** La **orquestación**, la **persistencia** y la **inserción DOCX** están implementadas.
+> Desde **2026-08-17 el proveedor de imágenes real activo es ComfyUI (SDXL Base+Refiner)** — **sí**
+> hay imagen IA real por defecto (**DEFAULT_PROVIDER="comfyui"**). Si ComfyUI no está disponible o
+> se agota el presupuesto interno de la fase, cae a placeholder local automáticamente (fallback
+> limpio, no es error).
 
 ---
 
@@ -627,6 +639,8 @@ Validado por tests de integración (`tests/test_frontend_api_autopilot.py`,
 
 | Problema | Causa | Fix | Archivos | Validación | Estado |
 |---|---|---|---|---|---|
+| Split image_search/image_generator por ratio no existía (books.image_search_ratio sin consumidor) | Feature nueva, no bug | _run_image_gen_split en core/autopilot.py: con ratio>0 encola 2 tasks por capítulo (search_chapter_images + generate_chapter_images), reparte num_images proporcionalmente, fusiona results; ratio=0.0/None = passthrough exacto a _run_single (sin cambio de comportamiento) | core/autopilot.py, tests/test_autopilot_persist_chapters.py | test_image_gen_ratio_zero_delegates_to_run_single (passthrough) + test_image_gen_ratio_positive_splits_into_two_tasks (2 tasks, reparto 2+2=4, results fusionados, chapters.images poblado con 4 rutas reales) — 4/4 PASS | **IMPLEMENTED + VALIDATED (orquestación); BLOCKED para producción real hasta registrar search_chapter_images en core/schemas.py PAYLOAD_SCHEMAS/OUTPUT_SCHEMAS** |
+| search_chapter_images sin PAYLOAD_SCHEMAS/OUTPUT_SCHEMAS en core/schemas.py (P1 §19) | Módulo nuevo (8N image_search) sin registrar en el mapeo de validación central; bloqueaba el uso real de books.image_search_ratio>0 en producción (la task fallaría en validate_payload) | Nueva clase `ImageSearchPayload(TaskPayload)` en core/schemas.py con los 6 campos reales leídos por modules/image_search/main.py (book_id, chapter_number, language, chapter_title, chapter_text, num_images); registrada en PAYLOAD_SCHEMAS. OUTPUT_SCHEMAS reutiliza ImageGenerateOutput existiente (plug-compatible, sin duplicar clase) | core/schemas.py, tests/test_schemas_image_search.py (nuevo) | 3/3 PASS (test_schemas_image_search.py) + sanity test_autopilot_persist_chapters.py 4 passed in 1.84s + import OK | **FIXED + VALIDATED** |
 | Editor timeout (tareas muertas) | LLM lento agotaba timeout scheduler 180s sin fallback | `EDITOR_PROVIDER_TIMEOUT=60`, `EDITOR_MAX_RETRIES=1`, `_fallback_edit` (devuelve original) | modules/editor/main.py | tests/test_editor.py + E2E (fallback) | **FIXED + VALIDATED** |
 | Writer timeout + duplicados de continuación | LLM lento + continuaciones repetidas sin control | `WRITER_PROVIDER_TIMEOUT=60`, `WRITER_TOTAL_TIME_BUDGET=150`, `ABSOLUTE_HARD_LIMIT=8`, duplicate guard + backstop determinista | modules/chapter_writer/main.py | test_chapter_writer + E2E (1668w, det.) | **FIXED + VALIDATED** |
 | Flaky tests 7.9D.7 | `os.environ['CHAP_FORCE_MIN']` en import-time de runner contaminaba pytest | Env movido a `_configure_environment()` en `main()` | run_e2e_001_editorial.py | 528 passed en tests/ | **FIXED + VALIDATED** |
@@ -654,6 +668,12 @@ Validado por tests de integración (`tests/test_frontend_api_autopilot.py`,
 | Falso positivo en gate de relevancia research (FASE 8K.3): `_keyword_overlap` usaba substring (`w in haystack`) y no filtraba stopwords; query real `"Los Dooms: El Último"` extraía keywords `['los','dooms','el','último']` y `'el'` coincidía dentro de `"... por el censo."` → overlap=0.250 ≥ umbral 0.15; las 3 fuentes irrelevantes del libro #18 (Crozet, Crimora, Sam Porter Bridges) PASABAN el filtro | Substring matching + ausencia de stopwords ES/EN en keywords de query | (1) Tokenización del haystack en set de palabras (`re.findall` + membership); (2) `_STOPWORDS_ES` con lista mínima ES + EN común; (3) keywords efectivas = palabras ≥2 chars excluyendo stopwords; (4) test `test_real_query_los_dooms_stopwords_filtro` con query/candidatos reales del libro #18 | `modules/research/main.py`, `tests/test_research_sources.py` (nuevo, untracked) | Evidencia real: Crozet/Crimora/Sam Porter Bridges ANTES overlap=0.250 (PASABAN) → DESPUÉS overlap=0.000 (FILTRADAS). Suite completa: **601 passed, 0 failed, 0 errors (142.61s)**. Diagnóstico libro #19: FAIL legítimo (0 candidatos en backends, no culpa del filtro) | **FIXED + VALIDATED** |
 | Anchor de relevancia en research insuficiente (después de 8K.3): el filtro por FRACCIÓN de palabras de la query (`_keyword_overlap >= 0.15`) aceptaba fuentes temáticamente ajenas al libro, sobre todo con queries de pocas palabras o con muchas palabras genéricas — 1 sola coincidencia podía superar el umbral 0.15 aunque la fuente no tuviera relación con el tema (evidencia real: book_23 "La Historia de los Dooms" con fuentes sobre Latveria, Kornbluth, Tannehill, Dončić). | El overlap por fracción de palabras de la query no distingue palabra-ancla (tema del libro) de palabras genéricas/modificadoras de capítulo; se agrava con queries cortas pero no se limita a ellas. | Nueva `_has_anchor_keyword(topic, cand)`: exige que al menos una keyword del "topic" (tema del libro, ya viajaba en el payload sin usarse) aparezca como token real en el candidato. Filtro compuesto: `_keyword_overlap >= 0.15 AND _has_anchor_keyword`. `topic=None/""` preserva compatibilidad total (no bloquea). `research_web()` recibe `topic` opcional (retrocompatible); `execute()` lo lee del payload. | modules/research/main.py, tests/test_research_sources.py (3 tests nuevos + 1 fixture ajustada: título "Libro"→"Gato" en `test_source_count_ge_min_keeps_gate_fail_none`, para coherencia temática con la nueva semántica de anclaje) | 25/25 PASS (test_research_sources.py, test_research_multisource.py, test_research_curation.py) | **FIXED + VALIDATED** |
 | Gate espurio en fact_check: la fase del Autopilot se marcaba FAILED aunque el módulo devolviera `quality_gate=PASS`, siempre que `status=FAIL` (hallazgo de 1+ claim con severidad ERROR). Afectó 5 libros reales en producción (books 9, 18, 19, 23, 25) con job FAILED espurio. | `core/autopilot.py::_run_single`, bloque fact_check, usaba `if st=="FAIL" or qg=="FAIL"`. `modules/fact_checker/main.py` distingue `status` (hallazgo de claims, informativo) de `quality_gate` (integridad del proceso, el gate real); el propio módulo ya refleja esa jerarquía (`quality_gate=FAIL` eleva `status`, nunca al revés). El bloque research (mismo patrón OR) SÍ es correcto por diseño de 8H.3 y no se tocó. | Condición cambiada a `if qg=="FAIL"` únicamente; `st` se conserva solo en el mensaje de error para trazabilidad. | core/autopilot.py (bloque fact_check únicamente), tests/test_autopilot_fact_check_gate.py (nuevo, 2 tests) | 8/8 (test_autopilot_fact_check_gate.py) + 32/32 (test_autopilot_fact_check_gate.py + test_autopilot_editorial.py + test_autopilot_quality_gate_payload.py + test_autopilot_document_output.py) | **FIXED + VALIDATED** |
+
+| ComfyUI roto (comfyui.py era un esqueleto con dict sin cerrar, sin nodo SaveImage y helpers inexistentes) no generaba imágenes reales | Implementación previa incompleta; el proveedor activo por defecto era solo local placeholder | `core/image_providers/comfyui.py` reescrito: workflow **SDXL Base+Refiner real** en dos pasadas (nodos 4,5,6,7,10,11,12,15,16,17,19) reconstruido a partir de los nodos especificados —el JSON exacto llegó vacío—; helpers `http_bytes`/`_env_float` en `core/image_providers/base.py`; `_generate_once` (POST /prompt → poll /history → GET /view → valida PNG → guarda) con **fallback opción A** a LocalImageProvider; script `tools/validate_comfyui.py`; `modules/image_generator/module.json` **`timeout_seconds` 180→360**; `COMFYUI_POLL_MAX_WAIT` default **300s**; **guard de presupuesto total en `generate_image`** (`IMAGE_TOTAL_TIME_BUDGET`=330s, margen 90s, `fallback_reason="time_budget_exhausted"`); **`COMFYUI_CONNECT_TIMEOUT` corto (10s)** para el POST de encolado con `fallback_reason="comfyui_unreachable"`; **flip `DEFAULT_PROVIDER="comfyui"`** — hallazgo clave: solo cambiar la constante no bastaba (el `get()` resuelve `self._default` antes que `DEFAULT_PROVIDER`), así que se movió el flag `default=True` a `ComfyUiProvider` en `_register_defaults` (local queda como fallback) | core/image_providers/comfyui.py, core/image_providers/base.py, core/image_providers/registry.py, tools/validate_comfyui.py, modules/image_generator/module.json, modules/image_generator/main.py | Script aislado contra ComfyUI real (0.33.1): imagen real (189k colores), 1:1 y 16:9 OK, ~72–95 s/imagen; fallback validado contra puerto inexistente sin excepción (~2s, razón comfyui_unreachable) y contra timeout externo; margen 240s/360s = 50%; tests existentes 20+6 PASS sin regresión + test_budget_guard_forces_local_fallback_for_remaining_images (nuevo) + 6/6 PASS en modules/image_generator/tests/ + 12 PASS (scheduler + autopilot_persist) + **resolución por default (`get(None)`) contra servidor real confirmada (Clase ComfyUiProvider, imagen real, 95.4s)** | **IMPLEMENTED + VALIDATED + ACTIVADO POR DEFECTO (DEFAULT_PROVIDER = comfyui desde 2026-08-17)** |
+| Regresión en estilo por defecto de imágenes: `_build_fallback_plan` y `_normalize_images` en `image_planner` usaban `"Fotografía editorial, paleta coherente, detalle realista"` como fallback tras quitarse `or "realistic"` en `frontend/editorial.py`, dejando el estilo por defecto real de producción inconsistente con el esperado | El default hardcodeado en dos puntos de `image_planner/main.py` no se actualizó cuando `frontend/editorial.py` dejó de forzar `"realistic"` | Sustituido el default de `_build_fallback_plan` (l.204) y `_normalize_images` (l.365) por `"realistic"`, alineado con el default real de producción; test `test_no_genre_keeps_default_style` actualizado para reflejarlo | modules/image_planner/main.py, tests/test_image_planner.py | 23/23 PASS (test_image_planner.py) + grep repo-wide confirmó que el string antiguo solo persiste en `_build_prompt` (l.233, texto de guía para el LLM, no asignado a ningún campo salvo eco literal del LLM) y en `tools/gen_book30_fallback_image.py` (script auxiliar fuera de alcance) | **FIXED + VALIDATED** |
+| build_payload() (image_plan) forzaba visual_style="realistic" y no pasaba genre al payload, sin FASE que lo documentara (encontrado sin confirmar en working tree, previo al commit 3aef299) | El forzado "or realistic" en frontend/editorial.py impedía que image_planner aplicara su propio fallback de estilo (ya corregido en FASE 8N.1); genre tampoco llegaba al LLM/fallback de image_plan para dar contexto de género | visual_style ahora se pasa tal cual (None si no hay dato, delegando el default a image_planner); se añade genre: book.get("genre") al payload de image_plan | frontend/editorial.py (build_payload, phase_id=="image_plan") | Cambio ya presente en working tree; sin test dedicado nuevo — cubierto indirectamente por test_image_planner.py (23/23 PASS, FASE 8N.1) | **DOCUMENTED RETROACTIVELY** (funcional, no revertido; consistente con 8N.1) |
+| image_search_ratio no era seleccionable desde el front (solo columna BD sin UI) | Bloqueaba el uso real de la feature (P1 ya cerrado en 8N.2) por falta de control en index.html | Radio-group nuevo "Origen de imágenes" (0/25/50/75/100% IA vs Web, default 0.0=Solo IA) en index.html; lectura + envío en app.js::createNewBook(); persistencia clamped [0.0,1.0] en editorial.py::create_book() + columna en INSERT INTO books | frontend/index.html, frontend/app.js, frontend/editorial.py, tests/test_editorial_panel.py (test nuevo) | test_create_book_persists_image_search_ratio 1/1 PASS + regresión test_editorial_panel.py 24/24 + test_editorial_metadata.py 6/6 + node --check OK | **FIXED + VALIDATED** |
+
 
 ### Mantenimiento / Limpieza (checkpoint 2026-08-16)
 
@@ -690,7 +710,7 @@ Distinción **LIMITATION** (diseño/entorno) vs **BUG**.
 
 | Limitación | Tipo |
 |---|---|
-| Proveedor de imágenes activo = **local placeholder** (PNG de color sólido derivado de seed), NO genera imágenes IA reales. | LIMITATION |
+| Requiere **servidor ComfyUI accesible** (`COMFYUI_URL`) + **checkpoints SDXL Base+Refiner descargados** para generación real de imágenes; si no está disponible/apagado, cae a placeholder local automáticamente. | LIMITATION |
 | **PDF** fuera de alcance / deuda (pdf_builder). | LIMITATION / OUT OF SCOPE |
 | **Dependencia de Ollama** (LLM local) para planner/research/writer/fact_check/editor/image_plan; si no está activo se usa fallback determinista (writer/editor), pero la calidad nominal del LLM se pierde. | LIMITATION |
 | Requiere **worker/server activo** (scheduler/ap formativo) para procesar tareas. | LIMITATION |
@@ -709,15 +729,18 @@ Priorizada (no estética como P0):
 
 | Prioridad | Deuda | Nota |
 |---|---|---|
+| **P1** | ~~search_chapter_images sin PAYLOAD_SCHEMAS/OUTPUT_SCHEMAS~~ | **CLOSED** — ver §16. Registrado ImageSearchPayload + reutilizado ImageGenerateOutput, 2026-08-18. images_per_chapter con ratio>0 ya no falla en validate_payload. |
 | **P2** | Que `book_planner` emita `author`/`genre`/`language` en la ruta autómata real. **Mejora, no bug**: el sistema ya funciona correctamente sin ello (QC/DOCX aceptan su ausencia por diseño, ver §16). | **CLOSED** — resuelto en FASE 8J.1 (ver §16): `book_planner.execute()` emite `language` (del payload, default "es") y `genre` (inferido keyword-based desde la idea); `author` omitido (no derivable honestamente) |
 | **P2** | PDF: renombrar a `book_{book_id}_{lang}.pdf` y validar. | Problema Abierto #3 |
 | **P2** | Traducir textos de interfaz que quedan en inglés. | Sec. 13 | CLOSED (ver §16, FASE 8H.1) — textos de interfaz traducidos; lo que queda en inglés es intencional (términos técnicos, marcas, formatos). |
 | **P3** | Eliminar código duplicado/inaccesible en `frontend_api.py`. | CLOSED (ver §16, FASE 8H.2). Microdiagnóstico confirmó que no había código inaccesible real, solo imports/comentarios redundantes de bajo riesgo. |
 | **P3** | Reconexión SSE robusta si se implementa. | MANUAL_USUARIO §27 |
-| **P3** | Conectar un proveedor de imágenes IA real (p.ej. ComfyUI) por defecto. | Sec. 8 |
+| **P3** | Conectar un proveedor de imágenes IA real (p.ej. ComfyUI) por defecto. | **CLOSED** — 2026-08-17: `ComfyUiProvider` reescrito (SDXL Base+Refiner real) + fallback validado; timeout externo de fase `timeout_seconds=360` + guard de presupuesto interno (`IMAGE_TOTAL_TIME_BUDGET=330s`) + `COMFYUI_CONNECT_TIMEOUT` corto (10s); fix de `registry._register_defaults` (mover `default=True` a `ComfyUiProvider`) y **flip `DEFAULT_PROVIDER="comfyui"` ACTIVADO POR DEFECTO**. Ver §16 y §8. |
 | **P3** | (opcional, no urgente) Extraer helper de validación común para los pares approve/reject y cancel/retry en frontend_api.py (patrón fetch→validate→acción→broadcast repetido, pero con estados/retornos distintos; riesgo medio si se toca, valor bajo) | Diagnóstico 8H.2 §1.3 |
 | **P3** | El runner E2E real (`run_e001_editorial.py`) no ejercita el camino real de outline→writer con LLM activo: corre en `chapter_execution_mode=deterministic` con editor `fallback`, por lo que no detecta bugs como outline.sections vacío (8K.1). | `run_e2e_001_editorial.py`; deuda de cobertura E2E — se necesita un test focalizado que invoque el outline con LLM real y verifique `sections` non-empty antes del writer |
 | **P2** | Patrón recurrente: fixes de código validados en repo/tests no llegan al proceso real del servidor hasta reinicio manual (visto en 8L.1/8L.2 con `CHAP_FORCE_MIN`, y de nuevo hoy con el fix de research — book_23 corrió con módulo stale pese a que el fix ya estaba en el repo ~14 min antes). No hay verificación automática de que el proceso activo corresponda al código del repo. Sin mecanismo de auto-reload ni check de versión/hash al arrancar. | Catalizador 2026-08-16: reinicio manual requerido para exponer los fixes de research (anchor) + fact_check (gate). |
+| P3 | `image_planner/main.py:233` (`_build_prompt`) sigue usando el string antiguo `"Fotografía editorial, paleta coherente, detalle realista"` como guía de estilo textual para el LLM. No es un bug funcional (no se asigna a ningún campo de salida directamente; solo sobrevive al output si el LLM lo copia literalmente en su JSON), pero es inconsistente con el nuevo default `"realistic"`. | Trazado en sesión 2026-08-17 (fix FASE 8N.1); no corregido por estar fuera del alcance autorizado de esa tarea |
+
 
 
 # 20. ROADMAP
@@ -814,7 +837,7 @@ PIPELINE STATUS:         Activo; 8/8 etapas PASS en E2E real; AUTOPILOT_PHASES =
 EDITOR:                  IMPLEMENTED + VALIDATED (fallback determinista; E2E fallback PASS)
 WRITER:                  IMPLEMENTED + VALIDATED (backstop determinista; E2E 1668w ≥1500, sin placeholders)
 RESEARCH:                IMPLEMENTED + VALIDATED (multi-fuente Wikipedia es/en + Wikidata + curación LLM opcional con fallback determinista, 8I.1); gate de orquestación corregido (8H.3)
-IMAGES:                  Orquestación/persistencia/inserción IMPLEMENTED; proveedor activo = LOCAL PLACEHOLDER (no IA real)
+IMAGES:                  Orquestación/persistencia/inserción IMPLEMENTED; proveedor activo = COMFYUI (SDXL Base+Refiner, IA REAL) default desde 2026-08-17; fallback a local si no responde; image_search_ratio: split IMPLEMENTED+VALIDATED en autopilot, BLOCKED para ratio>0 real por falta de schema en core/schemas.py; search_chapter_images YA registrado en PAYLOAD_SCHEMAS/OUTPUT_SCHEMAS (P1 cerrado 2026-08-18) — ratio>0 desbloqueado a nivel de validación de schema (aún sin exponer en el front).; image_search_ratio YA seleccionable desde el front (FASE 8N.3, 2026-08-18) — ciclo completo backend+front cerrado.
 DOCUMENT BUILDER:        IMPLEMENTED + VALIDATED (book_{book_id}_{lang}.docx; comments[:255])
 LAYOUT:                  IMPLEMENTED + VALIDATED (5 presets + aliases + overrides)
 FRONT:                   IMPLEMENTED (10 fases; textos de interfaz traducidos, 8H.1; sin UI de proveedor de imagen IA)
@@ -824,13 +847,60 @@ DOCX:                    PASS (output/docx/book_1001_es.docx)
 PDF:                     OUT OF SCOPE / DEUDA (book_{language}.pdf sin book_id)
 MAIN BLOCKERS:           Ninguno bloqueante. Problemas Abiertos #1, #2 y #4 cerrados (ver §16: 8F.1/8F.2/8F.4/8J.1). Deuda de cobertura de orquestación editor/image_gen cerrada en 8G.2 (ver §16/§19).
 NEXT RECOMMENDED ACTION: Tras reiniciar el proceso con los 2 fixes (research anchor de relevancia + gate de fact_check), reintentar los libros reales con job FAILED espurio por el bug de gate: books 9, 18, 19, 23 y 25 (fact_check#status=FAIL quality_gate=PASS). Mantener green y vigilar la tasa de duplicación de continuation (book_22, 5/6) y el anclaje de relevancia en los reintentos.
-LAST VERIFIED:           2026-08-16 (checkpoint 8L.2: timeout writer ampliado a 300s + CHAP_FORCE_MIN activo en servidor real, book_22 COMPLETED 1620 palabras)
+LAST VERIFIED:           2026-08-18 (checkpoint 8N.3: image_search_ratio expuesto en el front, ciclo completo backend+front validado; P1 §19 y Categoría 2 cerrados)
 ```
 
 
 # 24. CHANGELOG RESUMIDO (hitos)
 
 ```text
+FASE 8N.3 / 2026-08-18
+- que se hizo: expuesto image_search_ratio en el front (radio-group en index.html, lectura/envío en app.js, persistencia clamped en editorial.py::create_book()). Cierra el ciclo completo de la feature iniciada en 8M.2/8N.2 (P1 schema ya cerrado).
+- hallazgo colateral: se detectó y documentó retroactivamente un cambio no confirmado en build_payload() (visual_style/genre, ver fila nueva en §16) presente en el working tree desde antes de esta sesión, sin FASE propia previa.
+- validación: test_create_book_persists_image_search_ratio 1/1 PASS + test_editorial_panel.py 24/24 + test_editorial_metadata.py 6/6 + node --check OK
+- estado: CERRADO - VALIDADO
+
+FASE 8N.2 / 2026-08-18
+- que se hizo: cierre de P1 §19 — registro de `ImageSearchPayload(TaskPayload)` en core/schemas.py `PAYLOAD_SCHEMAS` para capability `search_chapter_images`; los 6 campos (book_id, chapter_number, language, chapter_title, chapter_text, num_images) coinciden con los leídos por modules/image_search/main.py. `OUTPUT_SCHEMAS` reutiliza `ImageGenerateOutput` existente (plug-compatible, sin duplicar clase).
+- validación: test_schemas_image_search.py 3/3 PASS (0.17s) + regresión focalizada test_autopilot_persist_chapters.py 4 passed in 1.84s + `python -c "from core.module_registry import *; import core.schemas; print('OK')"` → OK.
+- estado: **CLOSED** — P1 §19 cerrada; images_per_chapter con ratio>0 ya no falla en validate_payload (a nivel de schema; aún sin exponer en el front).
+
+FASE image_search (módulo nuevo standalone) / 2026-08-17
+- que se hizo: módulo nuevo modules/image_search/ (capability search_chapter_images): búsqueda de imágenes vía SearXNG (GET /search?categories=images&format=json, sin LLM), con timeouts cortos (search ~15s / descarga ~10s) y fallback resiliente (si SearXNG no responde o una descarga falla NO lanza excepción: devuelve las imágenes obtenidas y el resto en status=error). Persiste en el MISMO patrón de ruta que image_generator (data/images/books/{book_id}/chapters/{chapter_number}/images/) con un *.metadata.json por imagen. Shape de retorno plug-compatible con generate_image (superset de campos: source_type, source_url, engine, resolution, license=None).
+- validación: 5/5 tests PASS (modules/image_search/tests/), HTTP mockeado — no depende de un servidor SearXNG real. Suite completa NO ejecutada (tarea aislada; no se tocaron autopilot/editorial/database/frontend).
+- estado: IMPLEMENTED, NOT_YET_WIRED (no está conectado a autopilot/editorial; próxima fase: columna image_search_ratio en books + split en build_payload)
+
+FASE 8N.1 / 2026-08-17
+- problema: regresión del estilo visual por defecto en `image_planner` — tras quitarse `or "realistic"` en `frontend/editorial.py` en una sesión previa, `_build_fallback_plan` y `_normalize_images` seguían usando el string largo `"Fotografía editorial, paleta coherente, detalle realista"` como fallback, en vez de `"realistic"`.
+- solución: 2 puntos corregidos en `modules/image_planner/main.py` (l.204 `_build_fallback_plan`, l.365 `_normalize_images`) → default `"realistic"`; test `test_no_genre_keeps_default_style` actualizado para reflejar el default real corregido.
+- validación: 23/23 PASS (`tests/test_image_planner.py`, collect-only confirmado). Grep repo-wide (`*.py`,`*.js`,`*.md`) del string antiguo: 2 coincidencias residuales — `image_planner/main.py:233` (`_build_prompt`, texto de guía LLM; ruta de fallback sin LLM ya usa `"realistic"`) y `tools/gen_book30_fallback_image.py:29` (script auxiliar, fuera de alcance). Registrado como deuda menor P3 en §19.
+- estado: CERRADO - VALIDADO (fix confirmado con diff literal + grep + recuento de tests; línea 233 documentada como deuda cosmética, no bloqueante)
+
+2026-08-17 / FRENTE COMFYUI COMPLETO (provider reescrito -> timeout externo -> guard de presupuesto -> connect timeout -> fix register_defaults -> flip)
+- Provider ComfyUI reescrito (SDXL Base+Refiner real, 2 pasadas) con fallback a local; timeout externo de fase 360s (module.json); guard de presupuesto interno (IMAGE_TOTAL_TIME_BUDGET=330s, margen 90s); COMFYUI_CONNECT_TIMEOUT corto (10s) para el POST de encolado (fallback_reason=comfyui_unreachable); fix de registry._register_defaults (mover default=True a ComfyUiProvider — el cambio de la constante DEFAULT_PROVIDER solo no bastaba, get() resuelve self._default antes) y flip: DEFAULT_PROVIDER="comfyui" ACTIVADO POR DEFECTO desde 2026-08-17. Validado con servidor real vía resolución por default (get(None) → Clase ComfyUiProvider, imagen real, 95.4s); fallback sin excepción; 12 PASS + 6/6 image_generator. Ver §16/§8.
+
+2026-08-17 / GUARD DE PRESUPUESTO IMAGE_GENERATOR (cierre §19/a)
+- Guard de presupuesto total en `image_generator` (`IMAGE_TOTAL_TIME_BUDGET=330s`) cierra el
+  encaje entre `COMFYUI_POLL_MAX_WAIT=300s` por imagen y `timeout_seconds=360s` del scheduler —
+  evita que un preset de 3 imágenes/capítulo pierda el commit completo de la fase si la primera
+  imagen tarda cerca de su límite; fallback limpio por imagen en su lugar. 6/6 PASS módulo
+  image_generator. Proveedor ComfyUI real queda IMPLEMENTED + VALIDATED end-to-end,
+  DEFAULT_PROVIDER sin tocar.
+
+2026-08-17 / COMFYUI REAL IMAGE PROVIDER (diseño + implementación)
+- `core/image_providers/comfyui.py` reescrito de cero: workflow SDXL Base+Refiner en dos
+  pasadas reconstruido a partir de los nodos especificados (4,5,6,7,10,11,12,15,16,17,19) —
+  el JSON exacto llegó vacío; sustituciones por imagen (prompt/negativo en base 6/7 y refiner
+  15/16, width/height en 5 por aspect_ratio, noise_seed aleatorio en 10, checkpoints 4/12 vía
+  env, filename_prefix en 19 con seed). Helpers `http_bytes`/`_env_float` en
+  `core/image_providers/base.py`.
+- validación aislada real (script, no pytest) contra servidor ComfyUI (0.33.1): imagen real
+  generada (189k colores únicos, no placeholder), ratios 1:1 y 16:9 confirmados, ~72–80
+  s/imagen a 25 steps (Base+Refiner); fallback automático a LocalImageProvider validado sin
+  excepción (COMFYUI_URL=127.0.0.1:9999 → metadata fallback=True).
+- tests existentes 20+6 PASS sin regresión. DEFAULT_PROVIDER en registry.py NO tocado
+  (pendiente: check de timeout de fase image_gen, 180s).
+
 CHECKPOINT 8Z.2 / 2026-08-16
 - (1) Anchor de relevancia en research: nueva `_has_anchor_keyword(topic, cand)` — filtro compuesto (`_keyword_overlap >= 0.15 AND _has_anchor_keyword`) que ancla la relevancia al tema del libro (topic, ya presente en el payload). `topic` opcional en `research_web()`, retrocompatible; `topic=None/""` no bloquea. 25/25 PASS (research_sources/multisource/curation). Ver §16.
 - (2) Gate espurio en fact_check: `autopilot._run_single` pasó el bloque fact_check de `if st=='FAIL' or qg=='FAIL'` a `if qg=='FAIL'`, eliminando fallos de fase espurios con `quality_gate=PASS` (books 9,18,19,23,25). Bloque research intacto (8H.3). 32/32 PASS (test_autopilot_fact_check_gate/editorial/quality_gate_payload/document_output). Ver §16.

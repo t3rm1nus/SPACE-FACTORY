@@ -122,3 +122,65 @@ def test_generate_chapter_images_is_parallel_safe(tmp_path):
     out_b = image_generator.generate_image(_payload(book_id=2, chapter_number=1, language="en"))
     ImageGenerateOutput(**validate_output("generate_image", out_b))
     assert out_a["images_dir"] != out_b["images_dir"]
+def test_budget_guard_forces_local_fallback_for_remaining_images(tmp_path, monkeypatch):
+    """Peor caso: la imagen 1 consume casi todo IMAGE_TOTAL_TIME_BUDGET.
+
+    Verifica que las imágenes 2 y 3 del loop caen a fallback local
+    (metadata fallback_reason='time_budget_exhausted') en vez de intentar el
+    provider real, confirmando que el loop nunca se acerca al timeout del
+    scheduler (360s).
+    """
+    import modules.image_generator.main as main
+    from core.schemas import ImageGenerateOutput, validate_output
+    from core.image_providers.registry import get as _reg_get
+
+    real = MagicMock(name="real_provider")
+    real.name = "comfyui"
+    real.model = "sdxl"
+    real.health_check.return_value = {"healthy": True}
+    real.generate.return_value = MagicMock(
+        provider="comfyui", model="sdxl", seed=1,
+        image_path=str(tmp_path / "first.png"),
+        metadata={"width": 1024, "height": 1024, "steps": 25},
+    )
+
+    def fake_get(name=None):
+        if name == "local":
+            return _reg_get("local")
+        return real
+
+    monkeypatch.setattr(main, "get_provider", fake_get)
+    monkeypatch.setattr(main, "IMAGE_TOTAL_TIME_BUDGET", 3.0)
+    # La imagen 1 "consume" casi todo el presupuesto simulado (elapsed > budget).
+    calls = {"n": 0}
+
+    def fake_perf():
+        calls["n"] += 1
+        return 3.5 if calls["n"] > 1 else 0.0
+
+    monkeypatch.setattr(main.time, "perf_counter", fake_perf)
+
+    payload = {
+        "book_id": 1, "chapter_number": 1, "language": "es",
+        "provider": "comfyui", "model": "sdxl",
+        "generate_thumbnails": True, "skip_existing": True, "max_attempts": 2,
+        "image_plan": {
+            "images": [_spec("img_01_hero"), _spec("img_02_detail"), _spec("img_03_closing")],
+            "visual_style": "editorial", "identity_notes": [],
+        },
+    }
+    out = main.generate_image(payload)
+    ImageGenerateOutput(**validate_output("generate_image", out))
+
+    assert out["requested"] == 3
+    assert out["generated"] == 3
+    assert out["failed"] == 0
+    # El provider real solo se usó en la primera imagen.
+    assert real.generate.call_count == 1
+    # La primera no se marcó como fallback.
+    assert out["results"][0].get("fallback", False) is False
+    # Las imágenes 2 y 3 cayeron a fallback local por presupuesto.
+    assert out["results"][1]["fallback"] is True
+    assert out["results"][1]["fallback_reason"] == "time_budget_exhausted"
+    assert out["results"][2]["fallback"] is True
+    assert out["results"][2]["fallback_reason"] == "time_budget_exhausted"

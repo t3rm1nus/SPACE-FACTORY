@@ -338,3 +338,24 @@ def test_create_book_without_layout_config_defaults_none(client):
     chapters = _get_chapters(book_id)
     dd = _build_book_dict(book, chapters)
     assert dd["layout_config"] is None
+def test_create_book_persists_image_search_ratio(client):
+    from frontend.editorial import _get_book
+
+    # Con campo presente -> queda 0.5 en BD.
+    resp = client.post("/api/books", data=json.dumps({
+        "title": "Con ratio",
+        "target_chapters": 1,
+        "image_search_ratio": 0.5,
+    }), content_type="application/json")
+    book_id = resp.get_json()["book_id"]
+    row = _get_book(book_id)
+    assert row["image_search_ratio"] == pytest.approx(0.5)
+
+    # Sin campo -> default 0.0.
+    resp2 = client.post("/api/books", data=json.dumps({
+        "title": "Sin ratio",
+        "target_chapters": 1,
+    }), content_type="application/json")
+    book_id2 = resp2.get_json()["book_id"]
+    row2 = _get_book(book_id2)
+    assert row2["image_search_ratio"] == pytest.approx(0.0)

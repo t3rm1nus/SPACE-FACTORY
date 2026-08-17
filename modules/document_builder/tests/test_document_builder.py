@@ -303,3 +303,159 @@ def test_build_book_docx_legal_without_author_omits_line_and_uses_title(tmp_path
     # La línea del copyright usa el título del libro
     assert any("© 2024 El libro del espacio. Todos los derechos reservados." in t for t in texts)
 
+# ---------------------------------------------------------------------------
+# 7.9D.8 — REPARTO GEOMÉTRICO DE IMÁGENES ENTRE PÁRRAFOS
+# Antes de la fase 7.9D.8 todas las imágenes de un capítulo se insertaban
+# juntas al final (tras "Fuentes utilizadas"). Ahora se intercalan de forma
+# aproximadamente uniforme entre los párrafos de contenido real.
+# ---------------------------------------------------------------------------
+def _make_image_files(tmp_path: Path, count: int) -> list[str]:
+    """Crea `count` imágenes PNG válidas y devuelve sus rutas."""
+    paths = []
+    for i in range(1, count + 1):
+        p = tmp_path / f"fig_{i}.png"
+        PILImage.new("RGB", (64, 64), color=(30, (i * 40) % 255, 120)).save(p)
+        paths.append(str(p))
+    return paths
+
+
+def _single_chapter_payload(tmp_path: Path, edited_es: str, images_count: int) -> dict:
+    """Payload con un único capítulo cuyo edited_es e imágenes son controlables."""
+    book = {
+        "book_id": 1,
+        "title": "Libro reparto de imágenes",
+        "subtitle": "Subtítulo",
+        "description": "Introducción.",
+        "author": "Space Lair",
+        "target_audience": "General",
+        "genre": "Divulgación",
+        "languages": ["es"],
+        "target_chapters": 1,
+        "status": "edited",
+        "created_at": datetime(2024, 1, 1).isoformat(),
+        "chapters": [
+            {
+                "chapter_id": 10,
+                "book_id": 1,
+                "number": 1,
+                "title": "Capítulo de reparto",
+                "edited_es": edited_es,
+                "images": _make_image_files(tmp_path, images_count),
+            },
+        ],
+    }
+    return {"book": book, "language": "es"}
+
+
+def _image_paragraph_indices(doc) -> list[int]:
+    """Índices (dentro de doc.paragraphs) de los párrafos que contienen un drawing."""
+    indices = []
+    for i, p in enumerate(doc.paragraphs):
+        if p._p.xpath(".//w:drawing"):
+            indices.append(i)
+    return indices
+
+
+def test_images_distributed_between_paragraphs(tmp_path):
+    """Capítulo con 20 párrafos y 3 imágenes: no deben quedar consecutivas al final.
+
+    Debe haber al menos un párrafo de texto real entre imagen1-imagen2 y
+    entre imagen2-imagen3.
+    """
+    from docx import Document
+
+    paras = "\n\n".join(f"Párrafo de contenido número {i}." for i in range(1, 21))
+    payload = _single_chapter_payload(tmp_path, paras, images_count=3)
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    draw = _image_paragraph_indices(doc)
+    assert len(draw) == 3
+
+    # Están en orden creciente y separadas (no consecutivas).
+    assert draw == sorted(draw)
+    assert all(d > 0 for d in draw)
+
+    for prev, cur in zip(draw, draw[1:]):
+        between = doc.paragraphs[prev + 1:cur]
+        assert any(p.text.startswith("Párrafo de contenido") for p in between)
+
+    # Hay texto real después de la última imagen (no queda pegada al final).
+    assert any(p.text.startswith("Párrafo de contenido")
+               for p in doc.paragraphs[draw[-1] + 1:])
+
+def test_images_short_chapter_all_at_end(tmp_path):
+    """Capítulo muy corto (2 párrafos) con 3 imágenes: cae en la salvaguarda.
+
+    No debe romper ni intentar repartir en huecos que no existen: las imágenes
+    van todas al final, tras el último párrafo de texto.
+    """
+    from docx import Document
+
+    payload = _single_chapter_payload(tmp_path, "Párrafo A.\n\nPárrafo B.", images_count=3)
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    draw = _image_paragraph_indices(doc)
+    assert len(draw) == 3
+
+    last_text_idx = max(
+        i for i, p in enumerate(doc.paragraphs)
+        if p.text.startswith("Párrafo")
+    )
+    # Todas las imágenes van después del último párrafo de texto real.
+    assert all(i > last_text_idx for i in draw)
+
+    texts = [p.text for p in doc.paragraphs]
+    assert any(t.startswith("Figura 1") for t in texts)
+    assert any(t.startswith("Figura 3") for t in texts)
+
+
+def test_fuentes_utilizadas_after_last_image(tmp_path):
+    """'## Fuentes utilizadas' sigue al final del capítulo, tras las imágenes
+    intercaladas, y no aparece en medio del reparto."""
+    from docx import Document
+
+    paras = "\n\n".join(f"Párrafo {i}." for i in range(1, 21))
+    content = (
+        paras
+        + "\n\n## Fuentes utilizadas\n\nReferencia uno.\n\nReferencia dos."
+    )
+    payload = _single_chapter_payload(tmp_path, content, images_count=3)
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    draw = _image_paragraph_indices(doc)
+    assert len(draw) == 3
+
+    texts = [p.text for p in doc.paragraphs]
+    idx_sources = next(i for i, p in enumerate(doc.paragraphs) if p.text == "Fuentes utilizadas")
+    idx_ref1 = next(i for i, t in enumerate(texts) if t == "Referencia uno.")
+    idx_ref2 = next(i for i, t in enumerate(texts) if t == "Referencia dos.")
+
+    # Todas las imágenes intercaladas van ANTES del bloque de fuentes.
+    assert all(i < idx_sources for i in draw)
+    # "Fuentes utilizadas" precede a sus referencias.
+    assert idx_sources < idx_ref1 < idx_ref2
+    # Entre imágenes sigue habiendo texto real (reparto intacto).
+    for prev, cur in zip(draw, draw[1:]):
+        assert any(p.text.startswith("Párrafo") for p in doc.paragraphs[prev + 1:cur])
+
+
+def test_no_images_behavior_unchanged(tmp_path):
+    """Regresión: un capítulo sin imágenes NO cambia de comportamiento.
+
+    No se generan drawings ni captions 'Figura N' y todo el texto está presente.
+    """
+    from docx import Document
+
+    paras = "\n\n".join(f"Párrafo {i}." for i in range(1, 21))
+    payload = _single_chapter_payload(tmp_path, paras, images_count=0)
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    assert _image_paragraph_indices(doc) == []
+
+    texts = [p.text for p in doc.paragraphs]
+    assert not any(t.startswith("Figura") for t in texts)
+    assert sum(1 for t in texts if t.startswith("Párrafo")) == 20

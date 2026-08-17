@@ -301,8 +301,19 @@ def _add_formatted_text(paragraph: Any, text: str) -> None:
             paragraph.add_run(part)
 
 
-def _parse_markdown_to_paragraphs(doc: Document, text: str, *, skip_first_h1: bool = False) -> None:
-    lines = text.splitlines()
+def _iter_markdown_blocks(lines, *, skip_first_h1: bool = False):
+    """Genera los bloques de markdown de un capítulo como tuplas (tipo, nivel, valor).
+
+    Replica exactamente la clasificación de _parse_markdown_to_paragraphs:
+    - ("heading", nivel, texto)
+    - ("quote", None, texto)
+    - ("separator", None, None)
+    - ("bullet", None, texto)
+    - ("normal", None, texto)
+
+    Las líneas vacías se omiten. Si skip_first_h1 es True se salta el primer
+    "# " del bloque (el titular ya se añadió explícitamente como Heading 1).
+    """
     for i, line in enumerate(lines):
         stripped = line.rstrip()
         if not stripped.strip():
@@ -313,29 +324,129 @@ def _parse_markdown_to_paragraphs(doc: Document, text: str, *, skip_first_h1: bo
             continue
 
         if stripped.startswith("###### "):
-            doc.add_paragraph(stripped[7:].strip(), style="Heading 6")
+            yield ("heading", 6, stripped[7:].strip())
         elif stripped.startswith("##### "):
-            doc.add_paragraph(stripped[6:].strip(), style="Heading 5")
+            yield ("heading", 5, stripped[6:].strip())
         elif stripped.startswith("#### "):
-            doc.add_paragraph(stripped[5:].strip(), style="Heading 4")
+            yield ("heading", 4, stripped[5:].strip())
         elif stripped.startswith("### "):
-            doc.add_paragraph(stripped[4:].strip(), style="Heading 3")
+            yield ("heading", 3, stripped[4:].strip())
         elif stripped.startswith("## "):
-            doc.add_paragraph(stripped[3:].strip(), style="Heading 2")
+            yield ("heading", 2, stripped[3:].strip())
         elif stripped.startswith("# "):
-            doc.add_paragraph(stripped[2:].strip(), style="Heading 1")
+            yield ("heading", 1, stripped[2:].strip())
         elif stripped.startswith("> "):
-            doc.add_paragraph(stripped[2:].strip(), style="Quote")
+            yield ("quote", None, stripped[2:].strip())
         elif stripped.strip() == "---":
-            p = doc.add_paragraph("— — —", style="Separator")
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            yield ("separator", None, None)
         elif stripped.strip().startswith("- ") or stripped.strip().startswith("* "):
-            bullet_text = stripped.strip()[2:]
-            p = doc.add_paragraph(style="List Bullet")
-            _add_formatted_text(p, bullet_text)
+            yield ("bullet", None, stripped.strip()[2:])
         else:
-            p = doc.add_paragraph(style="Normal")
-            _add_formatted_text(p, stripped)
+            yield ("normal", None, stripped)
+
+
+def _render_markdown_block(
+    doc: Document, kind: str, level: Optional[int], value: Optional[str]
+) -> None:
+    """Renderiza un bloque de markdown (emitido por _iter_markdown_blocks) como párrafo."""
+    if kind == "heading":
+        doc.add_paragraph(value or "", style=f"Heading {int(level)}")
+    elif kind == "quote":
+        doc.add_paragraph(value or "", style="Quote")
+    elif kind == "separator":
+        p = doc.add_paragraph("— — —", style="Separator")
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    elif kind == "bullet":
+        p = doc.add_paragraph(style="List Bullet")
+        _add_formatted_text(p, value or "")
+    else:  # normal
+        p = doc.add_paragraph(style="Normal")
+        _add_formatted_text(p, value or "")
+
+
+def _parse_markdown_to_paragraphs(doc: Document, text: str, *, skip_first_h1: bool = False) -> None:
+    for kind, level, value in _iter_markdown_blocks(text.splitlines(), skip_first_h1=skip_first_h1):
+        _render_markdown_block(doc, kind, level, value)
+
+
+def _split_sources_tail(lines) -> tuple[list[str], list[str]]:
+    """Divide las líneas del capítulo en cuerpo y cola de '## Fuentes utilizadas' .
+
+    El cuerpo se usa para intercalar imágenes; la cola (encabezado + referencias)
+    sigue yendo al final del capítulo, tras el texto y las imágenes intercaladas.
+    Devuelve (body, tail).
+    """
+    body: list[str] = []
+    tail: list[str] = []
+    in_sources = False
+    for line in lines:
+        stripped = line.rstrip()
+        if (
+            not in_sources
+            and stripped.startswith("## ")
+            and "fuentes utilizadas" in stripped.lower()
+        ):
+            in_sources = True
+        if in_sources:
+            tail.append(line)
+        else:
+            body.append(line)
+    return body, tail
+
+
+def _count_body_paragraphs(lines) -> int:
+    """Cuenta los párrafos de contenido real que producirá el cuerpo del capítulo."""
+    return sum(1 for _ in _iter_markdown_blocks(lines, skip_first_h1=True))
+
+
+def _compute_insertion_points(num_images: int, num_paragraphs: int):
+    """Calcula los puntos de inserción (~uniformes) de las imágenes entre párrafos.
+
+    Devuelve:
+    - [] si no hay imágenes (no cambia el comportamiento).
+    - None si hay MENOS párrafos que imágenes (capítulo muy corto): señal para
+      conservar el comportamiento actual (todas las imágenes al final).
+    - lista ordenada de índices de párrafo (1-based) de contenido tras los
+      cuales se coloca cada imagen, usando floor(k * M / (N + 1)) para k=1..N.
+
+    Los puntos se fuerzan a >= 1 y sin duplicados para no colocar dos imágenes
+    en el mismo hueco ni antes del primer párrafo.
+    """
+    if num_images <= 0:
+        return []
+    if num_paragraphs <= num_images:
+        # Capítulo tan corto que no hay huecos suficientes: no repartir.
+        return None
+    points: list[int] = []
+    for k in range(1, num_images + 1):
+        p = (k * num_paragraphs) // (num_images + 1)
+        p = max(1, p)
+        if p not in points:
+            points.append(p)
+    return sorted(points)
+
+
+def _add_body_with_images(doc: Document, body_lines, images, emit_image) -> None:
+    """Añade el cuerpo del capítulo intercalando las imágenes entre los párrafos.
+
+    ``emit_image(path)`` coloca una imagen (con su caption) justo después del
+    párrafo corriente. Consume las rutas de ``images`` (pop) conforme las coloca,
+    de modo que el llamador solo emite al final las que queden sin intercalar.
+    """
+    body = [ln for ln in body_lines]
+    points = _compute_insertion_points(len(images), _count_body_paragraphs(body))
+    if points is None:
+        # Capítulo muy corto: conserva el comportamiento actual (todo al final).
+        _parse_markdown_to_paragraphs(doc, "\n".join(body), skip_first_h1=True)
+        return
+
+    points_set = set(points)
+    par_count = 0
+    for kind, level, value in _iter_markdown_blocks(body, skip_first_h1=True):
+        _render_markdown_block(doc, kind, level, value)
+        par_count += 1
+        if par_count in points_set and images:
+            emit_image(images.pop(0))
 
 
 def _add_image_if_exists(doc: Document, image_path: str, caption: str, index: int) -> None:
@@ -413,16 +524,30 @@ def _add_chapter(doc: Document, chapter: Chapter, language: str) -> None:
     doc.add_paragraph(title, style="Heading 1")
 
     content = getattr(chapter, f"edited_{language}") or getattr(chapter, f"draft_{language}")
+    caption_ref = f": {title}"
+    caption_number = 0
+    images = list(chapter.images or [])
+
+    def _emit_image(img_path: str) -> None:
+        nonlocal caption_number
+        caption_number += 1
+        caption = f"Figura {caption_number}{caption_ref}"
+        _add_image_if_exists(doc, img_path, caption, caption_number)
+
     if content:
-        _parse_markdown_to_paragraphs(doc, content, skip_first_h1=True)
+        body, sources_tail = _split_sources_tail(content.splitlines())
+        _add_body_with_images(doc, body, images, _emit_image)
+        if sources_tail:
+            _parse_markdown_to_paragraphs(doc, "\n".join(sources_tail), skip_first_h1=False)
     else:
         doc.add_paragraph(
             "(Sin contenido disponible para este capítulo)", style="Normal"
         )
 
-    for idx, img_path in enumerate(chapter.images, start=1):
-        caption = f"Figura {idx}: {chapter.title or f'Capítulo {chapter.number}'}"
-        _add_image_if_exists(doc, img_path, caption, idx)
+    # Imágenes que quedaron sin intercalar (capítulo muy corto / huecos insuficientes):
+    # se conserva el comportamiento actual, todas al final.
+    for img_path in images:
+        _emit_image(img_path)
 
 
 def build_book_docx(payload: dict[str, Any]) -> dict[str, Any]:

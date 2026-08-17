@@ -307,6 +307,9 @@ def create_book(data: dict) -> dict:
     image_count = data.get("image_count")
     image_count = 3 if image_count is None else int(image_count)
     image_count = max(0, min(20, image_count))
+    image_search_ratio = data.get("image_search_ratio")
+    image_search_ratio = 0.0 if image_search_ratio is None else float(image_search_ratio)
+    image_search_ratio = max(0.0, min(1.0, image_search_ratio))
     layout_config = data.get("layout_config")
     layout_config_json = json.dumps(layout_config, ensure_ascii=False) if layout_config else None
 
@@ -314,8 +317,8 @@ def create_book(data: dict) -> dict:
     try:
         cursor = conn.execute(
             """
-            INSERT INTO books (title, subtitle, description, author, target_audience, genre, languages, target_chapters, image_count, layout_config, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned')
+            INSERT INTO books (title, subtitle, description, author, target_audience, genre, languages, target_chapters, image_count, image_search_ratio, layout_config, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'planned')
             """,
             (
                 title,
@@ -327,6 +330,7 @@ def create_book(data: dict) -> dict:
                 data.get("language") or "es",
                 chapters_count,
                 image_count,
+                image_search_ratio,
                 layout_config_json,
             ),
         )
@@ -538,7 +542,8 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
         payload = {
             "chapter_text": text or "Capítulo sin texto todavía.",
             "chapter_title": chapter.get("title"),
-            "visual_style": data.get("style") or "realistic",
+            "visual_style": data.get("style"),
+            "genre": book.get("genre"),
             "num_images": int(data.get("num_images") if data.get("num_images") is not None else 3),
             "language": language,
         }

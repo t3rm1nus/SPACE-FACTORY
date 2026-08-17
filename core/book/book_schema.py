@@ -29,6 +29,7 @@ class Book(BaseModel):
     target_chapters: int = Field(default=10, ge=1, le=500)
     status: BookStatus = BookStatus.PLANNED
     image_count: int = Field(default=3, ge=0, le=20)
+    image_search_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
     layout_config: Optional[dict] = Field(default=None)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
