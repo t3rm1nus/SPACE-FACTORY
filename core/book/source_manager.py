@@ -98,6 +98,41 @@ class SourceManager:
             return _row_to_source(row)
         finally:
             conn.close()
+    @staticmethod
+    def get_source_by_url(url: str) -> Optional[dict[str, Any]]:
+        """Devuelve la fuente persistida con ese url_hash, o None."""
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT * FROM sources WHERE url_hash = ?", (_url_hash(url),)
+            ).fetchone()
+            return _row_to_source(row)
+        finally:
+            conn.close()
+
+    @staticmethod
+    def book_ids_for_source(source_id: int) -> list[int]:
+        """Book_ids DISTINCT de los capítulos asociados a la fuente dada."""
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT chapter_ids FROM sources WHERE id = ?", (source_id,)
+            ).fetchone()
+            if not row:
+                return []
+            cids = json.loads(row["chapter_ids"] or "[]")
+            if not cids:
+                return []
+            placeholders = ",".join("?" * len(cids))
+            rows = conn.execute(
+                f"SELECT DISTINCT book_id FROM chapters WHERE id IN ({placeholders})",
+                cids,
+            ).fetchall()
+            return sorted(int(r["book_id"]) for r in rows)
+        finally:
+            conn.close()
+
+
 
     @staticmethod
     def get_source(source_id: int) -> Optional[dict[str, Any]]:

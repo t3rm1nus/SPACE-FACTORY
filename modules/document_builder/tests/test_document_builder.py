@@ -104,9 +104,30 @@ def test_build_book_docx_creates_real_docx(tmp_path: Path):
 
     # Check header/footer
     section = doc.sections[0]
+    assert section.different_first_page_header_footer is True
     assert "El libro del espacio" in section.header.paragraphs[0].text
+
+    # A1: año legal = año de creación del libro (2024 en el fixture),
+    # nunca un literal hardcodeado desincronizado.
+    legal_texts = [p.text for p in doc.paragraphs if "©" in p.text]
+    assert any("© 2024" in t for t in legal_texts)
+
+    # A2: la portada (primera página) no lleva header/footer.
+    first_page_header_text = "".join(
+        p.text for p in section.first_page_header.paragraphs
+    )
+    first_page_footer_text = "".join(
+        p.text for p in section.first_page_footer.paragraphs
+    )
+    assert "El libro del espacio" not in first_page_header_text
+
+    # A3: el footer NO expone el nombre de archivo interno; solo número de
+    # página (campo PAGE, texto vacío hasta renderizarse).
     footer_text = section.footer.paragraphs[0].text
-    assert f"book_{out['book_id']}_es.docx" in footer_text
+    footer_xml = section.footer.paragraphs[0]._p.xml
+    assert ".docx" not in footer_text
+    assert f"book_{out['book_id']}" not in footer_text
+    assert 'w:instrText' in footer_xml and "PAGE" in footer_xml
 
 
 def test_build_book_docx_custom_page_size(tmp_path: Path):
@@ -237,9 +258,11 @@ def test_docx_isolation_two_books_same_language(tmp_path: Path):
     # 5) B contiene su propia identidad
     assert title_b == "Libro B"
     assert bytes_a_before != bytes_b
-    # 6) footer de B referencia a su propio archivo canónico
+    # 6) identidad 1:1: el path canónico de B es book_22_es.docx y el footer
+    # NO expone nombres de archivo internos (A3: footer solo número de página).
+    assert path_b.endswith("book_22_es.docx")
     footer_b = Document(path_b).sections[0].footer.paragraphs[0].text
-    assert "book_22_es.docx" in footer_b
+    assert ".docx" not in footer_b
 
 
 @pytest.mark.parametrize("preset,exp_font,exp_color", [
@@ -459,3 +482,69 @@ def test_no_images_behavior_unchanged(tmp_path):
     texts = [p.text for p in doc.paragraphs]
     assert not any(t.startswith("Figura") for t in texts)
     assert sum(1 for t in texts if t.startswith("Párrafo")) == 20
+
+
+def test_markdown_link_rendered_as_real_hyperlink(tmp_path):
+    """B1: [Título](url) se renderiza como hipervínculo real, nunca crudo.
+
+    El DOCX no contiene la sintaxis markdown "](http", contiene el texto del
+    enlace, y el XML incluye un <w:hyperlink> con relación externa.
+    """
+    from docx import Document
+
+    content = (
+        "Párrafo introductorio.\n\n"
+        "## Fuentes utilizadas\n\n"
+        "[Título](https://ejemplo.com/pagina)"
+    )
+    payload = _single_chapter_payload(tmp_path, content, images_count=0)
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    texts = [p.text for p in doc.paragraphs]
+    full_text = "\n".join(texts)
+    assert "](http" not in full_text
+    assert "[Título]" not in full_text
+    assert "Título" in texts  # el texto visible del enlace es un párrafo/run
+
+    # Hipervínculo real: elemento w:hyperlink en el XML + relación externa.
+    xml = "\n".join(p._p.xml for p in doc.paragraphs)
+    assert "<w:hyperlink" in xml
+    rels = doc.part.rels
+    assert any(
+        r.reltype.endswith("/hyperlink") and r.target_ref == "https://ejemplo.com/pagina"
+        for r in rels.values()
+    )
+
+
+def test_duplicate_source_lines_deduplicated(tmp_path):
+    """B2: la misma línea de fuente repetida aparece UNA sola vez en el DOCX."""
+    from docx import Document
+
+    src = "Fuente repetida de ejemplo (web_searxng)"  # texto tras quitar "- "
+    content = (
+        "Párrafo uno.\n\n"
+        f"## Fuentes utilizadas\n\n- {src}\n\n- Otra fuente distinta (web_wikipedia)\n\n- {src}"
+    )
+    payload = _single_chapter_payload(tmp_path, content, images_count=0)
+    out = build_book_docx(payload)
+
+    texts = [p.text for p in Document(out["docx_path"]).paragraphs]
+    assert texts.count(src) == 1
+
+
+def test_figure_numbering_no_gap_when_first_image_missing(tmp_path):
+    """B3: si la primera imagen no existe, la segunda es 'Figura 1' (sin hueco)."""
+    from docx import Document
+
+    payload = _single_chapter_payload(tmp_path, "Párrafo A.", images_count=1)
+    missing = str(tmp_path / "no_existe.png")
+    existing = payload["book"]["chapters"][0]["images"][0]
+    payload["book"]["chapters"][0]["images"] = [missing, existing]
+
+    out = build_book_docx(payload)
+
+    texts = [p.text for p in Document(out["docx_path"]).paragraphs]
+    captions = [t for t in texts if t.startswith("Figura")]
+    assert len(captions) == 1
+    assert captions[0].startswith("Figura 1")

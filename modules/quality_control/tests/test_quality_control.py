@@ -48,6 +48,36 @@ def _make_book(tmp_path: Path, chapter_count: int = 25) -> dict:
         "chapters": chapters,
     }
 
+def test_check_images_uses_book_image_count_not_literal(tmp_path: Path):
+    """image_count=5 con 5 imágenes reales por capítulo -> PASS (no el literal 3)."""
+    from modules.quality_control.main import _check_images
+
+    img_path = tmp_path / "hero.png"
+    PILImage.new("RGB", (64, 64), color="red").save(img_path)
+    (tmp_path / "metadata.json").write_text('{"camera": "test"}', encoding="utf-8")
+
+    book = Book.model_validate({
+        "title": "Libro de prueba",
+        "description": "Descripción del libro.",
+        "image_count": 5,
+        "chapters": [
+            {
+                "chapter_id": i,
+                "book_id": 1,
+                "number": i,
+                "edited_es": "Contenido del capítulo {}.".format(i),
+                "images": [str(img_path)] * 5,
+            }
+            for i in range(1, 4)
+        ],
+    })
+    checks = _check_images(book)
+    count_checks = [c for c in checks if c.message.startswith("5 imágenes por capítulo")]
+    assert len(count_checks) == 1 and count_checks[0].status == "PASS"
+    assert not any(c.status == "FAIL" and "Imágenes por capítulo" in c.message for c in checks)
+
+
+
 
 def test_health_check():
     result = health_check()

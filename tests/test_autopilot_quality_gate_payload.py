@@ -34,6 +34,16 @@ def _db(tmp_path, monkeypatch):
     init_db()
 
 
+@pytest.fixture
+def store(tmp_path):
+    return autopilot.BookJobStore(os.path.join(str(tmp_path), "jobs"))
+
+
+@pytest.fixture
+def _book_provider():
+    return lambda: _make_book(1)
+
+
 def _make_book(target_chapters: int) -> dict:
     d = dict(_META)
     d["target_chapters"] = target_chapters
@@ -58,3 +68,51 @@ def test_quality_gate_payload_propagates_real_thresholds():
     assert payload["min_chapters"] != 20
     assert payload["target_chapters"] != 30
     assert payload["max_chapters"] != 40
+
+
+def test_quality_gate_fail_persists_real_metrics(store, _book_provider):
+    """Fix 8I.3 — una fase global que falle por gate (quality_gate con
+    overall_status=FAIL) NO debe perseguir metrics={} en el job: la rama de
+    ``run_job`` para result.ok=False debe conservar el resultado real que el
+    módulo ya devolvió (overall_status, book_checks), igual que la rama de éxito.
+    (Confirmado con libro 32: quality_gate FAIL persistía metrics={})."""
+    modules = {
+        "quality_control": {
+            "manifest": {"id": "quality_control", "config": {"timeout_seconds": 60}},
+            "execute": lambda payload: {
+                "overall_status": "FAIL",
+                "is_complete": False,
+                "book_checks": [
+                    {"status": "FAIL", "message": "Fuentes faltantes en capítulos: [1]"}
+                ],
+            },
+        }
+    }
+    cap_map = {"final_quality_control": ["quality_control"]}
+    executor = autopilot.default_executor_factory(modules, cap_map)
+
+    book_id = _book_provider()["book_id"]
+    job = autopilot.create_job(store, book_id)
+    for ph in job["phases"]:
+        if ph["id"] == "quality_gate":
+            ph["status"] = autopilot.PHASE_PENDING
+            ph["attempts"] = 0
+        else:
+            ph["status"] = autopilot.PHASE_PASS
+            ph["attempts"] = 1
+    store.save(job)
+    job = store.load(job["job_id"])
+
+    final = autopilot.run_job(
+        job, store, executor, emit=lambda ev, d: None, max_attempts=1
+    )
+
+    qg_phase = next(p for p in final["phases"] if p["id"] == "quality_gate")
+    assert qg_phase["status"] == autopilot.PHASE_FAIL
+    assert qg_phase["error"] == "quality_gate#overall_status=FAIL"
+    # El detalle real del módulo debe persistirse en metrics (no {}).
+    assert qg_phase["metrics"]["overall_status"] == "FAIL"
+    assert qg_phase["metrics"]["is_complete"] is False
+    assert any(
+        c.get("status") == "FAIL" for c in qg_phase["metrics"]["book_checks"]
+    )

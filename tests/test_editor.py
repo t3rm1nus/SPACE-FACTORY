@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -156,6 +157,46 @@ def test_execute_llm_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Amazonas" in out["edited_text"]
     assert out["editorial_notes"] == ["Se simplificó una redundancia."]
     assert len(out["changes_summary"]) == 2
+
+
+def test_execute_refusal_llm_triggers_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si el LLM devuelve un rechazo ('Lo siento, pero no puedo ayudar con
+    eso.'), debe activarse _fallback_edit y el capítulo queda idéntico al
+    original, sin la frase de rechazo."""
+    import json as _json
+
+    import modules.editor.main as main
+
+    refusal_json = _json.dumps(
+        {
+            "edited_text": "Lo siento, pero no puedo ayudar con eso.",
+            "editorial_notes": [],
+            "changes_summary": [],
+        }
+    )
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def generate(self, *args: Any, **kwargs: Any) -> Any:
+            result = MagicMock()
+            result.text = refusal_json
+            result.raw_response = None
+            result.input_tokens = 10
+            result.output_tokens = 10
+            return result
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+
+    original = _payload()["chapter_text"]
+    out = execute(_payload())
+    assert "Lo siento" not in out["edited_text"]
+    assert "no puedo ayudar" not in out["edited_text"]
+    assert out["execution_mode"] == "fallback"
+    # El capítulo se conserva sin cambios (fallback determinista).
+    assert out["edited_text"].strip() == original.strip()
+
 
 def test_detect_placeholders() -> None:
     assert _detect_placeholder("[TODO]") is True

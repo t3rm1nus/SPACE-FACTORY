@@ -1461,6 +1461,118 @@ def test_deterministic_complete_preserves_outline_headings() -> None:
     assert "## Antecedentes" in out_md
     assert main._detect_placeholder(out_md) is False
 
+def _shared_book_facts() -> list[str]:
+    """Pool de hechos compartido a nivel de LIBRO (patrón book_37).
+
+    Simula sources cuyo ``content`` cubre varios capítulos del mismo libro:
+    todos los capítulos extraen del mismo pool via `_extract_research_facts`.
+    """
+    import modules.chapter_writer.main as main
+
+    sources = [
+        {"url": "https://example.com/s1", "title": "Fuente A",
+         "source_type": "web", "chapter_ids": [1, 2, 3],
+         "content": "La capa de enlace usa tramas Ethernet para encapsular los datos."},
+        {"url": "https://example.com/s2", "title": "Fuente B",
+         "source_type": "web", "chapter_ids": [1, 2],
+         "content": "El protocolo IP enruta paquetes entre redes distintas de forma autónoma."},
+        {"url": "https://example.com/s3", "title": "Fuente C",
+         "source_type": "web", "chapter_ids": [2, 3],
+         "content": "TCP garantiza la entrega fiable y ordenada de los segmentos transmitidos."},
+    ]
+    return main._extract_research_facts(None, sources)
+
+
+def test_deterministic_complete_varies_output_across_chapters() -> None:
+    """Fix §17 #7 (book_37): capítulos distintos NO generan párrafos literales idénticos.
+
+    Mismo pool de hechos compartido + mismo minimum_words, distinto chapter_number
+    → el texto completo generado debe diferir (comparación de string completa).
+    """
+    import modules.chapter_writer.main as main
+
+    md = "# Introducción\n\n## Antecedentes\n\n" + "dato " * 100
+    facts = _shared_book_facts()
+
+    payload_ch1 = _payload()
+    payload_ch1["chapter_outline"]["number"] = 1
+    out_md_1, out_words_1 = main._deterministic_complete(
+        md, len(md.split()), 1500, payload_ch1, "es", facts=facts,
+    )
+
+    payload_ch2 = _payload()
+    payload_ch2["chapter_outline"]["number"] = 2
+    out_md_2, out_words_2 = main._deterministic_complete(
+        md, len(md.split()), 1500, payload_ch2, "es", facts=facts,
+    )
+
+    assert out_words_1 >= 1500 and out_words_2 >= 1500
+    # Comparación de string completa, no solo longitud.
+    assert out_md_1 != out_md_2
+
+
+def test_deterministic_complete_no_verbatim_overlap_across_chapters_small_pool() -> None:
+    """Re-fix regresión §17 #7 (book_43): rangos de seed DISJUNTOS por capítulo.
+
+    Con pool de hechos PEQUEÑO y muchos párrafos por capítulo, el offset +1
+    viejo hacía que cap1 (seeds 1..M) y cap2 (seeds 2..K) recorrieran casi el
+    mismo rango → mismo seed_total producía párrafos verbatim idénticos entre
+    capítulos. Con chapter_number*1000 los rangos son disjuntos: ningún
+    párrafo del backstop de un capítulo puede aparecer en el otro.
+    """
+    import modules.chapter_writer.main as main
+
+    facts = _shared_book_facts()[:3]  # pool deliberadamente pobre (3 hechos)
+    md = "# Introducción\n\n## Antecedentes\n\n" + "dato " * 100
+
+    def _backstop_paragraphs(out_md: str) -> set[str]:
+        return {
+            p.strip() for p in out_md.split("\n\n")
+            if any(p.strip().startswith(opener) for opener in main._DET_OPENERS_ES)
+        }
+
+    paras_by_chapter: dict[int, set[str]] = {}
+    # Estrés al peor caso realista: minimum alto genera ~90+ párrafos backstop
+    # por capítulo (~P_max: ABSOLUTE_HARD_LIMIT*8 iteraciones, párrafos ~30-38w).
+    for number in (1, 2):
+        payload = _payload()
+        payload["chapter_outline"]["number"] = number
+        out_md, out_words = main._deterministic_complete(
+            md, len(md.split()), 3200, payload, "es", facts=facts,
+        )
+        assert out_words >= 3200
+        paras_by_chapter[number] = _backstop_paragraphs(out_md)
+
+    # Suficientes párrafos backstop por capítulo para que cualquier solape de
+    # rangos o de espacio combinatorio se manifieste.
+    assert len(paras_by_chapter[1]) >= 20
+    assert len(paras_by_chapter[2]) >= 20
+    # NINGÚN párrafo verbatim compartido entre capítulos.
+    assert not (paras_by_chapter[1] & paras_by_chapter[2])
+
+
+
+def test_deterministic_complete_same_chapter_is_stable() -> None:
+    """No-regresión: mismo chapter_number + mismos hechos → MISMO resultado (determinismo)."""
+    import modules.chapter_writer.main as main
+
+    md = "# Introducción\n\n## Antecedentes\n\n" + "dato " * 100
+    facts = _shared_book_facts()
+
+    payload_a = _payload()
+    payload_a["chapter_outline"]["number"] = 1
+    out_md_a, _ = main._deterministic_complete(
+        md, len(md.split()), 1500, payload_a, "es", facts=facts,
+    )
+
+    payload_b = _payload()
+    payload_b["chapter_outline"]["number"] = 1
+    out_md_b, _ = main._deterministic_complete(
+        md, len(md.split()), 1500, payload_b, "es", facts=facts,
+    )
+
+    assert out_md_a == out_md_b
+
 
 def test_extract_research_facts_unique_sentences() -> None:
     """_extract_research_facts devuelve oraciones únicas (>= 6 palabras), sin duplicados."""

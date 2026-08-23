@@ -429,3 +429,88 @@ def test_explicit_empty_sources_override_is_respected(monkeypatch):
     monkeypatch.setattr(editorial, "_get_chapter", _mock_chapter)
     payload = editorial.build_payload(1, "writer", {}, chapter_id=1)
     assert payload["sources"] == []
+
+
+# ---------------------------------------------------------------------------
+# Anti-reciclaje: fuentes ya persistidas para OTRO libro solo se re-asocian
+# si siguen ancladas temáticamente al libro nuevo (_has_anchor_keyword).
+# Caso real 2026-08-22: 'Latveria' (Marvel, book_23) reciclada a book_39 (Doom).
+# ---------------------------------------------------------------------------
+def test_stale_source_not_reassociated_without_topic_anchor(monkeypatch, tmp_path, store):
+    import json as _json
+
+    from core.book.source_manager import SourceManager
+    from core.database import get_db as _get_db, init_db as _init_db
+
+    db_path = os.path.join(str(tmp_path), "test_sources.db")
+    monkeypatch.setenv("SPACE_LAIR_DB_PATH", db_path)
+    _init_db()
+
+    conn = _get_db()
+    try:
+        # Libro NUEVO sobre Doom y libro VIEJO dueño de la fuente Marvel.
+        conn.execute(
+            "INSERT INTO books (id, title, description) VALUES (?, ?, ?)",
+            (1, "Historia del Mítico Juego Doom", "Libro sobre el videojuego Doom"),
+        )
+        conn.execute(
+            "INSERT INTO books (id, title, description) VALUES (?, ?, ?)",
+            (2, "Universo Marvel", "Libro sobre cómics de Marvel"),
+        )
+        conn.execute(
+            "INSERT INTO chapters (id, book_id, number, title) VALUES (?, ?, ?, ?)",
+            (11, 2, 1, "Capítulo 1 Marvel"),
+        )
+        conn.execute(
+            "INSERT INTO chapters (id, book_id, number, title) VALUES (?, ?, ?, ?)",
+            (21, 1, 1, "El Nacimiento de Doom"),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    # Fuente AJENA ya persistida para el libro 2 (Marvel): sin anclaje con Doom.
+    alien = SourceManager.add_source(
+        url="https://es.wikipedia.org/wiki/Latveria",
+        title="Latveria",
+        source_type="web_wikipedia",
+        relevance=6,
+        notes="content_snippet=Latveria es una nación ficticia que aparece en "
+              "cómics estadounidenses publicados por Marvel Comics gobernado por "
+              "el Señor Supremo Doctor Doom.",
+        chapter_ids=[11],
+    )
+    assert sorted(alien["chapter_ids"]) == [11]
+
+    sources = [
+        {"url": "https://es.wikipedia.org/wiki/Latveria", "title": "Latveria",
+         "source_type": "web_wikipedia", "relevance": 6},
+        {"url": "https://es.wikipedia.org/wiki/Doom_(videojuego)",
+         "title": "Doom (videojuego de 1993)", "source_type": "web_wikipedia",
+         "relevance": 9},
+    ]
+
+    def _exec(phase, job):
+        if phase["id"] == "research":
+            return PhaseResult(
+                ok=True,
+                metrics={"status": "PASS", "sources": list(sources),
+                         "source_count": len(sources), "stored_sources": []},
+                module="research",
+            )
+        return _ok_executor(phase, job)
+
+    job = create_job(store, book_id=1)
+    run_job(job, store, _exec, max_attempts=2, sleep_fn=_NOSLEEP)
+    assert job["status"] == JOB_COMPLETED
+
+    re_alien = SourceManager.get_source(alien["id"])
+    # La fuente ajena NO se asoció a los capítulos del libro nuevo (capítulo 21).
+    assert 21 not in re_alien["chapter_ids"]
+    assert sorted(re_alien["chapter_ids"]) == [11]
+
+    # La fuente afín SÍ se insertó y asoció a los capítulos del libro nuevo.
+    affine = SourceManager.get_source_by_url("https://es.wikipedia.org/wiki/Doom_(videojuego)")
+    assert affine is not None
+    assert 21 in affine["chapter_ids"]
+

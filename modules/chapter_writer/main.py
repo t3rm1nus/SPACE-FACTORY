@@ -36,6 +36,31 @@ PLACEHOLDER_PATTERNS = [
     r"\{\{.*?\}\}",
 ]
 
+# Frases de rechazo del LLM (refusals): si el modelo responde con una negativa
+# ("Lo siento, pero no puedo ayudar con eso."), esa propuesta NO es contenido
+# válido y debe descartarse igual que un duplicado (sin finalizar el capítulo
+# con ella). Detección case-insensitive.
+REFUSAL_PATTERNS = [
+    r"no puedo ayudar",
+    r"lo siento, pero",
+    r"como modelo de lenguaje",
+    r"no puedo generar",
+    r"no puedo continuar con esa solicitud",
+    r"as an ai language model",
+    r"i cannot assist",
+    r"i'm sorry, but i can't",
+]
+
+
+def _detect_refusal(text: str) -> bool:
+    """True si ``text`` es un rechazo (refusal) del LLM."""
+    if not text or not text.strip():
+        return False
+    for pat in REFUSAL_PATTERNS:
+        if re.search(pat, text, re.IGNORECASE):
+            return True
+    return False
+
 
 _BRACKET_PLACEHOLDER_KEYWORDS = [
     r"TODO",
@@ -1132,6 +1157,10 @@ _DET_OPENERS_ES = [
     "Desarrollando esta idea, cabe señalar que",
     "A modo de aclaración, es útil recordar que",
     "Teniendo en cuenta lo anterior, se añade que",
+    "Dentro de este marco, conviene subrayar que",
+    "En relación con lo expuesto, cabe añadir que",
+    "Siguiendo con este hilo, resulta pertinente notar que",
+    "Completa el cuadro anterior el hecho de que",
 ]
 _DET_OPENERS_EN = [
     "At this point, it is worth clarifying that",
@@ -1142,6 +1171,10 @@ _DET_OPENERS_EN = [
     "Developing this idea, it should be noted that",
     "By way of clarification, it is useful to recall that",
     "Taking the above into account, it follows that",
+    "Within this framework, it is worth stressing that",
+    "In connection with the above, it may be added that",
+    "Following this thread, it is pertinent to observe that",
+    "Completing the previous picture is the fact that",
 ]
 
 _DET_CLOSERS_ES = [
@@ -1150,6 +1183,8 @@ _DET_CLOSERS_ES = [
     "Por tanto, se trata de un matiz que enriquece el desarrollo.",
     "De este modo, la exposición gana en profundidad y matices.",
     "Se trata, en definitiva, de una consideración relevante para el conjunto.",
+    "Este detalle completa la perspectiva general del apartado.",
+    "Con esto queda ilustrada la dimensión práctica del punto tratado.",
 ]
 _DET_CLOSERS_EN = [
     "Thus, this aspect reinforces the general argument of the chapter.",
@@ -1157,6 +1192,26 @@ _DET_CLOSERS_EN = [
     "Therefore, this is a nuance that enriches the development.",
     "In this way, the exposition gains depth and nuance.",
     "Ultimately, this is a relevant consideration for the whole.",
+    "This detail rounds out the overall perspective of the section.",
+    "With this, the practical dimension of the point is illustrated.",
+]
+
+# Puentes para párrafos que combinan DOS hechos (re-fix regresión book_43:
+# amplía el espacio combinatorio de forma no lineal cuando el pool tiene >=2
+# hechos; con 1 solo hecho el backstop cae al comportamiento de un hecho).
+_DET_BRIDGES_ES = [
+    "Asimismo,",
+    "En esta misma línea,",
+    "Por añadidura,",
+    "Al mismo tiempo,",
+    "Como complemento de lo anterior,",
+]
+_DET_BRIDGES_EN = [
+    "Likewise,",
+    "Along the same lines,",
+    "Furthermore,",
+    "At the same time,",
+    "As a complement to the above,",
 ]
 
 
@@ -1205,6 +1260,32 @@ def _elaborate_fact_deterministic(fact: str, language: str, seed: int) -> str:
     return f"{op} {fact}. {cl}"
 
 
+def _elaborate_fact_pair_deterministic(
+    fact_a: str, fact_b: str, language: str, seed: int
+) -> str:
+    """Redacta un párrafo determinista que COMBINA dos hechos (re-fix book_43).
+
+    Multiplica el espacio combinatorio del backstop cuando el pool tiene >=2
+    hechos: opener (12) x puente (5) x closer (7) x par ordenado (N*(N-1)).
+    Determinista: mismo seed → mismo párrafo.
+    """
+    es = language != "en"
+    openers = _DET_OPENERS_ES if es else _DET_OPENERS_EN
+    closers = _DET_CLOSERS_ES if es else _DET_CLOSERS_EN
+    bridges = _DET_BRIDGES_ES if es else _DET_BRIDGES_EN
+
+    s = seed
+    op = openers[s % len(openers)]
+    s //= len(openers)
+    br = bridges[s % len(bridges)]
+    s //= len(bridges)
+    cl = closers[s % len(closers)]
+
+    fa = fact_a.rstrip(" .").strip()
+    fb = fact_b.rstrip(" .").strip()
+    return f"{op} {fa}. {br} {fb}. {cl}"
+
+
 def _deterministic_section_paragraphs(
     section: str,
     objective: str,
@@ -1234,7 +1315,16 @@ def _deterministic_section_paragraphs(
     i = 0
     wc = sum(len(p.split()) for p in paragraphs)
     while wc < target_words and i < ABSOLUTE_HARD_LIMIT * 6:
-        if facts:
+        if len(facts) >= 2:
+            # Re-fix book_43: con pool >= 2 hechos se combinan PARES ordenados
+            # (multiplica el espacio combinatorio; con 1 hecho, ruta simple).
+            n = len(facts)
+            ia = (seed + i) % n
+            ib = (ia + 1 + ((seed + i) // n) % (n - 1)) % n
+            paras = _elaborate_fact_pair_deterministic(
+                facts[ia], facts[ib], language, seed + i
+            )
+        elif facts:
             fact = facts[(seed + i) % len(facts)]
             paras = _elaborate_fact_deterministic(fact, language, seed + i)
         else:
@@ -1276,7 +1366,17 @@ def _deterministic_complete(
 
     current = md
     wc = words
-    seed = 0
+    # Seed por capítulo (fix §17 #7): mismo book_id + mismo chapter_number +
+    # mismos hechos → mismo resultado, pero capítulos distintos ya no recorren
+    # el pool compartido de hechos desde el mismo punto (evita párrafos
+    # literales idénticos entre capítulos del mismo libro, caso book_37).
+    # Re-fix (regresión book_43): el offset +1 era insuficiente — con el
+    # incremento +1 por iteración los rangos de seed de capítulos distintos
+    # se solapaban casi por completo y, con pool de hechos pobre, el mismo
+    # seed_total producía párrafos verbatim idénticos. Factor 1000 garantiza
+    # rangos disjuntos (ABSOLUTE_HARD_LIMIT=8 continuaciones ⇒ decenas de
+    # seeds usados por capítulo como máximo, muy lejos del siguiente bloque).
+    seed = int(((validated.get("chapter_outline") or {}).get("number") or 1)) * 1000
     hard = 0
     attempted_no_progress: set[str] = set()
     while wc < minimum_words and hard < ABSOLUTE_HARD_LIMIT * 8:
@@ -1593,14 +1693,14 @@ def execute(payload: dict, capability: str = "write_chapter_es") -> dict:
                 repeated_continuation = True
                 rejected_continuations += 1
                 duplicate_rejections += 1
-            elif _status in ("rejected_duplicate", "rejected_full_chapter", "rejected_heading"):
+            elif _status in ("rejected_duplicate", "rejected_full_chapter", "rejected_heading", "rejected_refusal"):
                 rejected_continuations += 1
                 duplicate_rejections += 1
 
             # Decisiones de control (100% Python):
             # - una propuesta duplicada NO es finalización: se descarta solo
             #   esa propuesta y, si queda presupuesto, se vuelve a solicitar.
-            if _status in ("rejected_duplicate", "rejected_heading"):
+            if _status in ("rejected_duplicate", "rejected_heading", "rejected_refusal"):
                 continue
             # - repetición exacta, capítulo completo repetido, progreso nulo,
             #   error o ausencia de sección: terminación controlada de la fase.
@@ -1922,6 +2022,26 @@ def _continuation_step(
 
         new_text = new_text_raw
         added_words = len(new_text.split())
+
+        # Rechazo del LLM ("Lo siento, pero no puedo ayudar con eso.", etc.):
+        # la propuesta se descarta como los duplicados (NO finaliza el capítulo;
+        # si queda presupuesto, se reintenta). No es 'repeated' ni 'error'.
+        if _detect_refusal(new_text):
+            log(
+                logger,
+                logging.WARNING,
+                f"CHAPTER_WRITER continuation REJECTED_AS_REFUSAL attempt={attempt + 1} "
+                f"current_words={words} added_words={added_words}",
+            )
+            return {
+                "md": md, "words": words,
+                "input_tokens": input_tokens + cont_result.input_tokens,
+                "output_tokens": output_tokens + cont_result.output_tokens,
+                "status": "rejected_refusal", "added_words": added_words,
+                "duplicate_detected": False, "continuation_rejected": True,
+                "target_section": target_section, "proposal_norm": proposal_norm,
+            }
+
         condition_3 = _has_strong_text_overlap(md, new_text)
         condition_4 = bool(section_text) and _has_strong_text_overlap(new_text, section_text)
         strong_duplicate = condition_3 or condition_4

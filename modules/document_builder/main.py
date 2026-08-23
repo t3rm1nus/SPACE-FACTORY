@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -286,8 +287,44 @@ def _add_page_number(paragraph: Any) -> None:
     run._r.append(fld_char_end)
 
 
+def _add_hyperlink(paragraph: Any, text: str, url: str) -> None:
+    """Añade un hipervínculo REAL (<w:hyperlink>) a un párrafo.
+
+    Mismo patrón de manipulación XML de bajo nivel que _add_page_number:
+    relación externa en el part + elemento w:hyperlink con r:id. El run
+    interior lleva subrayado y el color azul estándar de hyperlink.
+    """
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+
+    r_id = paragraph.part.relate_to(
+        url, RT.HYPERLINK, is_external=True
+    )
+    hyperlink = OxmlElement("w:hyperlink")
+    hyperlink.set(qn("r:id"), r_id)
+
+    run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    color = OxmlElement("w:color")
+    color.set(qn("w:val"), "0563C1")
+    u = OxmlElement("w:u")
+    u.set(qn("w:val"), "single")
+    rPr.append(color)
+    rPr.append(u)
+    run.append(rPr)
+
+    t = OxmlElement("w:t")
+    t.set(qn("xml:space"), "preserve")
+    t.text = text
+    run.append(t)
+    hyperlink.append(run)
+    paragraph._p.append(hyperlink)
+
+
+_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
+
+
 def _add_formatted_text(paragraph: Any, text: str) -> None:
-    parts = re.split(r"(\*\*.*?\*\*|\*.*?\*)", text)
+    parts = re.split(r"(\*\*.*?\*\*|\*.*?\*|\[[^\]]+\]\([^)\s]+\))", text)
     for part in parts:
         if not part:
             continue
@@ -298,7 +335,12 @@ def _add_formatted_text(paragraph: Any, text: str) -> None:
             run = paragraph.add_run(part[1:-1])
             run.italic = True
         else:
-            paragraph.add_run(part)
+            # Enlaces markdown [texto](url) → hipervínculo real.
+            m = _LINK_RE.fullmatch(part.strip())
+            if m:
+                _add_hyperlink(paragraph, m.group(1), m.group(2))
+            else:
+                paragraph.add_run(part)
 
 
 def _iter_markdown_blocks(lines, *, skip_first_h1: bool = False):
@@ -378,6 +420,7 @@ def _split_sources_tail(lines) -> tuple[list[str], list[str]]:
     """
     body: list[str] = []
     tail: list[str] = []
+    seen: set[str] = set()
     in_sources = False
     for line in lines:
         stripped = line.rstrip()
@@ -388,6 +431,15 @@ def _split_sources_tail(lines) -> tuple[list[str], list[str]]:
         ):
             in_sources = True
         if in_sources:
+            # Mitigación defensiva (NO fix de causa raíz): deduplicar líneas
+            # de fuente exactas (mismo texto tras normalizar espacios),
+            # conservando la primera aparición y el orden. Las vacías se
+            # conservan tal cual (separadores visuales).
+            if stripped.strip():
+                key = " ".join(stripped.split())
+                if key in seen:
+                    continue
+                seen.add(key)
             tail.append(line)
         else:
             body.append(line)
@@ -449,10 +501,13 @@ def _add_body_with_images(doc: Document, body_lines, images, emit_image) -> None
             emit_image(images.pop(0))
 
 
-def _add_image_if_exists(doc: Document, image_path: str, caption: str, index: int) -> None:
+def _add_image_if_exists(
+    doc: Document, image_path: str, caption_ref: str, index: int
+) -> bool:
+    """Inserta la imagen con su caption; devuelve True si se insertó de verdad."""
     if not image_path or not os.path.isfile(image_path):
         logger.warning("Imagen no encontrada, se omite: %s", image_path)
-        return
+        return False
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -461,11 +516,13 @@ def _add_image_if_exists(doc: Document, image_path: str, caption: str, index: in
         run.add_picture(image_path, width=Inches(5.5))
     except Exception as exc:
         logger.warning("No se pudo insertar la imagen %s: %s", image_path, exc)
-        return
+        return False
 
-    if caption:
-        cap = doc.add_paragraph(caption, style="Caption")
+    if caption_ref is not None:
+        cap = doc.add_paragraph(f"Figura {index}{caption_ref}", style="Caption")
         cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    return True
 
 
 def _add_cover(doc: Document, book: Book) -> None:
@@ -478,7 +535,10 @@ def _add_cover(doc: Document, book: Book) -> None:
 
 
 def _add_legal(doc: Document, book: Book) -> None:
-    year = book.created_at.year if book.created_at else 2024
+    # Año del copyright: se prefiere el año de creación del libro (semántica
+    # editorial correcta: la obra se publica cuando se creó) y, si falta,
+    # el año actual real (antes había un 2024 hardcodeado).
+    year = book.created_at.year if book.created_at else datetime.now().year
     author = book.author
     title = book.title or "Sin título"
     # Si no hay autor, se omite la línea "Autor: X" (igual que _add_cover) y
@@ -530,9 +590,11 @@ def _add_chapter(doc: Document, chapter: Chapter, language: str) -> None:
 
     def _emit_image(img_path: str) -> None:
         nonlocal caption_number
-        caption_number += 1
-        caption = f"Figura {caption_number}{caption_ref}"
-        _add_image_if_exists(doc, img_path, caption, caption_number)
+        # El número SOLO se consume cuando la imagen se inserta de verdad
+        # (fix hueco: antes se incrementaba aunque el fichero no existiera,
+        # dejando huecos tipo "Figura 2" sin "Figura 1").
+        if _add_image_if_exists(doc, img_path, caption_ref, caption_number + 1):
+            caption_number += 1
 
     if content:
         body, sources_tail = _split_sources_tail(content.splitlines())
@@ -606,6 +668,10 @@ def build_book_docx(payload: dict[str, Any]) -> dict[str, Any]:
     doc.core_properties.comments = (book.description or "")[:255]
     doc.core_properties.language = language
 
+    # La PORTADA (primera página) no lleva header ni footer (estilo editorial
+    # estándar). La página LEGAL (página 2) SÍ hereda header/footer normales.
+    section.different_first_page_header_footer = True
+
     header = section.header
     header_para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
     header_para.text = book.title or ""
@@ -614,8 +680,9 @@ def build_book_docx(payload: dict[str, Any]) -> dict[str, Any]:
     footer = section.footer
     footer_para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
     footer_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    # Solo número de página: nunca exponer el nombre de archivo interno al lector
+    # (el título ya aparece en el header de cada página).
     _add_page_number(footer_para)
-    footer_para.add_run(f" | {filename}")
 
     chapters = sorted(book.chapters or [], key=lambda c: c.number)
 

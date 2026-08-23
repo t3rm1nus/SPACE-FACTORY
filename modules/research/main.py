@@ -470,7 +470,14 @@ def _has_anchor_keyword(topic: str, cand: dict[str, Any]) -> bool:
         str(cand.get("snippet") or "").lower() + " " +
         str(cand.get("content") or "").lower(),
     ))
-    return any(w in haystack_words for w in topic_keywords)
+    hits = sum(1 for w in topic_keywords if w in haystack_words)
+    if len(topic_keywords) == 1:
+        # Tema de una sola palabra: 1 coincidencia basta (comportamiento previo).
+        return hits >= 1
+    # Tema multi-palabra: exigir al menos 2 keywords ancladas para evitar
+    # falsos positivos por homónimos (caso real book_37: "Historia del Doom"
+    # anclaba el artículo Marvel "Doctor Doom" solo por la palabra "doom").
+    return hits >= 2
 
 
 def _content_length(cand: dict[str, Any]) -> int:

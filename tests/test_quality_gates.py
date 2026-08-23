@@ -19,7 +19,7 @@ def test_research_no_sources_required_true_fails(monkeypatch):
     """1. Research con 0 fuentes y research_required=true -> FAIL."""
     from modules import research as resmod
 
-    def fake_research(query, max_sources, timeout):
+    def fake_research(query, max_sources=8, timeout=20, language="es", topic=None):
         return {
             "query": query, "status": "FAIL", "execution_mode": "real",
             "sources": [], "stored_sources": [], "source_count": 0, "error": "sin red",
@@ -34,7 +34,7 @@ def test_research_with_sources_passes(monkeypatch):
     """2. Research con fuentes -> PASS."""
     from modules import research as resmod
 
-    def fake_research(query, max_sources, timeout):
+    def fake_research(query, max_sources=8, timeout=20, language="es", topic=None):
         return {
             "query": query, "status": "PASS", "execution_mode": "real",
             "sources": [{"url": "https://x"}], "stored_sources": [{"url": "s"}],
@@ -49,7 +49,7 @@ def test_research_not_required_zero_sources_passes(monkeypatch):
     """3. research_required=false y 0 fuentes -> PASS."""
     from modules import research as resmod
 
-    def fake_research(query, max_sources, timeout):
+    def fake_research(query, max_sources=8, timeout=20, language="es", topic=None):
         return {
             "query": query, "status": "FAIL", "execution_mode": "real",
             "sources": [], "stored_sources": [], "source_count": 0, "error": "sin red",

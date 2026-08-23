@@ -411,25 +411,29 @@ def _check_images(book: Book) -> list[QualityControlItem]:
     checks: list[QualityControlItem] = []
     chapters = sorted(book.chapters or [], key=lambda c: c.number)
 
+    # El total esperado por capítulo es el REAL del libro (books.image_count,
+    # propagado a Book.image_count con default 3). No un literal fijo.
+    expected = max(0, min(int(book.image_count or 3), 20))
+
     wrong_count = []
     has_images = False
     for ch in chapters:
         if len(ch.images) > 0:
             has_images = True
-        if has_images and len(ch.images) != 3:
+        if has_images and len(ch.images) != expected:
             wrong_count.append("cap {}: {}".format(ch.number, len(ch.images)))
     if wrong_count:
         checks.append(
             QualityControlItem(
                 status="FAIL",
-                message="Imágenes por capítulo != 3: {}".format(wrong_count),
+                message="Imágenes por capítulo != {}: {}".format(expected, wrong_count),
             )
         )
     elif has_images:
         checks.append(
             QualityControlItem(
                 status="PASS",
-                message="3 imágenes por capítulo",
+                message="{} imágenes por capítulo".format(expected),
             )
         )
     else:

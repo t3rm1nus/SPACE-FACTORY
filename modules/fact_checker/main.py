@@ -198,9 +198,17 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
 
     issues_raw = result_data.get("issues") or []
     normalized_issues: list[dict[str, Any]] = []
+    seen_claims: set[str] = set()
     for issue in issues_raw:
         if not isinstance(issue, dict):
             continue
+        # Dedupe por texto de claim normalizado (lowercase + strip + espacios
+        # colapsados): el LLM a veces repite la misma claim; se conserva la
+        # primera aparición (mismo patrón que _dedupe_by_path en autopilot).
+        claim_key = " ".join(str(issue.get("claim", "")).lower().split())
+        if claim_key in seen_claims:
+            continue
+        seen_claims.add(claim_key)
         normalized_issues.append({
             "claim": issue.get("claim", ""),
             "severity": issue.get("severity", "INFO"),

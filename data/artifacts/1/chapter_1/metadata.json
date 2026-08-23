@@ -1,28 +1,36 @@
 {
   "book_metadata": {
-    "book_id": 1,
-    "title": "T"
+    "title": "Libro",
+    "book_id": 1
   },
   "chapter_outline": {
     "number": 1,
-    "title": "C1",
-    "sections": []
+    "title": "Introducción",
+    "objective": "Presentar el tema",
+    "sections": [
+      {
+        "heading": "Antecedentes",
+        "objective": "Contexto histórico"
+      }
+    ]
   },
-  "research": "investigación real",
+  "research": "Datos verificados del tema.",
   "sources": [
     {
-      "url": "u1"
+      "url": "https://only-this.com"
     }
   ],
-  "previous_chapter_summaries": [],
-  "target_word_count": 3000,
-  "style_guide": null,
-  "provider": "none",
+  "previous_chapter_summaries": [
+    "Resumen previo."
+  ],
+  "target_word_count": 1500,
+  "style_guide": "formal",
+  "provider": "ollama",
   "model": "",
   "tokens_input": 0,
   "tokens_output": 0,
-  "word_count": 33,
-  "text": "# C1\n\n## Introducción\nEste capítulo desarrolla el tema propuesto en el outline.\n\n## Conclusión\nEl capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente.\n\n## Fuentes utilizadas\n- u1",
+  "word_count": 31,
+  "text": "# Introducción\n\n## Introducción\nPresentar el tema\n\n## Antecedentes\nContexto histórico\n## Conclusión\nEl capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente.\n\n## Fuentes utilizadas\n- https://only-this.com",
   "unexpected_sections": [
     "Introducción",
     "Conclusión"
@@ -32,8 +40,8 @@
   "structural_anomalies": [],
   "duplicate_detected": false,
   "continuation_rejected_as_duplicate": false,
-  "initial_word_count": 33,
-  "final_word_count": 33,
+  "initial_word_count": 31,
+  "final_word_count": 31,
   "minimum_words": 1500,
   "total_continuation_attempts": 0,
   "successful_continuations": 0,

@@ -606,9 +606,44 @@ def run_job(
                         from core.book.source_manager import SourceManager as _SM
                         real_chapters = _editorial.get_chapters(job["book_id"]) or []
                         chapter_ids = [int(c["id"]) for c in real_chapters if c.get("id")]
+                        # ---- Anti-reciclaje de fuentes ajenas al tema (2026-08-22):
+                        # una fuente YA persistida para OTRO libro solo se re-asocia
+                        # si sigue anclada al tema de ESTE libro (mismo criterio que
+                        # el filtro PASO 4 de research: _has_anchor_keyword con el
+                        # topic real del libro). Fuentes nuevas (primera inserción) o
+                        # ya pertenecientes SOLO a este libro no se re-validan.
+                        from modules.research.main import _has_anchor_keyword as _anchor
+                        _book = _editorial.load_book(job["book_id"]) or {}
+                        # load_book anida el libro bajo "book"; el data del job puede
+                        # traer topic explícito (mismo fallback que build_payload).
+                        _topic = (
+                            (job.get("data") or {}).get("topic")
+                            or (_book.get("book") or {}).get("title")
+                        )
                         for _source in (job["data"].get("sources") or []):
                             if not (_source or {}).get("url"):
                                 continue
+                            _existing = _SM.get_source_by_url(_source["url"])
+                            if _existing:
+                                _other_books = [
+                                    b for b in _SM.book_ids_for_source(_existing["id"])
+                                    if b != job["book_id"]
+                                ]
+                                if _other_books and _topic:
+                                    _cand = {
+                                        "title": _existing.get("title"),
+                                        "snippet": str(_existing.get("notes") or "").replace(
+                                            "content_snippet=", "", 1),
+                                        "content": "",
+                                    }
+                                    if not _anchor(_topic, _cand):
+                                        log(logger, logging.WARNING,
+                                            f"Fuente {_existing['id']} "
+                                            f"({_existing.get('title')!r}) NO asociada a "
+                                            f"book {job['book_id']}: sin anclaje temático "
+                                            f"(_has_anchor_keyword=False, libros previos "
+                                            f"{_other_books})")
+                                        continue
                             _SM.add_source(
                                 url=_source["url"],
                                 title=_source.get("title"),
@@ -631,6 +666,10 @@ def run_job(
                 break
             else:
                 phase["error"] = result.error
+                # Mismo patrón que la rama de éxito: aunque la fase falle por gate
+                # (quality_gate/fact_check/research), se conserva el resultado real
+                # (p.ej. overall_status) para trazabilidad. Desglose perdido: libro 32.
+                phase["metrics"] = result.metrics or {}
                 if attempts < max_attempts:
                     phase["status"] = PHASE_RETRY
                     job["updated_at"] = _now()
@@ -917,7 +956,12 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         merged: dict[str, Any] = {"results": []}
         task_ids: list[int] = []
         module_id = None
-        for capability, payload in tasks:
+
+        def _run_img_task(capability: str, payload: dict) -> None:
+            """Encola+ejecuta una task de imagen y fusiona sus ``results`` en
+            ``merged``. Reutilizado por image_gen_split (search+generate) y por
+            la ronda de compensación de déficit (evita duplicar el bloque)."""
+            nonlocal module_id
             task_id = _tq.enqueue_task(capability, payload, max_attempts=1)
             module = _pick_module(modules, cap_map, capability)
             task = _tq.get_task(task_id)
@@ -925,17 +969,79 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             task = _tq.get_task(task_id)
             task_ids.append(task_id)
             if task["status"] != "done":
-                return PhaseResult(
-                    ok=False,
-                    error=f"image_gen_split#{capability}: {task.get('error') or 'Sin detalle de error'}",
-                    task_id=task_id,
-                )
+                task_ids.pop()
+                raise _TaskFailed(capability, task.get("error") or "Sin detalle de error", task_id)
             try:
                 res = json.loads(task.get("result") or "{}") if task.get("result") else {}
             except (json.JSONDecodeError, TypeError):
                 res = {}
             merged["results"].extend(res.get("results") or [])
             module_id = task.get("module_id") or module_id
+
+        class _TaskFailed(Exception):
+            """Fallo real de ejecución de una task de imagen (no solo pocas ok)."""
+            def __init__(self, capability, error, task_id):
+                self.capability = capability
+                self.error = error
+                self.task_id = task_id
+
+        def _dedupe_by_path(results: list[dict]) -> list[dict]:
+            """Conserva la PRIMERA ocurrencia de cada ruta de imagen única.
+
+            Deduplica por el campo de ruta real (``image_path``) que producen
+            ``generate_chapter_images``/``search_chapter_images``. Una misma ruta
+            puede aparecer dos veces en ``merged['results']`` cuando la ronda de
+            compensación acaba reutilizando metadata ya existente en disco
+            (``skip_existing=True``) o por cualquier otra causa previa; aquí se
+            normaliza para que ``ok_count``/``shortfall`` no cuenten la misma
+            imagen dos veces y para que ``chapters.images`` no guarde duplicados.
+            """
+            seen: set[str] = set()
+            out: list[dict] = []
+            for r in results:
+                path = r.get("image_path")
+                key = path if isinstance(path, str) else id(r)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(r)
+            return out
+
+        try:
+            for capability, payload in tasks:
+                _run_img_task(capability, payload)
+
+            # ---- Dedup 1: normaliza las rutas fusionadas de search+generate
+            # ANTES de calcular ok_count/shortfall, para que una misma ruta ya
+            # repetida en el merge no cuente como 2 imágenes reales.
+            merged["results"] = _dedupe_by_path(merged["results"] or [])
+
+            # ---- Compensación de déficit (una sola ronda, SIN bucle ni recursión).
+            # Si search/generate no alcanzaron el total pedido (p.ej. una imagen
+            # web inválida/SVG se descartó y quedó status != "ok"), se genera
+            # localmente exactamente el shortfall. NO se reintenta tras compensar.
+            # El shortfall se calcula sobre la lista YA deduplicada.
+            ok_count = sum(1 for r in merged["results"] if r.get("status") == "ok")
+            shortfall = num_images - ok_count
+            if shortfall > 0:
+                comp_payload = dict(base)
+                comp_payload["num_images"] = shortfall
+                # Fuerza generación de material GENUINAMENTE nuevo: si se hereda
+                # skip_existing=True del payload base (regresión libro 36), la
+                # tarea de compensación reciclaría metadata ya existente y volver
+                # a añadir la MISMA ruta al merge.
+                comp_payload["skip_existing"] = False
+                _run_img_task("generate_chapter_images", comp_payload)
+                # ---- Dedup 2: vuelve a normalizar tras la compensación (si se
+                # disparó), por safety: la tarea de compensación podría haber
+                # devuelto una ruta ya presente en el merge.
+                merged["results"] = _dedupe_by_path(merged["results"] or [])
+        except _TaskFailed as ex:
+            return PhaseResult(
+                ok=False,
+                error=f"image_gen_split#{ex.capability}: {ex.error}",
+                task_id=ex.task_id,
+            )
 
         return PhaseResult(
             ok=True,

@@ -10,6 +10,7 @@ También cubren referencias bibliográficas legítimas como
 from __future__ import annotations
 
 import pytest
+from typing import Any
 
 from modules.chapter_writer.main import _detect_placeholder
 
@@ -134,3 +135,72 @@ def test_archivo_real_chapter_no_es_placeholder() -> None:
     if chapter_path.exists():
         text = chapter_path.read_text(encoding="utf-8")
         assert _detect_placeholder(text) is False
+
+
+# --- Detección de rechazos del LLM (REFUSAL_PATTERNS) -----------------------
+
+from modules.chapter_writer.main import REFUSAL_PATTERNS, _continuation_step, _detect_refusal
+
+
+FRASE_RECHAZO_REAL = "Lo siento, pero no puedo ayudar con eso."
+
+
+def test_detect_refusal_frase_real_produccion() -> None:
+    """La frase de rechazo real encontrada en producción se detecta."""
+    assert _detect_refusal(FRASE_RECHAZO_REAL) is True
+
+
+def test_detect_refusal_variantes_case_insensitive() -> None:
+    assert _detect_refusal("LO SIENTO, PERO NO PUEDO AYUDAR CON ESO.") is True
+    assert _detect_refusal("As an AI language model, I cannot assist with that request.") is True
+    assert _detect_refusal("No puedo continuar con esa solicitud.") is True
+
+
+def test_detect_refusal_contenido_valido_no_se_marca() -> None:
+    """Texto editorial normal no debe marcarse como rechazo."""
+    assert _detect_refusal("El protocolo TCP permitió la transmisión fiable de datos.") is False
+    assert _detect_refusal("") is False
+
+
+def test_continuation_step_rechaza_refusal() -> None:
+    """Una propuesta de continuación que es un rechazo del LLM se descarta
+    (mismo camino que rejected_duplicate): status 'rejected_refusal' y el
+    texto NO se inserta en el capítulo."""
+
+    class _FakeResult:
+        text = FRASE_RECHAZO_REAL
+        input_tokens = 10
+        output_tokens = 12
+
+    class _FakeProvider:
+        name = "fake"
+
+        def generate(self, *args: Any, **kwargs: Any) -> _FakeResult:
+            return _FakeResult()
+
+    validated = {
+        "book_metadata": {"title": "Libro", "language": "es"},
+        "chapter_outline": {
+            "number": 1,
+            "title": "Introducción",
+            "sections": [{"heading": "Antecedentes", "objective": "Contexto"}],
+        },
+        "target_word_count": 1500,
+    }
+    md = "# Libro\n\n## Antecedentes\n\nTexto existente suficiente para operar.\n"
+    step = _continuation_step(
+        md,
+        len(md.split()),
+        1500,
+        validated,
+        _FakeProvider(),
+        context=None,
+        input_tokens=0,
+        output_tokens=0,
+        max_tokens=512,
+        attempt=0,
+        previous_proposal_norm="",
+    )
+    assert step["status"] == "rejected_refusal"
+    assert step["md"] == md  # la frase de rechazo NO aparece en el capítulo
+    assert FRASE_RECHAZO_REAL not in step["md"]

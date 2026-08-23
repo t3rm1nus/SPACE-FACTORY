@@ -58,6 +58,42 @@ _ASPECT_TOKENS = [
 
 _VALID_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"}
 
+# Lista mínima conocida de dominios a bloquear (riesgo reputacional/legal: portadas
+# de editoriales reales, repositorios académicos/docentes y material con copyright).
+# Dominios en minúsculas sin protocolo; se compara por CONTENIDO (subdominios incluidos,
+# ej. "es.scribd.com" dispara "scribd.com"). No pretende ser exhaustiva: ampliable.
+_DOMAIN_DENYLIST = {
+    "scribd.com",
+    "scribdassets.com",
+    "slideshare.net",
+    "coursehero.com",
+    "studocu.com",
+    "academia.edu",
+    "issuu.com",
+    "docplayer.net",
+    "quizlet.com",
+    "mheducation.com",
+    "laleo.com",
+}
+
+
+def _is_denylisted(url: Optional[str]) -> bool:
+    """True si el dominio de ``url`` contiene algún dominio de ``_DOMAIN_DENYLIST``.
+
+    Tolerante a URL vacía/None (devuelve False, no levanta excepción). Elimina
+    el ``www.`` inicial y compara en minúsculas para cubrir subdominios
+    (``es.scribd.com`` dispara ``scribd.com``).
+    """
+    if not url:
+        return False
+    try:
+        netloc = urllib.parse.urlparse(url).netloc.lower()
+    except Exception:  # noqa: BLE001 - defensa en depth
+        return False
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+    return any(blocked in netloc for blocked in _DOMAIN_DENYLIST)
+
 
 # ---------------------------------------------------------------------------
 # Ruta de almacenamiento (MISMO patrón que modules/image_generator)
@@ -284,6 +320,26 @@ def search_chapter_images(payload: dict) -> dict:
         img_src = item.get("img_src") or item.get("thumbnail_src")
         if not img_src:
             continue
+
+        # §17 #5 — denylist de dominios: revisa AMBAS URLs (img_src + página fuente)
+        # antes de descargar. SearXNG expone la URL de la página fuente en el
+        # campo ``url`` del resultado (también presente como ``parsed_url`` en
+        # algunos proveedores/motores). Si CUALQUIERA de las dos es denylisted,
+        # se salta el resultado sin ocupar slot ni error-slot.
+        page_url = item.get("url") or item.get("parsed_url") or ""
+        blocked_domain = (
+            _is_denylisted(img_src) and "img_src"
+            or (_is_denylisted(page_url) and "page_url")
+            or None
+        )
+        if blocked_domain:
+            logger.warning(
+                "image_search: resultado bloqueado por denylist (vía %s): %s",
+                blocked_domain,
+                page_url or img_src,
+            )
+            continue
+
         image_id = f"img_{slot + 1:02d}_web"
         engine = _normalize_engine(item.get("engine"))
         ext = _image_extension(img_src)
@@ -292,6 +348,26 @@ def search_chapter_images(payload: dict) -> dict:
         if data_bytes is None:
             results.append(
                 _error_meta(image_id, query, images_dir, "download_failed", source_url=img_src)
+            )
+            failed += 1
+            slot += 1
+            continue
+
+        # Validar que los bytes descargados sean una imagen decodificable (PIL)
+        # ANTES de escribir el archivo ni marcarlo status="ok". Previene persistir
+        # HTML de error o contenido truncado como .png válido (bug real book_id=31:
+        # 5 archivos ~4KB/430B con status="ok" que PIL no podía abrir).
+        try:
+            import io
+
+            from PIL import Image
+
+            with Image.open(io.BytesIO(data_bytes)) as _im:
+                _im.verify()
+        except Exception as exc:  # noqa: BLE001 - contenido inválido: fallo de descarga
+            logger.warning("image_search: contenido de imagen inválido %s: %s", img_src, exc)
+            results.append(
+                _error_meta(image_id, query, images_dir, f"invalid image content: {exc}", source_url=img_src)
             )
             failed += 1
             slot += 1

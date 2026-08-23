@@ -303,3 +303,217 @@ def test_image_gen_ratio_positive_splits_into_two_tasks(store, tmp_path, monkeyp
     # Ambas fuentes están representadas (search y generate).
     assert any("search_" in os.path.basename(p) for p in stored)
     assert any("gen_" in os.path.basename(p) for p in stored)
+
+
+def test_image_gen_split_compensates_shortfall(store, tmp_path, monkeypatch):
+    """Fix 2026-08-22: si search_chapter_images pierde imágenes (status != 'ok',
+    p.ej. imagen web inválida/SVG descartada), _run_image_gen_split compensa el
+    déficit con una generación local extra (una sola ronda, sin bucle).
+
+    Setup: ratio=0.75, num_images=3 -> n_search=2 (devuelve 1 ok + 1 error) /
+    n_generate=1 (devuelve 1 ok) => ok_count=2 < 3 -> shortfall=1 -> tercera
+    llamada a generate_chapter_images devuelve 1 ok => 3 ok en total."""
+    monkeypatch.setenv("IMAGE_PROVIDER", "local")
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path / "images_root"))
+    monkeypatch.setenv("IMAGE_LOCAL_OUTPUT_DIR", str(tmp_path / "local_out"))
+
+    book_id = _make_book(1)
+    cid = _first_chapter_id(book_id)
+    persist_chapter_result(book_id, cid, "draft_es", _DRAFT_ES)
+
+    with get_db() as conn:
+        conn.execute("UPDATE books SET image_search_ratio = 0.75 WHERE id = ?", (book_id,))
+
+    img_dir = tmp_path / "imgs"
+    img_dir.mkdir(exist_ok=True)
+
+    call_counts = {"search": 0, "gen": 0}
+    generated_paths: list[str] = []
+
+    def _search(payload, capability=""):
+        call_counts["search"] += 1
+        results = []
+        # 1 ok
+        p = os.path.join(str(img_dir), f"search_ok_{call_counts['search']}.png")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("x")
+        results.append({"status": "ok", "image_path": p, "image_id": f"search_ok_{call_counts['search']}"})
+        # 1 error (simula imagen inválida/SVG descartada; sin archivo)
+        results.append({"status": "error", "error": "cannot identify image file", "image_path": "data/x.png"})
+        return {"results": results}
+
+    def _gen(payload, capability=""):
+        call_counts["gen"] += 1
+        if call_counts["gen"] == 1:
+            # 1ª llamada (n_generate=1): genera una imagen real y única.
+            n = int(payload.get("num_images") or 0)
+            results = []
+            for i in range(n):
+                p = os.path.join(str(img_dir), f"gen_{call_counts['gen']}_{i}.png")
+                with open(p, "w", encoding="utf-8") as f:
+                    f.write("x")
+                results.append({"status": "ok", "image_path": p, "image_id": f"gen_{call_counts['gen']}_{i}"})
+            generated_paths.extend(r["image_path"] for r in results)
+            return {"results": results}
+        # Llamada de compensación: reproduce el bug real (regresión libro 36):
+        # devuelve la MISMA ruta que la generación inicial (como haría generate_image
+        # con skip_existing=True reciclando metadata existente). El fix fuerza
+        # skip_existing=False en el payload y deduplica por image_path.
+        return {"results": [
+            {"status": "ok", "image_path": generated_paths[0], "image_id": "gen_1_0"}
+        ]}
+
+    modules = {
+        "image_search": {
+            "manifest": {"id": "image_search", "config": {"timeout_seconds": 30}},
+            "execute": _search,
+        },
+        "image_generator": {
+            "manifest": {"id": "image_generator", "config": {"timeout_seconds": 30}},
+            "execute": _gen,
+        },
+    }
+    cap_map = {
+        "search_chapter_images": ["image_search"],
+        "generate_chapter_images": ["image_generator"],
+    }
+
+    enqueued = []
+    enqueued_payloads = []
+    real_enqueue = task_queue.enqueue_task
+
+    def _capture(cap, payload, max_attempts=1):
+        enqueued.append(cap)
+        enqueued_payloads.append(dict(payload))
+        return real_enqueue(cap, payload, max_attempts=max_attempts)
+
+    monkeypatch.setattr(task_queue, "enqueue_task", _capture)
+
+    job = _job_ready_at_phase(store, book_id, "image_gen")
+    job["data"] = {"num_images": 3}
+    store.save(job)
+
+    executor = autopilot.default_executor_factory(modules, cap_map, store=store)
+    exec_result = executor([p for p in job["phases"] if p["id"] == "image_gen"][0], job)
+
+    # El executor de image_gen es per-chapter: metrics se agrega como subs/per_chapter.
+    assert exec_result.ok
+    # 3 tasks en total: search + generate + 1 de compensación (el déficit dispara
+    # una generación local extra).
+    assert enqueued == [
+        "search_chapter_images",
+        "generate_chapter_images",
+        "generate_chapter_images",
+    ], f"tasks encoladas: {enqueued}"
+
+    # 1) La tarea de compensación (la última generación) lleva skip_existing=False:
+    #    no recicla metadata ya existente.
+    comp_payload = enqueued_payloads[-1]
+    assert comp_payload["skip_existing"] is False, comp_payload
+    assert comp_payload["num_images"] == 1, comp_payload
+
+    # 2) Tras el dedup por image_path: la ruta que la compensación recicló NO queda
+    #    dos veces en chapters.images. Como la generación inicial aportó 1 ruta única
+    #    (gen_1_0) y la comp recicló esa misma ruta, quedan 2 imágenes ÚNICAS
+    #    (search_ok + gen_1_0), sin duplicados.
+    with get_db() as conn:
+        row = conn.execute("SELECT images FROM chapters WHERE id = ?", (cid,)).fetchone()
+    stored = json.loads(row["images"] or "[]")
+    assert len(stored) == len(set(stored)) == 2, f"imágenes persistidas: {stored}"
+    for p in stored:
+        assert os.path.isfile(p), f"imagen no existe en disco: {p}"
+def test_image_gen_split_dedupes_preexisting_duplicate_before_shortfall(store, tmp_path, monkeypatch):
+    """Regresión (dedup 1a): si la fase inicial search+generate YA trae una ruta
+    duplicada entre sí, el dedup por ``image_path`` lo limpia ANTES de calcular
+    ok_count/shortfall, para que la misma imagen cuente como UNA y la compensación
+    cubra el déficit real.
+
+    Setup: num_images=3, ratio=0.75 -> n_search=2 / n_generate=1.
+      - search devuelve 2 copias de la MISMA ruta A (duplicado entre sí).
+      - generate devuelve 1 ruta B nueva.
+      Sin dedup: ok_count=3 -> shortfall=0 (no compensaría a pesar de tener 2 únicas).
+      Con dedup: ok_count=2 -> shortfall=1 -> compensa (ruta C) => 3 imágenes únicas.
+    """
+    monkeypatch.setenv("IMAGE_PROVIDER", "local")
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path / "images_root"))
+    monkeypatch.setenv("IMAGE_LOCAL_OUTPUT_DIR", str(tmp_path / "local_out"))
+
+    book_id = _make_book(1)
+    cid = _first_chapter_id(book_id)
+    persist_chapter_result(book_id, cid, "draft_es", _DRAFT_ES)
+    with get_db() as conn:
+        conn.execute("UPDATE books SET image_search_ratio = 0.75 WHERE id = ?", (book_id,))
+
+    img_dir = tmp_path / "imgs"
+    img_dir.mkdir(exist_ok=True)
+
+    def _search(payload, capability=""):
+        # 2 resultados con la MISMA ruta (duplicado entre sí, pre-existente al merge).
+        p = os.path.join(str(img_dir), "dup_shared.png")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("x")
+        return {"results": [
+            {"status": "ok", "image_path": p, "image_id": "s0"},
+            {"status": "ok", "image_path": p, "image_id": "s1"},
+        ]}
+
+    call_counts = {"gen": 0}
+
+    def _gen(payload, capability=""):
+        call_counts["gen"] += 1
+        n = int(payload.get("num_images") or 0)
+        results = []
+        for i in range(n):
+            p = os.path.join(str(img_dir), f"gen_{call_counts['gen']}_{i}.png")
+            with open(p, "w", encoding="utf-8") as f:
+                f.write("x")
+            results.append({"status": "ok", "image_path": p, "image_id": f"g_{call_counts['gen']}_{i}"})
+        return {"results": results}
+
+    modules = {
+        "image_search": {
+            "manifest": {"id": "image_search", "config": {"timeout_seconds": 30}},
+            "execute": _search,
+        },
+        "image_generator": {
+            "manifest": {"id": "image_generator", "config": {"timeout_seconds": 30}},
+            "execute": _gen,
+        },
+    }
+    cap_map = {
+        "search_chapter_images": ["image_search"],
+        "generate_chapter_images": ["image_generator"],
+    }
+
+    enqueued = []
+    real_enqueue = task_queue.enqueue_task
+
+    def _capture(cap, payload, max_attempts=1):
+        enqueued.append(cap)
+        return real_enqueue(cap, payload, max_attempts=max_attempts)
+
+    monkeypatch.setattr(task_queue, "enqueue_task", _capture)
+
+    job = _job_ready_at_phase(store, book_id, "image_gen")
+    job["data"] = {"num_images": 3}
+    store.save(job)
+
+    executor = autopilot.default_executor_factory(modules, cap_map, store=store)
+    exec_result = executor([p for p in job["phases"] if p["id"] == "image_gen"][0], job)
+
+    assert exec_result.ok
+    # La compensación SÍ se dispara porque el duplicado cuenta como una sola imagen
+    # (search 2x A -> 1 única; generate 1x B => ok=2 -> shortfall=1).
+    assert enqueued == [
+        "search_chapter_images",
+        "generate_chapter_images",
+        "generate_chapter_images",
+    ], f"tasks encoladas: {enqueued}"
+
+    # shortfall trató A como 1 => se compensó 1 => 3 imágenes únicas, sin duplicados.
+    with get_db() as conn:
+        row = conn.execute("SELECT images FROM chapters WHERE id = ?", (cid,)).fetchone()
+    stored = json.loads(row["images"] or "[]")
+    assert len(stored) == len(set(stored)) == 3, f"imágenes persistidas: {stored}"
+    for p in stored:
+        assert os.path.isfile(p), f"imagen no existe en disco: {p}"

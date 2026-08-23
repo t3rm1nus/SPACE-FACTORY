@@ -63,6 +63,31 @@ def _detect_placeholder(text: str) -> bool:
     return False
 
 
+# Copia local de los patrones de rechazo del LLM (duplicada a propósito para no
+# crear dependencia cruzada editor -> chapter_writer; misma lista que
+# modules/chapter_writer/main.py::REFUSAL_PATTERNS).
+_REFUSAL_PATTERNS = [
+    r"no puedo ayudar",
+    r"lo siento, pero",
+    r"como modelo de lenguaje",
+    r"no puedo generar",
+    r"no puedo continuar con esa solicitud",
+    r"as an ai language model",
+    r"i cannot assist",
+    r"i'm sorry, but i can't",
+]
+
+
+def _detect_refusal(text: str) -> bool:
+    """True si ``text`` es un rechazo (refusal) del LLM."""
+    if not text or not text.strip():
+        return False
+    for pat in _REFUSAL_PATTERNS:
+        if re.search(pat, text, re.IGNORECASE):
+            return True
+    return False
+
+
 def _build_prompt(validated: dict, *, input_words: int | None = None, minimum_words: int | None = None, target_words: int | None = None) -> str:
     """Construye el prompt de edición editorial con control explícito de longitud."""
     if input_words is None:
@@ -297,9 +322,15 @@ def execute(payload: dict, capability: str = "edit_chapter") -> dict:
             if hasattr(result, "raw_response") and isinstance(result.raw_response, dict):
                 context = result.raw_response.get("context")
             result_data = _parse_llm_output(result.text)
-            if not result_data.get("edited_text"):
+            # Un rechazo del LLM ("Lo siento, pero no puedo ayudar con eso.")
+            # se trata igual que salida inválida: fallback determinista que
+            # conserva el capítulo original sin cambios.
+            if not result_data.get("edited_text") or _detect_refusal(
+                str(result_data.get("edited_text"))
+            ):
                 execution_mode = "fallback"
                 result_data = _fallback_edit(validated)
+                log(logger, logging.WARNING, "Salida del LLM detectada como inválida o rechazo (refusal); aplicado fallback.")
         except Exception as e:
             execution_mode = "fallback"
             result_data = _fallback_edit(validated)

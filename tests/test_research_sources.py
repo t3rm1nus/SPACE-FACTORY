@@ -336,6 +336,65 @@ def test_anchor_topic_none_integracion_mantiene_filtrado_previo(monkeypatch):
     assert out["quality_gate"] == "FAIL"
 
 
+def test_doctor_doom_marvel_no_anclaje_book37():
+    """Fix book_37: topic multi-palabra "Historia del Doom" NO debe anclarse al
+    artículo de Wikipedia "Doctor Doom" (supervillano Marvel), que solo comparte
+    la palabra "doom" pero no "historia". Snippet real extraído de la BD
+    (sources.id=624, book 37, chapter_ids=[167,168,169])."""
+    from modules.research.main import _has_anchor_keyword
+
+    doctor_doom_marvel = {
+        "url": "https://es.wikipedia.org/wiki/Doctor_Doom",
+        "title": "Doctor Doom",
+        "source_type": "web_wikipedia",
+        "snippet": "Doctor Doom o Doctor Muerte, alias del Dr. Víctor von Doom, es un supervillano",
+        "content": (
+            "Doctor Doom o Doctor Muerte, alias del Dr. Víctor von Doom, es un supervillano "
+            "que aparece en los cómics estadounidenses publicados por Marvel Comics. Creado "
+            "por Stan Lee y Jack Kirby, el personaje apareció por primera vez en The "
+            "Fantastic Four #5. En sus apariciones en cómics, Doctor Doom es representado "
+            "como el monarca de Latveria cuyo objetivo es traer orden a la humanidad a "
+            "través de la conquista mundial. Él sirve como el archienemigo de Reed Richards "
+            "y Los 4 Fantásticos, aunque también ha entrado en conflicto con los X-Men y "
+            "otros superhéroes del Universo Marvel. Aunque generalmente se lo retrata como "
+            "un villano, Doom también ha sido un antihéroe en ocasiones, trabajando con "
+            "héroes si sus objetivos están alineados y solo si eso lo beneficia."
+        ),
+    }
+    assert _has_anchor_keyword("Historia del Doom", doctor_doom_marvel) is False
+
+
+def test_historia_del_doom_si_ancla_articulo_videojuego_1993():
+    """No-regresión: topic "Historia del Doom" SÍ debe anclarse al artículo
+    legítimo "Doom (videojuego de 1993)" de Wikipedia (comparte "doom" y
+    "historia"/contexto del videojuego). Snippet real de la BD (sources.id=618)."""
+    from modules.research.main import _has_anchor_keyword
+
+    doom_1993 = {
+        "url": "https://es.wikipedia.org/wiki/Doom_(videojuego_de_1993)",
+        "title": "Doom (videojuego de 1993) - Wikipedia, la enciclopedia libre",
+        "source_type": "web_wikipedia",
+        "snippet": "Doom fue el tercer lanzamiento independiente importante de id Software",
+        "content": (
+            "Doom fue el tercer lanzamiento independiente importante de id Software, "
+            "después de Commander Keen (1990-1991) y Wolfenstein 3D (1992). En mayo de "
+            "1992, id comenzó a desarrollar un juego más oscuro centrado en luchar contra "
+            "demonios con tecnología, utilizando un nuevo motor de juego 3D del programador "
+            "principal, John Carmack. El diseñador Tom Hall inicialmente escribió una trama "
+            "de ciencia ficción, pero él y la mayor parte de la historia..."
+        ),
+    }
+    assert _has_anchor_keyword("Historia del Doom", doom_1993) is True
+
+
+def test_anchor_topic_una_sola_palabra_mantiene_comportamiento():
+    """No-regresión: topic de UNA sola keyword ("Doom") sigue anclando con 1 sola
+    coincidencia — el fix multi-palabra no debe endurecer temas monopalabra."""
+    from modules.research.main import _has_anchor_keyword
+
+    assert _has_anchor_keyword("Doom", {"title": "Doctor Doom", "content": "supervillano de Marvel"}) is True
+
+
 def test_anchor_topic_doom_descarta_edad_media_sin_mencionar_doom(monkeypatch):
     """(b) Con topic="Doom", una fuente de Edad Media histórica cuyas palabras
     de query (dark/ages) superan el overlap pero que NUNCA menciona 'doom' queda

@@ -268,3 +268,90 @@ def test_claims_checked_matches_issues_when_issues_present(
     assert out["claims_checked"] == 1
     assert len(out["issues"]) == 1
     assert out["issues"][0]["claim"] == "Cifra sin fuente"
+
+
+def test_execute_dedupes_repeated_claims(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El LLM a veces repite la misma claim en un único JSON de salida.
+
+    El dedupe por texto normalizado (lowercase + strip + espacios colapsados)
+    debe conservar solo la primera aparición y claims_checked debe reflejar
+    el número de claims ÚNICOS (ej. book_39 cap 173: 14 = 7 únicas × 2).
+    """
+    import modules.fact_checker.main as main
+
+    llm_json = json.dumps(
+        {
+            "status": "WARNING",
+            "claims_checked": 14,
+            "issues": [
+                {
+                    "claim": "Latveria es una nación ficticia de Marvel",
+                    "severity": "WARNING",
+                    "reason": "Sin fuente",
+                    "source_url": None,
+                    "suggestion": None,
+                },
+                {
+                    "claim": "  latveria   es una nación ficticia de Marvel  ",
+                    "severity": "ERROR",
+                    "reason": "Duplicado con distinto formato",
+                    "source_url": None,
+                    "suggestion": None,
+                },
+                {
+                    "claim": "Doom fue lanzado en 2016",
+                    "severity": "INFO",
+                    "reason": "Verificar fecha",
+                    "source_url": None,
+                    "suggestion": None,
+                },
+                {
+                    "claim": "DOOM fue lanzado en 2016.",
+                    "severity": "WARNING",
+                    "reason": "Duplicado (solo difiere punto final, se cuenta aparte)",
+                    "source_url": None,
+                    "suggestion": None,
+                },
+                {
+                    "claim": "Doom fue lanzado    en 2016",
+                    "severity": "ERROR",
+                    "reason": "Duplicado con espacios múltiples",
+                    "source_url": None,
+                    "suggestion": None,
+                },
+            ],
+            "corrections": [],
+            "unsupported_claims": [],
+            "supported_claims": 0,
+            "conflicting_claims": 0,
+        }
+    )
+
+    class FakeResult:
+        text = llm_json
+        provider = "ollama"
+        model = "llama3.1"
+        input_tokens = 10
+        output_tokens = 20
+        cost = 0.0
+        raw_response = {"model": "llama3.1", "response": llm_json}
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def generate(self, *args: Any, **kwargs: Any) -> FakeResult:
+            return FakeResult()
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    out = execute(_payload())
+    # 5 issues crudos -> 3 claims únicos tras normalizar (2 duplicados fuera)
+    assert out["claims_checked"] == 3
+    assert len(out["issues"]) == 3
+    claims = [i["claim"] for i in out["issues"]]
+    assert len({c.lower() for c in claims}) == len(claims)
+    # Se conserva la PRIMERA aparición de cada claim único
+    assert claims[0] == "Latveria es una nación ficticia de Marvel"
+    assert claims[1] == "Doom fue lanzado en 2016"

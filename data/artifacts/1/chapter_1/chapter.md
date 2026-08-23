@@ -1,10 +1,12 @@
-# C1
+# Introducción
 
 ## Introducción
-Este capítulo desarrolla el tema propuesto en el outline.
+Presentar el tema
 
+## Antecedentes
+Contexto histórico
 ## Conclusión
 El capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente.
 
 ## Fuentes utilizadas
-- u1
+- https://only-this.com

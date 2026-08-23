@@ -197,3 +197,108 @@ def test_fallback_query_desde_texto_cuando_no_hay_titulo(monkeypatch):
     assert "mundo" in captured["params"]["q"]
     assert captured["params"]["categories"] == "images"
     assert captured["params"]["format"] == "json"
+
+
+def test_download_invalid_image_content_marks_error(tmp_path, monkeypatch):
+    """Contenido descargado no-imagen (ej. HTML de error) -> status=error, sin escribir .png.
+
+    Regresión del bug real book_id=31: 5 archivos ~4KB/430B persistidos con
+    status="ok" que PIL no podía abrir (probablemente HTML de error o contenido
+    truncado). El fix valida los bytes descargados con PIL ANTES de escribir el
+    archivo ni de marcar status="ok".
+    """
+    results = _search_results(1)
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        # Descarga devuelve contenido NO-imagen (HTML de error), no una imagen válida.
+        return _FakeResp(content=b"<html>error</html>")
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+    out = image_search.search_chapter_images(_payload(num_images=1))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # (a) status=error (no "ok")
+    assert validated.requested == 1
+    assert validated.generated == 0
+    assert validated.failed == 1
+    assert validated.skipped == 0
+    assert validated.results[0].status == "error"
+    assert "invalid image content" in (validated.results[0].error or "")
+
+    # (b) NO se escribe ningún archivo .png en el directorio de destino.
+    assert os.listdir(validated.images_dir) == []
+
+
+    # (c) la función no lanza excepción — al retornar (y validar shape) queda confirmado.
+
+
+def test_denylist_bloquea_dominio_y_no_ocupa_slot(tmp_path, monkeypatch):
+    """§17 #5 — denylist de dominios: un resultado con img_src en scribd.com
+    (editorial/repositorio con copyright) se descarta SIN ser descargado ni
+    ocupar slot; un resultado legítimo se procesa normalmente.
+
+    - requested == generated + failed (consistencia de conteos).
+    - solo la imagen legítima aparece en results.
+    - _download_image NUNCA se llama con la URL denylisted.
+    """
+    # Item 1: página fuente denylisted vía `url`; item 2: legítimo.
+    results = [
+        {
+            "url": "https://www.scribd.com/document/12345/portada-libro",
+            "title": "Portada editorial sospechosa",
+            "img_src": "https://cdn.scribd.com/img/12345.png",
+            "engine": "bing images",
+            "resolution": "1024x768",
+        },
+        {
+            "url": "https://example.com/page/ilustracion",
+            "title": "Imagen ilustración capítulo",
+            "img_src": "https://cdn.example.com/img2.png",
+            "engine": "google images",
+            "resolution": "64x64",
+        },
+    ]
+
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=2))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # Consistencia de conteos: el denylisted NO ocupa slot.
+    assert validated.requested == 2
+    assert validated.generated == 1
+    assert validated.failed == 1
+    assert validated.skipped == 0
+
+    # Solo la imagen legítima está en results: el resultado denylisted se
+    # descarta sin ocupar slot, por lo que el único "ok" es la imagen legítima
+    # (slot 1) y el slot 2 (sin más resultados) queda en error "no_results".
+    assert len(validated.results) == 2
+    assert validated.results[0].status == "ok"
+    assert validated.results[1].status == "error"  # slot 2 sin más resultados útiles
+    assert validated.results[1].error == "no_results"
+    ok_results = [r for r in validated.results if r.status == "ok"]
+    assert len(ok_results) == 1
+    assert ok_results[0].image_path.endswith("img_01_web.png")
+    # source_url es un campo "extra" (ImageMetadata lo ignora al validar); se
+    # verifica sobre el dict raw que sí lo conserva.
+    raw_ok = [r for r in out["results"] if r.get("status") == "ok"][0]
+    assert raw_ok["source_url"] == "https://cdn.example.com/img2.png"
+    # El resultado denylisted no aparece en results en absoluto (ni como ok ni como error).
+    assert not any("scribd.com" in (r.get("source_url") or "") for r in out["results"])
+
+    # La URL denylisted (img_src ni página fuente) nunca fue descargada.
+    assert "https://cdn.scribd.com/img/12345.png" not in downloaded
+    assert "https://www.scribd.com/document/12345/portada-libro" not in downloaded
+    # La única descarga es la imagen legítima.
+    assert downloaded == ["https://cdn.example.com/img2.png"]
