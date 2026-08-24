@@ -68,6 +68,31 @@ def test_fallback_plan_shape() -> None:
     assert plan["chapters"][0]["number"] == 1
 
 
+def test_fallback_plan_titles_short_no_prefix_long_idea() -> None:
+    """Caso real book_55: idea de ~200 chars NO debe acabar baked-in en el título
+    del capítulo, ni traer prefijo 'Capítulo N:' (lo añade document_builder)."""
+    long_idea = (
+        "Protocolo de 30 días para recuperar tu enfoque en la era digital. "
+        "Basado en neurociencia, sin postureo. Aprende a entrenar tu atención, "
+        "domar la fatiga mental y usar el aburrimiento como herramienta creativa"
+    )
+    assert len(long_idea) >= 150  # sanity: idea larga, como el caso real
+    payload = _payload()
+    payload["idea"] = long_idea
+    plan = _fallback_plan(BookPlanPayload(**payload))
+    for ch in plan["chapters"]:
+        title = ch["title"]
+        # No contiene la idea completa (ni siquiera su primera frase entera)
+        assert long_idea not in title
+        # Título corto acotado (8 palabras + " - Parte N")
+        assert len(title) <= 100
+        # Sin prefijo "Capítulo N:" baked-in
+        assert not title.lower().startswith("capítulo ")
+    # Los títulos varían entre capítulos (" - Parte {i}")
+    titles = {ch["title"] for ch in plan["chapters"]}
+    assert len(titles) == len(plan["chapters"])
+
+
 def test_execute_fallback_when_llm_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     """Si el LLM falla, execute debe devolver un plan fallback válido."""
     import modules.book_planner.main as main

@@ -27,6 +27,63 @@ DEFAULT_MARGINS_MM = {
     "left": 25.4,
     "right": 25.4,
 }
+
+# ---------------------------------------------------------------------------
+# Tabla de strings de interfaz del DOCX (FASE 1 — multi-idioma)
+#
+# Todas las cadenas de texto visible en el documento (portada, legal, TOC,
+# introducción, labels, captions, fuentes) se parametizan por idioma a través
+# de este diccionario. El fallback es "es" (comportamiento histórico); un
+# idioma desconocido nunca causa error — se usa el español como seguro.
+#
+# Los valores con placeholders ({year}, {author}, {title}, {n}, {index}) se
+# formatean en el sitio con str.format() usando el idioma activo.
+# ---------------------------------------------------------------------------
+_UI_STRINGS = {
+    "es": {
+        "untitled": "Sin título",
+        "title_label": "Título: {title}",
+        "author_label": "Autor: {author}",
+        "copyright_template": "© {year} {holder}. Todos los derechos reservados.",
+        "reproduction_notice": (
+            "Queda prohibida la reproducción total o parcial de esta obra, "
+            "por cualquier medio o procedimiento, sin permiso expreso del autor."
+        ),
+        "toc_title": "Índice",
+        "chapter_label": "Capítulo",
+        "chapter_prefix": "Capítulo {n}: {title}",
+        "chapter_fallback": "Capítulo {n}",
+        "introduction_title": "Introducción",
+        "no_content": "(Sin contenido disponible para este capítulo)",
+        "sources_heading": "Fuentes utilizadas",
+        "figure_prefix": "Figura {index}{ref}",
+        "sources_attribution": "(fuente: {url})",
+    },
+    "en": {
+        "untitled": "Untitled",
+        "title_label": "Title: {title}",
+        "title_label_no_colon": "Title",
+        "author_label": "Author: {author}",
+        "copyright_template": "© {year} {holder}. All rights reserved.",
+        "reproduction_notice": (
+            "Reproduction of this work in any form or by any means, "
+            "without the express permission of the copyright holder, is prohibited."
+        ),
+        "toc_title": "Table of Contents",
+        "chapter_label": "Chapter",
+        "chapter_prefix": "Chapter {n}: {title}",
+        "chapter_fallback": "Chapter {n}",
+        "introduction_title": "Introduction",
+        "no_content": "(No content available for this chapter)",
+        "sources_heading": "Sources Used",
+        "figure_prefix": "Figure {index}{ref}",
+    },
+}
+
+
+def _ui(lang: str) -> dict:
+    """Devuelve los strings de UI para el idioma solicitado, con fallback seguro a 'es'."""
+    return _UI_STRINGS.get(lang, _UI_STRINGS["es"])
 PAGE_SIZES_MM = {
     "A4": (210.0, 297.0),
     "LETTER": (215.9, 279.4),
@@ -412,11 +469,13 @@ def _parse_markdown_to_paragraphs(doc: Document, text: str, *, skip_first_h1: bo
 
 
 def _split_sources_tail(lines) -> tuple[list[str], list[str]]:
-    """Divide las líneas del capítulo en cuerpo y cola de '## Fuentes utilizadas' .
+    """Divide las líneas del capítulo en cuerpo y cola de fuentes generada por el LLM.
 
-    El cuerpo se usa para intercalar imágenes; la cola (encabezado + referencias)
-    sigue yendo al final del capítulo, tras el texto y las imágenes intercaladas.
-    Devuelve (body, tail).
+    Detecta headings H2 tipo '## Fuentes utilizadas', '## Referencias' o
+    '## Bibliografía'. La cola se DESCARTA (fix #9/#13/#14): la sección de
+    fuentes del DOCX se construye de forma determinista desde chapter.sources
+    (fuentes reales del payload), nunca desde texto fabricado por el LLM.
+    Devuelve (body, tail); tail se conserva por compatibilidad de firma.
     """
     body: list[str] = []
     tail: list[str] = []
@@ -424,10 +483,20 @@ def _split_sources_tail(lines) -> tuple[list[str], list[str]]:
     in_sources = False
     for line in lines:
         stripped = line.rstrip()
+        lowered = stripped.lower()
         if (
             not in_sources
             and stripped.startswith("## ")
-            and "fuentes utilizadas" in stripped.lower()
+            and (
+                "fuentes utilizadas" in lowered
+                or "referencias" in lowered
+                or "bibliograf" in lowered
+                or lowered.strip("# ").strip() == "fuentes"
+                or "sources used" in lowered
+                or "sources" in lowered
+                or "references" in lowered
+                or "bibliography" in lowered
+            )
         ):
             in_sources = True
         if in_sources:
@@ -501,32 +570,78 @@ def _add_body_with_images(doc: Document, body_lines, images, emit_image) -> None
             emit_image(images.pop(0))
 
 
+def _prepare_image_source(image_path: str):
+    """Prepara la fuente para ``doc.add_picture``.
+
+    python-docx no soporta ``.webp`` nativamente (lanza excepción). Si el archivo
+    es webp, se convierte a PNG en memoria con Pillow y se devuelve un
+    ``BytesIO``; en cualquier otro caso se devuelve la ruta tal cual. Devuelve
+    ``None`` si la ruta no existe o si la conversión webp falla (el caller
+    mantiene el comportamiento de skip con warning, sin romper la fase).
+    """
+    if not image_path or not os.path.isfile(image_path):
+        return None
+    ext = os.path.splitext(image_path)[1].lower() if image_path else ""
+    if ext != ".webp":
+        return image_path
+    try:
+        import io
+
+        from PIL import Image as PILImage
+
+        img = PILImage.open(image_path)
+        buf = io.BytesIO()
+        # PNG no soporta modos con paleta/alpha tal cual en todos los casos; se
+        # normaliza a RGBA/RGB según transparencia para conservar calidad.
+        if img.mode in ("RGBA", "LA") or "transparency" in img.info:
+            img = img.convert("RGBA")
+        else:
+            img = img.convert("RGB")
+        img.save(buf, format="PNG")
+        buf.seek(0)
+        return buf
+    except Exception as exc:  # noqa: BLE001 - conversión fallida: skip con warning
+        logger.warning("No se pudo convertir la imagen webp a PNG %s: %s", image_path, exc)
+        return None
+
+
 def _add_image_if_exists(
-    doc: Document, image_path: str, caption_ref: str, index: int
+    doc: Document, image_path: str, caption_ref: str, index: int,
+    language: str = "es",
 ) -> bool:
     """Inserta la imagen con su caption; devuelve True si se insertó de verdad."""
     if not image_path or not os.path.isfile(image_path):
         logger.warning("Imagen no encontrada, se omite: %s", image_path)
         return False
 
+    image_source = _prepare_image_source(image_path)
+    if image_source is None:
+        logger.warning("Imagen no insertable (webp sin conversión), se omite: %s", image_path)
+        return False
+
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = p.add_run()
     try:
-        run.add_picture(image_path, width=Inches(5.5))
+        run.add_picture(image_source, width=Inches(5.5))
     except Exception as exc:
         logger.warning("No se pudo insertar la imagen %s: %s", image_path, exc)
         return False
 
     if caption_ref is not None:
-        cap = doc.add_paragraph(f"Figura {index}{caption_ref}", style="Caption")
+        ui = _ui(language)
+        cap = doc.add_paragraph(
+            ui["figure_prefix"].format(index=index, ref=caption_ref),
+            style="Caption",
+        )
         cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     return True
 
 
-def _add_cover(doc: Document, book: Book) -> None:
-    doc.add_paragraph(book.title or "Sin título", style="Cover Title")
+def _add_cover(doc: Document, book: Book, language: str = "es") -> None:
+    ui = _ui(language)
+    doc.add_paragraph(book.title or ui["untitled"], style="Cover Title")
     if book.subtitle:
         doc.add_paragraph(book.subtitle, style="Cover Subtitle")
     if book.author:
@@ -534,53 +649,66 @@ def _add_cover(doc: Document, book: Book) -> None:
     doc.add_page_break()
 
 
-def _add_legal(doc: Document, book: Book) -> None:
+def _add_legal(doc: Document, book: Book, language: str = "es") -> None:
     # Año del copyright: se prefiere el año de creación del libro (semántica
     # editorial correcta: la obra se publica cuando se creó) y, si falta,
     # el año actual real (antes había un 2024 hardcodeado).
+    ui = _ui(language)
     year = book.created_at.year if book.created_at else datetime.now().year
     author = book.author
-    title = book.title or "Sin título"
-    # Si no hay autor, se omite la línea "Autor: X" (igual que _add_cover) y
+    title = book.title or ui["untitled"]
+    # Si no hay autor, se omite la línea de autor (igual que _add_cover) y
     # el copyright usa el título del libro en vez del autor.
-    legal_lines = [f"Título: {title}"]
+    legal_lines = [ui["title_label"].format(title=title)]
     if author:
-        legal_lines.append(f"Autor: {author}")
+        legal_lines.append(ui["author_label"].format(author=author))
     copyright_holder = author or title
     legal_text = (
         "\n".join(legal_lines)
-        + f"\n© {year} {copyright_holder}. Todos los derechos reservados.\n"
-        "Queda prohibida la reproducción total o parcial de esta obra, "
-        "por cualquier medio o procedimiento, sin permiso expreso del autor."
+        + f"\n{ui['copyright_template'].format(year=year, holder=copyright_holder)}\n"
+        f"{ui['reproduction_notice']}"
     )
     p = doc.add_paragraph(legal_text, style="Legal Text")
     p.alignment = WD_ALIGN_PARAGRAPH.LEFT
     doc.add_page_break()
 
 
-def _add_toc(doc: Document, chapters: list[Chapter]) -> None:
-    doc.add_paragraph("Índice", style="TOC Title")
+def _add_toc(doc: Document, chapters: list[Chapter], language: str = "es") -> None:
+    ui = _ui(language)
+    doc.add_paragraph(ui["toc_title"], style="TOC Title")
+    # Fix defensivo: si el título ya trae prefijo "Capítulo N" / "Chapter N"
+    # con o sin ":" (p.ej. baked-in por un plan antiguo, o plano "Chapter N"),
+    # NO volver a prefijar para evitar duplicación.
+    label = re.escape(ui["chapter_label"])
+    chapter_prefix_re = re.compile(rf"(?i)^{label}\s+\d+\b")
     for ch in chapters:
-        title = ch.title or f"Capítulo {ch.number}"
-        entry = doc.add_paragraph(f"Capítulo {ch.number}: {title}", style="TOC Entry")
+        fallback_title = ui["chapter_fallback"].format(n=ch.number)
+        title = ch.title or fallback_title
+        if chapter_prefix_re.match(title):
+            entry_text = title
+        else:
+            entry_text = ui["chapter_prefix"].format(n=ch.number, title=title)
+        entry = doc.add_paragraph(entry_text, style="TOC Entry")
         entry.paragraph_format.tab_stops.add_tab_stop(
             Inches(6.0), alignment=WD_ALIGN_PARAGRAPH.RIGHT
         )
-        dots = "." * max(1, 80 - len(f"Capítulo {ch.number}: {title}"))
+        dots = "." * max(1, 80 - len(entry_text))
         entry.add_run(f" {dots}")
     doc.add_page_break()
 
 
-def _add_introduction(doc: Document, book: Book) -> None:
+def _add_introduction(doc: Document, book: Book, language: str = "es") -> None:
+    ui = _ui(language)
     if book.description:
-        doc.add_paragraph("Introducción", style="Intro Title")
+        doc.add_paragraph(ui["introduction_title"], style="Intro Title")
         _parse_markdown_to_paragraphs(doc, book.description)
         # Sin page break aquí: _add_chapter lo añade al empezar
 
 
 def _add_chapter(doc: Document, chapter: Chapter, language: str) -> None:
     doc.add_page_break()
-    title = chapter.title or f"Capítulo {chapter.number}"
+    ui = _ui(language)
+    title = chapter.title or ui["chapter_fallback"].format(n=chapter.number)
     doc.add_paragraph(title, style="Heading 1")
 
     content = getattr(chapter, f"edited_{language}") or getattr(chapter, f"draft_{language}")
@@ -593,18 +721,31 @@ def _add_chapter(doc: Document, chapter: Chapter, language: str) -> None:
         # El número SOLO se consume cuando la imagen se inserta de verdad
         # (fix hueco: antes se incrementaba aunque el fichero no existiera,
         # dejando huecos tipo "Figura 2" sin "Figura 1").
-        if _add_image_if_exists(doc, img_path, caption_ref, caption_number + 1):
+        if _add_image_if_exists(doc, img_path, caption_ref, caption_number + 1, language):
             caption_number += 1
 
     if content:
-        body, sources_tail = _split_sources_tail(content.splitlines())
+        body, _sources_tail_discarded = _split_sources_tail(content.splitlines())
+        # Fix #9/#13/#14: la cola de fuentes generada por el LLM (posible
+        # duplicada, truncada o fabricada) se DESCARTA. La sección de fuentes
+        # del DOCX se reconstruye de forma determinista desde chapter.sources
+        # (URLs reales pobladas por _chapter_source_urls/SourceManager).
         _add_body_with_images(doc, body, images, _emit_image)
-        if sources_tail:
-            _parse_markdown_to_paragraphs(doc, "\n".join(sources_tail), skip_first_h1=False)
     else:
         doc.add_paragraph(
-            "(Sin contenido disponible para este capítulo)", style="Normal"
+            ui["no_content"], style="Normal"
         )
+
+    real_sources = [str(u).strip() for u in (chapter.sources or []) if str(u).strip()]
+    if real_sources:
+        doc.add_paragraph(ui["sources_heading"], style="Heading 2")
+        for url in real_sources:
+            src_para = doc.add_paragraph(style="List Bullet")
+            try:
+                _add_hyperlink(src_para, url, url)
+            except Exception:
+                # Nunca romper el DOCX por una URL malformada: texto plano.
+                src_para.add_run(url)
 
     # Imágenes que quedaron sin intercalar (capítulo muy corto / huecos insuficientes):
     # se conserva el comportamiento actual, todas al final.
@@ -686,10 +827,10 @@ def build_book_docx(payload: dict[str, Any]) -> dict[str, Any]:
 
     chapters = sorted(book.chapters or [], key=lambda c: c.number)
 
-    _add_cover(doc, book)
-    _add_legal(doc, book)
-    _add_toc(doc, chapters)
-    _add_introduction(doc, book)
+    _add_cover(doc, book, language)
+    _add_legal(doc, book, language)
+    _add_toc(doc, chapters, language)
+    _add_introduction(doc, book, language)
     for ch in chapters:
         _add_chapter(doc, ch, language)
 

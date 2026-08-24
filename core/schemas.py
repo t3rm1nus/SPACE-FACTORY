@@ -406,6 +406,7 @@ class ImageSearchPayload(TaskPayload):
     chapter_title: Optional[str] = Field(default=None)
     chapter_text: Optional[str] = Field(default=None)
     num_images: Optional[int] = Field(default=None, ge=0, le=20)
+    topic: Optional[str] = Field(default=None, max_length=2000)
 
 
 class ImageGenerateOutput(BaseModel):

@@ -295,6 +295,7 @@ def search_chapter_images(payload: dict) -> dict:
     language = str(data.get("language") or "es")[:10]
     chapter_title = data.get("chapter_title")
     chapter_text = data.get("chapter_text") or ""
+    topic = data.get("topic")
 
     _num = data.get("num_images")
     num_images = int(_num) if _num is not None else 3
@@ -320,6 +321,30 @@ def search_chapter_images(payload: dict) -> dict:
         img_src = item.get("img_src") or item.get("thumbnail_src")
         if not img_src:
             continue
+
+        # §17 #11 — filtro de relevancia temática: si se pasa ``topic`` del libro
+        # (mismo criterio que research, reutilizando _has_anchor_keyword SIN
+        # modificar research), el resultado se descarta ANTES de descargar si no
+        # se ancla al tema. topic None/vacío => no bloquea nada (compatibilidad
+        # total con libros ya generados sin topic).
+        if topic:
+            try:
+                from modules.research.main import _has_anchor_keyword as _anchor_topic
+            except Exception:  # noqa: BLE001 - defensa: sin research no se filtra
+                _anchor_topic = None
+            if _anchor_topic is not None:
+                page_fetch_url = item.get("url") or item.get("parsed_url") or ""
+                _cand = {
+                    "title": item.get("title") or "",
+                    "snippet": page_fetch_url,
+                    "content": img_src,
+                }
+                if not _anchor_topic(str(topic), _cand):
+                    logger.warning(
+                        "image_search: resultado descartado por no anclarse al tema (%s): %s",
+                        topic, page_fetch_url or img_src,
+                    )
+                    continue
 
         # §17 #5 — denylist de dominios: revisa AMBAS URLs (img_src + página fuente)
         # antes de descargar. SearXNG expone la URL de la página fuente en el

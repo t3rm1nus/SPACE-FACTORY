@@ -65,6 +65,10 @@ def _image_has_metadata(image_path: str) -> bool:
         path.parent / "metadata.json",
         path.parent.parent / "metadata.json",
     ]
+    # Convención real de persistencia de image_generator E image_search (mismo
+    # patrón en ambos): <images_dir>/<image_id>.metadata.json, junto a la propia
+    # imagen (p.ej. img_01_web.metadata.json). El glob cubre cualquier image_id.
+    candidates += list(path.parent.glob("*.metadata.json"))
     for candidate in candidates:
         if candidate.is_file():
             try:

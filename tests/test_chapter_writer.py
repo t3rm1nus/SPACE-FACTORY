@@ -279,8 +279,31 @@ def test_build_prompt_en_editorial_rules() -> None:
     assert "Include a '## Sources used' section at the end, listing only valid provided URLs" in prompt
 
 
-def test_fallback_chapter_shape_en() -> None:
-    result = _fallback_chapter(_payload_en(), language="en")
+def test_build_prompt_no_longer_instructs_to_add_sources_section() -> None:
+    """Fix #17 (document_builder sources): el prompt YA NO debe ordenar crear
+    '## Fuentes utilizadas' / '## Sources used', y SÍ debe indicar que el sistema
+    añade esa sección automáticamente (instrucción única, no contradictoria)."""
+    es = _build_prompt(_payload(), language="es")
+    en = _build_prompt(_payload(), language="en")
+
+    # NO ordena generar la sección de fuentes (ni ES ni EN).
+    assert "## Fuentes utilizadas" not in es
+    assert "## Sources used" not in en
+    assert "Incluye al final una sección" not in es
+    assert "Include a '## Sources used' section" not in en
+
+    # SÍ contiene la nueva instrucción: no incluir la sección; el sistema la añade.
+    assert "No incluyas ninguna sección de fuentes, referencias ni bibliografía" in es
+    assert "el sistema las añade automáticamente" in es
+    assert "Do not include any sources, references, or bibliography section" in en
+    assert "the system adds them automatically" in en
+
+    # La regla de no inventar información/citas/fuentes se mantiene intacta.
+    assert "No inventes información, estadísticas, citas ni fuentes" in es
+    assert "Do not invent information, statistics, quotes, sources, or people" in en
+
+
+
     assert result["word_count"] == 1500
     assert "Introduction" in result["chapter_md"]
     assert "Conclusion" in result["chapter_md"]

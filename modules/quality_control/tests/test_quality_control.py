@@ -193,3 +193,24 @@ def test_final_quality_control_warning_missing_image_metadata(tmp_path: Path):
     assert result["overall_status"] == "WARNING"
     assert any("sin metadata" in c["message"] for c in result["image_checks"])
 
+
+def test_image_metadata_in_image_id_metadata_json_is_recognized(tmp_path: Path):
+    """§17 #12 — la metadata en convención real ({image_id}.metadata.json, como
+    persisten image_generator e image_search) NO debe disparar el falso warning
+    'Imágenes sin metadata' (antes solo se buscaba 'metadata.json' simple)."""
+    from modules.quality_control.main import _check_images, _image_has_metadata
+
+    # Convención real: <img_id>.metadata.json junto a la imagen.
+    img_path = tmp_path / "img_01_web.png"
+    PILImage.new("RGB", (64, 64), color="red").save(img_path)
+    (tmp_path / "img_01_web.metadata.json").write_text('{"provider": "searxng", "status": "ok"}', encoding="utf-8")
+
+    assert _image_has_metadata(str(img_path)) is True
+
+    book = _make_book(tmp_path, chapter_count=1)
+    book["chapters"][0]["images"] = [str(img_path)] * 3
+    checks = _check_images(Book.model_validate(book))
+    # Ningún check debe ser WARNING por metadata ausente: el PASS de metadata existe.
+    assert not any(c.status == "WARNING" and "metadata" in c.message for c in checks)
+    assert any(c.message == "Metadata presente en imágenes" for c in checks)
+

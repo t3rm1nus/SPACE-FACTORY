@@ -435,8 +435,8 @@ def test_images_short_chapter_all_at_end(tmp_path):
 
 
 def test_fuentes_utilizadas_after_last_image(tmp_path):
-    """'## Fuentes utilizadas' sigue al final del capítulo, tras las imágenes
-    intercaladas, y no aparece en medio del reparto."""
+    """'## Fuentes utilizadas' (construida desde chapter.sources) sigue al final
+    del capítulo, tras las imágenes intercaladas. Fix #9/#13/#14."""
     from docx import Document
 
     paras = "\n\n".join(f"Párrafo {i}." for i in range(1, 21))
@@ -445,6 +445,11 @@ def test_fuentes_utilizadas_after_last_image(tmp_path):
         + "\n\n## Fuentes utilizadas\n\nReferencia uno.\n\nReferencia dos."
     )
     payload = _single_chapter_payload(tmp_path, content, images_count=3)
+    # Fuentes reales del payload (vía _chapter_source_urls/SourceManager).
+    payload["book"]["chapters"][0]["sources"] = [
+        "https://es.wikipedia.org/wiki/Fuente_uno",
+        "https://es.wikipedia.org/wiki/Fuente_dos",
+    ]
     out = build_book_docx(payload)
 
     doc = Document(out["docx_path"])
@@ -453,13 +458,16 @@ def test_fuentes_utilizadas_after_last_image(tmp_path):
 
     texts = [p.text for p in doc.paragraphs]
     idx_sources = next(i for i, p in enumerate(doc.paragraphs) if p.text == "Fuentes utilizadas")
-    idx_ref1 = next(i for i, t in enumerate(texts) if t == "Referencia uno.")
-    idx_ref2 = next(i for i, t in enumerate(texts) if t == "Referencia dos.")
+    idx_ref1 = next(i for i, t in enumerate(texts) if t.endswith("/Fuente_uno"))
+    idx_ref2 = next(i for i, t in enumerate(texts) if t.endswith("/Fuente_dos"))
 
     # Todas las imágenes intercaladas van ANTES del bloque de fuentes.
     assert all(i < idx_sources for i in draw)
-    # "Fuentes utilizadas" precede a sus referencias.
+    # "Fuentes utilizadas" precede a sus referencias reales.
     assert idx_sources < idx_ref1 < idx_ref2
+    # La cola fabricada por el LLM NO se renderiza.
+    assert "Referencia uno." not in texts
+    assert "Referencia dos." not in texts
     # Entre imágenes sigue habiendo texto real (reparto intacto).
     for prev, cur in zip(draw, draw[1:]):
         assert any(p.text.startswith("Párrafo") for p in doc.paragraphs[prev + 1:cur])
@@ -485,17 +493,15 @@ def test_no_images_behavior_unchanged(tmp_path):
 
 
 def test_markdown_link_rendered_as_real_hyperlink(tmp_path):
-    """B1: [Título](url) se renderiza como hipervínculo real, nunca crudo.
+    """B1: [Título](url) en el CUERPO se renderiza como hipervínculo real.
 
-    El DOCX no contiene la sintaxis markdown "](http", contiene el texto del
-    enlace, y el XML incluye un <w:hyperlink> con relación externa.
+    (Fix #9/#13/#14: la cola '## Fuentes utilizadas' del LLM ya no se renderiza;
+    este test cubre el render de enlaces markdown dentro del cuerpo.)
     """
     from docx import Document
 
     content = (
-        "Párrafo introductorio.\n\n"
-        "## Fuentes utilizadas\n\n"
-        "[Título](https://ejemplo.com/pagina)"
+        "Párrafo introductorio con [Título](https://ejemplo.com/pagina) en el cuerpo."
     )
     payload = _single_chapter_payload(tmp_path, content, images_count=0)
     out = build_book_docx(payload)
@@ -505,7 +511,6 @@ def test_markdown_link_rendered_as_real_hyperlink(tmp_path):
     full_text = "\n".join(texts)
     assert "](http" not in full_text
     assert "[Título]" not in full_text
-    assert "Título" in texts  # el texto visible del enlace es un párrafo/run
 
     # Hipervínculo real: elemento w:hyperlink en el XML + relación externa.
     xml = "\n".join(p._p.xml for p in doc.paragraphs)
@@ -517,20 +522,90 @@ def test_markdown_link_rendered_as_real_hyperlink(tmp_path):
     )
 
 
-def test_duplicate_source_lines_deduplicated(tmp_path):
-    """B2: la misma línea de fuente repetida aparece UNA sola vez en el DOCX."""
+def test_duplicate_source_lines_discarded(tmp_path):
+    """B2 (fix #9): la cola duplicada del LLM NO aparece en el DOCX; solo las
+    fuentes reales de chapter.sources."""
     from docx import Document
 
-    src = "Fuente repetida de ejemplo (web_searxng)"  # texto tras quitar "- "
+    src = "Fuente repetida de ejemplo (web_searxng)"
     content = (
         "Párrafo uno.\n\n"
         f"## Fuentes utilizadas\n\n- {src}\n\n- Otra fuente distinta (web_wikipedia)\n\n- {src}"
     )
     payload = _single_chapter_payload(tmp_path, content, images_count=0)
+    payload["book"]["chapters"][0]["sources"] = [
+        "https://es.wikipedia.org/wiki/Fuente_real",
+    ]
     out = build_book_docx(payload)
 
     texts = [p.text for p in Document(out["docx_path"]).paragraphs]
-    assert texts.count(src) == 1
+    assert texts.count(src) == 0  # descartada, no solo deduplicada
+    assert "Otra fuente distinta" not in "".join(texts)
+    assert any(t.endswith("/Fuente_real") for t in texts)
+
+
+def test_sources_section_from_chapter_sources_without_llm_tail(tmp_path):
+    """Fix #14: aunque draft_es/edited_es NO traiga ninguna cola de fuentes,
+    la sección 'Fuentes utilizadas' se genera desde chapter.sources."""
+    from docx import Document
+
+    payload = _single_chapter_payload(tmp_path, "Párrafo único sin cola.", images_count=0)
+    payload["book"]["chapters"][0]["sources"] = [
+        "https://es.wikipedia.org/wiki/A",
+        "https://www.abacus.coop/guia",
+        "https://www.amazon.es/dp/TEST",
+    ]
+    out = build_book_docx(payload)
+
+    doc = Document(out["docx_path"])
+    headings = [p.text for p in doc.paragraphs if p.style.name.startswith("Heading")]
+    texts = [p.text for p in doc.paragraphs]
+
+    assert "Fuentes utilizadas" in headings
+    for url_part in ("/A", "/guia", "/dp/TEST"):
+        assert any(t.endswith(url_part) for t in texts)
+
+
+def test_empty_chapter_sources_omits_section_no_placeholder(tmp_path):
+    """Fix #14/#13: sin chapter.sources NO se inventa ni placeholder: se omite
+    la sección completa, incluso si el LLM dejó una cola en el texto."""
+    from docx import Document
+
+    content = (
+        "Párrafo uno.\n\n"
+        "## Fuentes utilizadas\n\n- Smith & Johnson (2019). Fake Editorial."
+    )
+    payload = _single_chapter_payload(tmp_path, content, images_count=0)
+    payload["book"]["chapters"][0]["sources"] = []
+    out = build_book_docx(payload)
+
+    texts = [p.text for p in Document(out["docx_path"]).paragraphs]
+    assert "Fuentes utilizadas" not in texts
+    assert not any("Smith & Johnson" in t or "Fake Editorial" in t for t in texts)
+    assert "(Sin fuentes proporcionadas)" not in texts
+
+
+def test_fabricated_llm_tail_replaced_by_real_sources(tmp_path):
+    """Fix #13: si el LLM fabricó citas APA falsas, NO aparecen en el DOCX;
+    solo las reales de chapter.sources."""
+    from docx import Document
+
+    content = (
+        "Párrafo uno.\n\n"
+        "## Fuentes\n\n"
+        "- Smith, J. & Johnson, K. (2019). Trust Theory. Fake Press. ISBN 000-0.\n"
+        "- Brown, A. (2020). Confidence. White & Black Books."
+    )
+    payload = _single_chapter_payload(tmp_path, content, images_count=0)
+    payload["book"]["chapters"][0]["sources"] = [
+        "https://es.wikipedia.org/wiki/Confianza",
+    ]
+    out = build_book_docx(payload)
+
+    full_text = "\n".join(p.text for p in Document(out["docx_path"]).paragraphs)
+    assert "Smith" not in full_text and "Johnson" not in full_text
+    assert "Brown" not in full_text and "ISBN" not in full_text
+    assert any(t.endswith("/Confianza") for t in full_text.splitlines())
 
 
 def test_figure_numbering_no_gap_when_first_image_missing(tmp_path):
@@ -548,3 +623,195 @@ def test_figure_numbering_no_gap_when_first_image_missing(tmp_path):
     captions = [t for t in texts if t.startswith("Figura")]
     assert len(captions) == 1
     assert captions[0].startswith("Figura 1")
+
+
+def _toc_chapter(number: int, title: str) -> Chapter:
+    return Chapter(
+        chapter_id=number,
+        book_id=1,
+        number=number,
+        title=title,
+    )
+
+
+def _toc_doc(chapters):
+    """Document con el estilo 'TOC Entry' asegurado (como hace build_book_docx)."""
+    from docx import Document
+    from docx.shared import Pt
+
+    from modules.document_builder.main import _add_toc, _ensure_style
+
+    doc = Document()
+    _ensure_style(doc, "TOC Title", font_size=Pt(18), bold=True)
+    _ensure_style(doc, "TOC Entry", font_size=Pt(11), alignment=__import__("docx").enum.text.WD_ALIGN_PARAGRAPH.LEFT)
+    _add_toc(doc, chapters)
+    return doc
+
+
+def test_add_toc_does_not_duplicate_prefix():
+    """Título que ya trae 'Capítulo N:' NO debe duplicar el prefijo en el TOC."""
+    chapters = [_toc_chapter(3, "Capítulo 3: Algo ya prefijado")]
+    doc = _toc_doc(chapters)
+    entries = [p.text for p in doc.paragraphs if "Algo ya prefijado" in p.text]
+    assert len(entries) == 1
+    # Una sola aparición del prefijo (no "Capítulo 3: Capítulo 3:")
+    assert entries[0].count("Capítulo 3:") == 1
+
+
+def test_add_toc_prefixes_plain_title():
+    """Caso sano: título sin prefijo SÍ recibe 'Capítulo N: ' normalmente."""
+    chapters = [_toc_chapter(2, "El Origen del Rock")]
+    doc = _toc_doc(chapters)
+    entries = [p.text for p in doc.paragraphs if "El Origen del Rock" in p.text]
+    assert len(entries) == 1
+    assert entries[0].startswith("Capítulo 2: El Origen del Rock")
+
+
+def test_webp_image_is_inserted(tmp_path):
+    """§17 #18 — una imagen .webp SÍ debe insertarse en el DOCX (se convierte a
+    PNG en memoria en _prepare_image_source), en vez de saltarse con warning por
+    no ser soportada por python-docx."""
+    from docx import Document
+
+    from modules.document_builder.main import _prepare_image_source
+
+    webp = tmp_path / "test_web.webp"
+    PILImage.new("RGB", (64, 64), color="blue").save(webp, format="WEBP")
+
+    # Conversión en memoria: no webp -> devuelve la ruta; webp -> BytesIO PNG.
+    assert _prepare_image_source(str(webp)) is not None
+
+    # Integración: build_book_docx con una imagen webp produce la Figura.
+    payload = _single_chapter_payload(tmp_path, "Párrafo A.", images_count=1)
+    payload["book"]["chapters"][0]["images"] = [str(webp)]
+
+    out = build_book_docx(payload)
+    texts = [p.text for p in Document(out["docx_path"]).paragraphs]
+    captions = [t for t in texts if t.startswith("Figura")]
+    assert len(captions) == 1
+    assert captions[0].startswith("Figura 1")
+
+
+def test_add_toc_plain_capitulo_n_not_duplicated():
+    """Caso books 49-54: título plano 'Capítulo N' (sin ':') NO debe duplicarse."""
+    chapters = [_toc_chapter(1, "Capítulo 1")]
+    doc = _toc_doc(chapters)
+    # La entrada lleva puntos de relleno al final; verificamos el inicio del
+    # texto y que NO se haya duplicado el prefijo.
+    entries = [p.text for p in doc.paragraphs if p.text.startswith("Capítulo 1")]
+    assert len(entries) == 1
+    assert not entries[0].startswith("Capítulo 1: ")  # sin doble prefijo
+# ---------------------------------------------------------------------------
+# FASE 1 — PARAMETRIZACIÓN POR IDIOMA (feature "generación en inglés")
+# Los strings de interfaz del DOCX (portada, legal, TOC, introducción, labels,
+# captions, fuentes) se traducen según `language`, con "es" como fallback.
+# ---------------------------------------------------------------------------
+def _en_payload(tmp_path: Path, edited_en: str, images_count: int = 0) -> dict:
+    """Payload con un único capítulo en inglés (edited_en) e imágenes."""
+    book = {
+        "book_id": 1,
+        "title": "English Book Title",
+        "subtitle": "Subtitle",
+        "description": "Introduction.",
+        "author": "Space Lair",
+        "target_audience": "General",
+        "genre": "Nonfiction",
+        "languages": ["en"],
+        "target_chapters": 1,
+        "status": "edited",
+        "created_at": datetime(2024, 1, 1).isoformat(),
+        "chapters": [
+            {
+                "chapter_id": 10,
+                "book_id": 1,
+                "number": 1,
+                "title": "Chapter One",
+                "edited_en": edited_en,
+                "images": _make_image_files(tmp_path, images_count) if images_count else [],
+            },
+        ],
+    }
+    return {"book": book, "language": "en"}
+
+
+def test_es_ui_strings_unchanged(tmp_path):
+    """FASE 1 regresión: con language='es' (default) los strings de UI son los
+    mismos que antes de la parametrización (comportamiento específico)."""
+    from docx import Document
+
+    payload = _single_chapter_payload(
+        tmp_path, "## Tema\n\nContenido.", images_count=0
+    )
+    payload["book"]["chapters"][0]["sources"] = [
+        "https://es.wikipedia.org/wiki/Fuente_real"
+    ]
+    out = build_book_docx(payload)
+    doc = Document(out["docx_path"])
+    texts = [p.text for p in doc.paragraphs]
+
+    # Los marcadores en español se conservan exactamente.
+    assert "Índice" in texts
+    assert "Introducción" in texts
+    assert "Fuentes utilizadas" in texts
+    assert any(t.startswith("Título: Libro reparto de imágenes") for t in texts)
+    assert any("© 2024 Space Lair. Todos los derechos reservados." in t for t in texts)
+    # No debe aparecer vocabulario en inglés.
+    assert not any("Table of Contents" in t for t in texts)
+    assert not any("Sources Used" in t for t in texts)
+
+
+def test_en_ui_strings_translated(tmp_path):
+    """FASE 1: con language='en' el DOCX usa los strings en inglés."""
+    from docx import Document
+
+    payload = _en_payload(tmp_path, "## Topic\n\nChapter content.", images_count=0)
+    payload["book"]["chapters"][0]["sources"] = [
+        "https://en.wikipedia.org/wiki/Real_source",
+    ]
+    out = build_book_docx(payload)
+    doc = Document(out["docx_path"])
+    texts = [p.text for p in doc.paragraphs]
+
+    # Claves en inglés.
+    assert "Table of Contents" in texts
+    assert "Introduction" in texts
+    assert "Sources Used" in texts
+    assert any(t.startswith("Title: English Book Title") for t in texts)
+    assert any("© 2024 Space Lair. All rights reserved." in t for t in texts)
+    # No debe colarse el fallback español en estos marcadores clave.
+    assert not any(t == "Índice" for t in texts)
+    assert not any(t == "Fuentes utilizadas" for t in texts)
+    assert not any("Todos los derechos reservados" in t for t in texts)
+
+
+def test_en_figure_caption_translated(tmp_path):
+    """FASE 1: el caption de imagen usa 'Figure' en inglés (no 'Figura')."""
+    from docx import Document
+
+    payload = _en_payload(tmp_path, "Párrafo A.\n\nPárrafo B.", images_count=1)
+    out = build_book_docx(payload)
+    texts = [p.text for p in Document(out["docx_path"]).paragraphs]
+    captions = [t for t in texts if t.startswith("Figure")]
+    assert len(captions) == 1
+    assert captions[0].startswith("Figure 1")
+
+
+def test_split_sources_tail_discards_english():
+    """FASE 1: _split_sources_tail descarta una cola de fuentes en inglés
+    ('## Sources Used' + lista) de la misma forma que la española."""
+    from modules.document_builder.main import _split_sources_tail
+
+    content = "\n".join([
+        "Párrafo uno.",
+        "",
+        "## Sources used",
+        "",
+        "- https://en.wikipedia.org/wiki/A",
+        "- https://en.wikipedia.org/wiki/B",
+    ])
+    body, tail = _split_sources_tail(content.splitlines())
+    joined = "\n".join(body)
+    assert "Sources used" not in joined
+    assert "en.wikipedia.org" not in joined
+    assert "Párrafo uno." in joined
+    assert tail  # la cola se captura pero se descarta aguas abajo

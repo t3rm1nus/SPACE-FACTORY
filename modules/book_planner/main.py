@@ -319,9 +319,21 @@ def _infer_genre(idea: str) -> Optional[str]:
     return None
 
 
+def _short_idea_title(idea: str, max_words: int = 8) -> str:
+    """Acorta una idea a un título corto de capítulo, cortando en límite de palabra."""
+    words = (idea or "").strip().split()
+    if not words:
+        return "Capítulo"
+    short = " ".join(words[:max_words])
+    if len(words) > max_words:
+        short += "..."
+    return short
+
+
 def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
     """Plan básico determinista cuando no hay LLM disponible."""
     title = validated.idea.strip()
+    short_title = _short_idea_title(title)
     subtitle = "Plan editorial"
     chapters = []
     base_words = 3000
@@ -329,7 +341,9 @@ def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
         chapters.append(
             {
                 "number": i,
-                "title": f"Capítulo {i}: {title}",
+                # Sin prefijo "Capítulo N:" (lo añade document_builder/_add_toc).
+                # Título corto derivado de la idea, NO la idea completa.
+                "title": f"{short_title} - Parte {i}",
                 "objective": f"Desarrollar el núcleo del capítulo {i}.",
                 "key_questions": [f"Pregunta clave {i}"],
                 "estimated_words": base_words,

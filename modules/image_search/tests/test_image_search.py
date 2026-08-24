@@ -302,3 +302,81 @@ def test_denylist_bloquea_dominio_y_no_ocupa_slot(tmp_path, monkeypatch):
     assert "https://www.scribd.com/document/12345/portada-libro" not in downloaded
     # La única descarga es la imagen legítima.
     assert downloaded == ["https://cdn.example.com/img2.png"]
+
+
+def test_topic_filter_descarta_candidato_no_anclado(tmp_path, monkeypatch):
+    """§17 #11 — con topic del libro presente, un candidato sin relación temática
+    (caso real tipo book_43 'historia polar': comicvine.gamespot.com) se descarta
+    ANTES de descargar y NO ocupa slot, igual que el denylist."""
+    results = [
+        {
+            "url": "https://comicvine.gamespot.com/comic-page",
+            "title": "Portada de cómic de superhéroes",
+            "img_src": "https://comicvine.gamespot.com/img/cover.png",
+            "engine": "google images",
+            "resolution": "1024x768",
+        },
+        {
+            "url": "https://example.com/historia-polar-expedicion",
+            "title": "Historia polar de las expediciones al Antártico",
+            "img_src": "https://cdn.example.com/exp.png",
+            "engine": "bing images",
+            "resolution": "64x64",
+        },
+    ]
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(
+        _payload(num_images=2, topic="historia polar")
+    )
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # El candidato comicvine se descarta: el único 'ok' es la imagen temática.
+    ok_results = [r for r in validated.results if r.status == "ok"]
+    assert len(ok_results) == 1
+    assert ok_results[0].image_path.endswith("img_01_web.png")
+    # La URL de comicvine NUNCA fue descargada ni aparece en results.
+    assert "https://comicvine.gamespot.com/img/cover.png" not in downloaded
+    assert not any("comicvine" in (r.get("source_url") or "") for r in out["results"])
+
+
+def test_topic_none_no_bloquea(tmp_path, monkeypatch):
+    """§17 #11 — topic ausente/None NO filtra nada: comportamiento idéntico al
+    actual (libros ya generados sin topic)."""
+    results = [
+        {
+            "url": "https://example.com/page{0}".format(i),
+            "title": "Imagen {0}".format(i),
+            "img_src": "https://cdn.example.com/img{0}.png".format(i),
+            "engine": "bing images",
+            "resolution": "64x64",
+        }
+        for i in range(1, 4)
+    ]
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    # Sin 'topic' en el payload (compatibilidad total).
+    out = image_search.search_chapter_images(_payload(num_images=3))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    assert validated.requested == 3
+    assert validated.generated == 3
+    assert validated.failed == 0
+    # Las 3 imágenes legítimas se descargaron sin ningún filtrado por tema.
+    assert len(downloaded) == 3

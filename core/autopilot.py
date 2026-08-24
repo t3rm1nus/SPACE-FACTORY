@@ -923,6 +923,11 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         if not ratio or ratio <= 0.0:
             return _run_single(phase, job, chapter_id=chapter_id)
 
+        # Topic del libro (mismo fallback que build_payload y el anti-reciclaje de
+        # fuentes): job.data.topic si lo hay, si no el título del libro. Se propaga
+        # a image_search para el filtro de relevancia temática (§17 #11).
+        topic = (job.get("data") or {}).get("topic") or (book or {}).get("title")
+
         # Misma fuente de num_images que build_payload/generate_chapter_images.
         base = build_phase_payload(phase, job["book_id"], job.get("data"), chapter_id)
         _num = base.get("num_images")
@@ -946,6 +951,7 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                     "chapter_text": base.get("chapter_text", ""),
                     "num_images": n_search,
                     "language": base.get("language", "es"),
+                    "topic": topic,
                 },
             ))
         if n_generate > 0:
