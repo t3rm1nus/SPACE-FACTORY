@@ -871,6 +871,7 @@ OUT OF SCOPE — PDF (deuda), modificaciones a módulos OUT_OF_SCOPE sin nueva e
    - `translator` (translate_es_en/translate_en_es): registrado en PAYLOAD_SCHEMAS/OUTPUT_SCHEMAS (core/schemas.py) pero SIN fase propia en AUTOPILOT_PHASES ni caso en build_phase_payload — módulo huérfano del pipeline.
    - Frontend: sin selector de idioma en index.html; app.js::createNewBook() nunca envía "language" en el POST; editorial.py::create_book() persiste siempre default "es" en books.languages.
    - Conclusión: para generar en inglés hace falta diseño nuevo — pendiente de decisión del arquitecto entre (a) traducir edited_es→en vía translator tras el pipeline es, o (b) escribir nativo con write_chapter_en seleccionado por books.languages. Ninguna se ha implementado.
+   - Hallazgo adicional (diagnóstico solo-lectura, arquitecto, 2026-08-24): frontend/editorial.py::build_payload lee chapter.get('edited_es') or chapter.get('draft_es') hardcodeado a columnas _es en 4 casos (fact_check línea ~518, editor línea ~530, image_plan línea ~541, image_gen línea ~553), ignorando el idioma real del capítulo. image_planner/main.py::_build_prompt también ignora el campo language del payload (prompt visual siempre en español). Ninguno de los dos es bloqueante hoy (no hay libros EN en producción); quedan como parte del mismo diseño pendiente de la tarea 6, no requieren fix aislado.
 
 
 # 21. ARCHIVOS PROTEGIDOS
