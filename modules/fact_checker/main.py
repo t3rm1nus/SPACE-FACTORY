@@ -98,6 +98,126 @@ def _escalate_fabrication_issue(issue: dict[str, Any]) -> dict[str, Any]:
     return issue
 
 
+# ---------------------------------------------------------------------------
+# §17 #22 (fix book_65/book_64): verificación de consistencia para ERROR
+# "puros" del LLM (no estructurales).
+#
+# Problema real (book_65 cap.431 "café Liberica", book_64 cafés de Madrid): el
+# LLM del fact_checker clasifica como ERROR —bloqueante, dispara
+# quality_gate=FAIL— claims por juicio subjetivo de EXACTITUD ("no es tan raro
+# como se describe"), sin pasar por _has_fabrication_signature() ni
+# _is_unsupported_issue(). El veredicto es INESTABLE entre reintentos (la misma
+# claim cambia de severidad en cada intento) y agota los reintentos de fase.
+#
+# FIX: toda severity=ERROR que NO sea estructural (no escalada por
+# _escalate_fabrication_issue) pasa por una segunda pasada LLM binaria y
+# estricta. Si no confirma el ERROR -> se degrada a WARNING (fail-safe hacia
+# MENOS bloqueo). Timeout/error/salida inválida también degradan.
+#
+# Presupuesto: solo se dispara para claims ERROR no estructurales (pocas por
+# capítulo en la práctica). Peor caso: N claims × FACT_CHECK_CONSISTENCY_TIMEOUT
+# (20s default). Con N=5 serían 100s < timeout_seconds=180 del scheduler para
+# fact_check_chapter (modules/fact_checker/module.json). No existe
+# FACT_CHECK_TOTAL_TIME_BUDGET en este módulo; no se añade.
+# ---------------------------------------------------------------------------
+FACT_CHECK_CONSISTENCY_TIMEOUT = float(
+    os.environ.get("FACT_CHECK_CONSISTENCY_TIMEOUT", "20")
+)
+
+_CONSISTENCY_DOWNGRADE_NOTE = (
+    "[Degradado a WARNING: verificación de consistencia no confirmó ERROR]"
+)
+
+
+def _verify_error_consistency(claim_text: str, reason: str, context: str = "") -> bool:
+    """Segunda pasada binaria para un ERROR subjetivo del LLM.
+
+    Pregunta de forma estricta y acotada si la claim es un error factual claro
+    que requiere corrección obligatoria o una afirmación defendible / sin
+    verificación concluyente. Devuelve True SOLO si la segunda pasada confirma
+    el ERROR de forma inequívoca (respuesta normalizada que empieza por
+    "ERROR").
+
+    Fail-safe: cualquier excepción, timeout o salida inválida devuelve False
+    (degrada a WARNING; nunca mantenemos un bloqueo por un fallo de la propia
+    verificación).
+    """
+    try:
+        provider = get_provider()
+        provider.timeout = FACT_CHECK_CONSISTENCY_TIMEOUT
+        provider.max_retries = 0
+        prompt = (
+            "Evalúa esta afirmación marcada como ERROR factual:\n\n"
+            f"Afirmación: {claim_text}\n"
+            f"Motivo del rechazo: {reason}\n"
+            + (f"Contexto del capítulo: {context}\n" if context else "")
+            + "\n¿Es un error factual CLARO que requiere corrección obligatoria, "
+            "o es una afirmación defendible / sin verificación concluyente?\n"
+            "Responde EXACTAMENTE con una sola palabra:\n"
+            "- \"ERROR\" si es un error factual claro y verificable que exige corrección.\n"
+            "- \"DEFENDIBLE\" si es defendible, opinable o no hay verificación concluyente."
+        )
+        result = provider.generate(
+            prompt,
+            system=(
+                "Eres un verificador de hechos editorial. Responde únicamente "
+                "con la palabra ERROR o DEFENDIBLE."
+            ),
+            model=DEFAULT_ROUTER_MODEL,
+            max_tokens=8,
+            temperature=0.0,
+        )
+        answer = " ".join(str(result.text or "").upper().split())
+        if answer.startswith("DEFENDIBLE"):
+            return False
+        return answer.startswith("ERROR")
+    except Exception as e:
+        log(
+            logger,
+            logging.WARNING,
+            f"Verificación de consistencia falló ({e}); fail-safe: degrada a WARNING.",
+        )
+        return False
+
+
+def _apply_error_consistency_pass(
+    issues: list[dict[str, Any]], context: str = ""
+) -> list[dict[str, Any]]:
+    """Segunda fase del pipeline: re-verifica ERRORs NO estructurales.
+
+    - Las claims escaladas por _escalate_fabrication_issue son estructurales
+      (firma de fabricación factual) y NUNCA pasan por esta verificación.
+    - Solo aplica con ejecución LLM real (execution_mode == "real"); en
+      fallback/backstop determinista no hay nada que re-verificar.
+    - Un ERROR confirmado se mantiene intacto; uno no confirmado (o con
+      verificación fallida/timeout) se degrada a WARNING con nota en reason.
+    - Las claves internas que empiezan por "_" se eliminan antes de devolver.
+    """
+    out: list[dict[str, Any]] = []
+    for issue in issues:
+        if (
+            issue.get("severity") == "ERROR"
+            and not issue.get("_fabrication_structural")
+            and issue.get("_llm_original_error")
+        ):
+            confirmed = _verify_error_consistency(
+                str(issue.get("claim", "")),
+                str(issue.get("reason", "")),
+                context,
+            )
+            issue = dict(issue)
+            if confirmed:
+                issue["consistency_check"] = "CONFIRMED"
+            else:
+                issue["severity"] = "WARNING"
+                issue["reason"] = (
+                    f"{issue.get('reason') or ''} {_CONSISTENCY_DOWNGRADE_NOTE}"
+                ).strip()
+                issue["consistency_check"] = "DOWNGRADED"
+        out.append({k: v for k, v in issue.items() if not k.startswith("_")})
+    return out
+
+
 
 def _heuristic_issues(text: str, sources: list[dict]) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
@@ -282,15 +402,30 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
         if claim_key in seen_claims:
             continue
         seen_claims.add(claim_key)
-        normalized_issues.append(
-            _escalate_fabrication_issue({
-                "claim": issue.get("claim", ""),
-                "severity": issue.get("severity", "INFO"),
-                "reason": issue.get("reason", ""),
-                "source_url": issue.get("source_url"),
-                "suggestion": issue.get("suggestion"),
-            })
-        )
+        original_severity = str(issue.get("severity", "INFO")).upper()
+        normalized = _escalate_fabrication_issue({
+            "claim": issue.get("claim", ""),
+            "severity": issue.get("severity", "INFO"),
+            "reason": issue.get("reason", ""),
+            "source_url": issue.get("source_url"),
+            "suggestion": issue.get("suggestion"),
+        })
+        # Marcas internas para la pasada de consistencia (§17 #22):
+        # - _fabrication_structural: el ERROR lo puso la escalada estructural
+        #   (firma de fabricación factual) -> NUNCA se re-verifica.
+        # - _llm_original_error: el ERROR ya venía del LLM (subjetivo) ->
+        #   candidato a segunda pasada binaria.
+        if original_severity != "ERROR" and normalized.get("severity") == "ERROR":
+            normalized["_fabrication_structural"] = True
+        elif normalized.get("severity") == "ERROR":
+            normalized["_llm_original_error"] = True
+        normalized_issues.append(normalized)
+
+    # §17 #22: segunda pasada solo para ERROR subjetivos del LLM, SOLO si hubo
+    # llamada LLM real (execution_mode == "real"); en fallback determinista no
+    # hay nada que re-verificar.
+    if execution_mode == "real":
+        normalized_issues = _apply_error_consistency_pass(normalized_issues)
 
     unsupported = result_data.get("unsupported_claims") or []
     corrections = result_data.get("corrections") or []

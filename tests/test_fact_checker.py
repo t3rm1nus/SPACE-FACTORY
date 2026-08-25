@@ -157,16 +157,35 @@ def test_execute_llm_success(monkeypatch: pytest.MonkeyPatch) -> None:
         name = "ollama"
         model = "llama3.1"
 
-        def generate(self, *args: Any, **kwargs: Any) -> FakeResult:
-            return FakeResult()
+        def __init__(self) -> None:
+            self.calls = 0
 
-    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+        def generate(self, *args: Any, **kwargs: Any):
+            self.calls += 1
+            if self.calls == 1:
+                return FakeResult()  # primera pasada: el JSON con la issue ERROR
+            # §17 #22 segunda pasada: confirma el ERROR de forma binaria.
+
+            class ConfirmResult:
+                text = "ERROR"
+                provider = "ollama"
+                model = "llama3.1"
+                input_tokens = 1
+                output_tokens = 1
+                cost = 0.0
+                raw_response = {}
+
+            return ConfirmResult()
+
+    provider = FakeProvider()
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
     monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
 
     out = execute(_payload())
     assert out["status"] == "FAIL"
     assert out["claims_checked"] == 1
-    assert out["issues"][0]["severity"] == "ERROR"
+    assert out["issues"][0]["severity"] == "ERROR"  # segunda pasada CONFIRMA
+    assert out["issues"][0]["consistency_check"] == "CONFIRMED"
     # La fuente no se inventa: sigue null en el issue
     assert out["issues"][0]["source_url"] is None
     assert out["unsupported_claims"] == ["Ventas +45%"]
@@ -513,6 +532,100 @@ def test_book59_fabricated_claims_escalate_to_error_and_fail_gate(
     assert out["quality_gate"] == "FAIL"
 
 
+def test_llm_error_downgraded_when_consistency_check_disagrees(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ERROR subjetivo del LLM + segunda pasada que disiente -> WARNING."""
+    import modules.fact_checker.main as main
+
+    provider = _two_pass_provider(_liberica_llm_json(), "DEFENDIBLE")
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    out = execute(_payload())
+    issue = out["issues"][0]
+    assert issue["severity"] == "WARNING"  # degradada, ya no bloquea
+    assert main._CONSISTENCY_DOWNGRADE_NOTE in issue["reason"]
+    assert issue["consistency_check"] == "DOWNGRADED"
+    assert provider.calls == 2  # primera pasada + verificación
+    assert out["quality_gate"] == "PASS"
+
+
+def test_llm_error_kept_when_consistency_check_agrees(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Ambas pasadas ERROR -> el ERROR se mantiene y el gate falla."""
+    import modules.fact_checker.main as main
+
+    provider = _two_pass_provider(_liberica_llm_json(), "ERROR")
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    out = execute(_payload())
+    issue = out["issues"][0]
+    assert issue["severity"] == "ERROR"  # confirmado: sin cambios
+    assert issue["consistency_check"] == "CONFIRMED"
+    assert main._CONSISTENCY_DOWNGRADE_NOTE not in issue["reason"]
+    assert out["quality_gate"] == "FAIL"
+    assert out["status"] == "FAIL"
+
+
+def test_structural_fabrication_error_skips_consistency_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un ERROR escalado por _escalate_fabrication_issue NO se re-verifica.
+
+    Es estructural (firma fecha+nombre+cifra), no subjetivo: la segunda pasada
+    LLM no debe ocurrir ni poder degradarlo.
+    """
+    import modules.fact_checker.main as main
+
+    # Claim tipo book_59: WARNING desde el LLM, la escalada la sube a ERROR.
+    llm_json = json.dumps(
+        {
+            "status": "FAIL",
+            "claims_checked": 1,
+            "issues": [
+                {
+                    "claim": (
+                        "The first major concentration camp in Palestine was "
+                        "established in 1942 without any historical support."
+                    ),
+                    "severity": "WARNING",
+                    "reason": (
+                        "El capítulo no proporciona evidencia; la afirmación "
+                        "no tiene una fuente."
+                    ),
+                    "source_url": None,
+                    "suggestion": None,
+                }
+            ],
+            "corrections": [],
+            "unsupported_claims": [],
+            "supported_claims": 0,
+            "conflicting_claims": 0,
+        }
+    )
+    # Si la segunda pasada se llamara, degradaría: no debe ocurrir.
+    provider = _two_pass_provider(llm_json, "DEFENDIBLE")
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    payload = _payload()
+    payload["chapter_text"] = (
+        "The first major concentration camp in Palestine was established in "
+        "1942, according to claims without sources."
+    )
+
+    out = execute(payload)
+    issue = out["issues"][0]
+    assert provider.calls == 1  # SOLO la primera pasada: no hay re-verificación
+    assert issue["severity"] == "ERROR"  # estructural: se mantiene ERROR
+    assert "fabricación factual" in issue["reason"]
+    assert "consistency_check" not in issue
+    assert out["quality_gate"] == "FAIL"
+
+
 def test_supported_specific_claim_not_escalated(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -553,3 +666,135 @@ def test_supported_specific_claim_not_escalated(
     out = execute(payload)
     assert out["quality_gate"] == "PASS"
     assert out["status"] in ("PASS", "WARNING")
+
+
+def test_consistency_check_timeout_defaults_to_downgrade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Timeout/error/respuesta inválida en la verificación -> degrada (fail-safe)."""
+    import modules.fact_checker.main as main
+
+    for bad_second in (
+        RuntimeError("ollama timeout"),
+        "no sé",  # salida inválida: ni ERROR ni DEFENDIBLE
+        "",       # vacía
+    ):
+        provider = _two_pass_provider(_liberica_llm_json(), bad_second)
+        monkeypatch.setattr(main, "get_provider", lambda p=provider: p)
+        monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+        out = execute(_payload())
+        issue = out["issues"][0]
+        assert issue["severity"] == "WARNING", f"fallo con segunda pasada={bad_second!r}"
+        assert main._CONSISTENCY_DOWNGRADE_NOTE in issue["reason"]
+        assert out["quality_gate"] == "PASS"
+
+
+def test_book65_liberica_real_case_reproduction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reproducción del caso real book_65 en ambos escenarios del mock.
+
+    - Escenario A (lo observado en producción: juicio subjetivo no replicable):
+      la segunda pasada disiente -> la claim se degrada y la fase ya no agota
+      reintentos.
+    - Escenario B: si la segunda pasada confirma, el ERROR se mantiene (el fix
+      no oculta errores reales).
+    """
+    import modules.fact_checker.main as main
+
+    # Escenario A: disiente -> WARNING
+    provider_a = _two_pass_provider(_liberica_llm_json(), "DEFENDIBLE")
+    monkeypatch.setattr(main, "get_provider", lambda: provider_a)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+    out_a = execute(_payload())
+    assert out_a["issues"][0]["severity"] == "WARNING"
+    assert out_a["issues"][0]["consistency_check"] == "DOWNGRADED"
+    assert out_a["quality_gate"] == "PASS"
+
+    # Escenario B: confirma -> ERROR intacto
+    provider_b = _two_pass_provider(_liberica_llm_json(), "ERROR")
+    monkeypatch.setattr(main, "get_provider", lambda: provider_b)
+    out_b = execute(_payload())
+    assert out_b["issues"][0]["severity"] == "ERROR"
+    assert out_b["quality_gate"] == "FAIL"
+
+
+# ---------------------------------------------------------------------------
+# §17 #22: verificación de consistencia para ERROR subjetivos del LLM
+# (fix book_65 "café Liberica" / book_64 cafés de Madrid)
+# ---------------------------------------------------------------------------
+
+def _two_pass_provider(first_json: str, second_answer):
+    """Provider falso de dos pasadas: 1ª = JSON del fact-check, 2ª = verificación.
+
+    Registra las llamadas en .calls para verificar si la segunda pasada ocurrió.
+    """
+    class Provider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, *args: Any, **kwargs: Any):
+            self.calls += 1
+            if self.calls == 1:
+                class R1:
+                    text = first_json
+                    provider = "ollama"
+                    model = "llama3.1"
+                    input_tokens = 10
+                    output_tokens = 20
+                    cost = 0.0
+                    raw_response = {}
+                return R1()
+            if isinstance(second_answer, Exception):
+                raise second_answer
+
+            class R2:
+                text = second_answer
+                provider = "ollama"
+                model = "llama3.1"
+                input_tokens = 1
+                output_tokens = 1
+                cost = 0.0
+                raw_response = {}
+            return R2()
+
+    return Provider()
+
+
+def _liberica_llm_json() -> str:
+    """Reproducción EXACTA del caso real book_65 cap.431 (task 888)."""
+    return json.dumps(
+        {
+            "status": "FAIL",
+            "claims_checked": 1,
+            "issues": [
+                {
+                    "claim": (
+                        "El café Liberica es una variedad única de café que "
+                        "es muy rara y valiosa."
+                    ),
+                    "severity": "ERROR",
+                    "reason": (
+                        "La información sobre el café Liberica en el capítulo "
+                        "no es precisa. El café Liberica no es tan raro ni "
+                        "valioso como se describe, y su cultivo limitado y "
+                        "vulnerabilidad ante enfermedades son temas de debate "
+                        "entre los expertos."
+                    ),
+                    "source_url": None,
+                    "suggestion": (
+                        "El texto debería ser corregido para reflejar la "
+                        "realidad del café Liberica."
+                    ),
+                }
+            ],
+            "corrections": [],
+            "unsupported_claims": [],
+            "supported_claims": 0,
+            "conflicting_claims": 0,
+        }
+    )
