@@ -68,6 +68,38 @@ AUTOPILOT_PHASES = [
 # El subestado por capítulo vive en phase["subs"]["chapters"].
 PER_CHAPTER_PHASES = {"writer", "writer_en", "fact_check", "editor", "image_plan", "image_gen"}
 
+
+def _resolve_writer_capability(book: Optional[dict]) -> str:
+    """Resuelve la capability de la fase writer según el idioma del libro.
+
+    - book.languages contiene "en" (str —posiblemente separado por comas— o
+      lista) → "write_chapter_en".
+    - Cualquier otro caso ("es", vacío, None, libro ausente/ilegible) →
+      "write_chapter_es" (comportamiento histórico intacto, regresión cero).
+    """
+    langs = (book or {}).get("languages")
+    if isinstance(langs, str):
+        candidates = [part.strip().lower() for part in langs.split(",")]
+    elif isinstance(langs, (list, tuple)):
+        candidates = [str(part).strip().lower() for part in langs]
+    else:
+        candidates = []
+    if any(part.startswith("en") for part in candidates if part):
+        return "write_chapter_en"
+    return "write_chapter_es"
+
+
+def _resolve_book_languages(book: Optional[dict]) -> list[str]:
+    """Alias compatible de ``frontend.editorial._resolve_book_languages``.
+
+    §17 #21: la implementación canónica se MOVIO a frontend/editorial.py (junto
+    a _is_english_language) para que book_planner/editorial puedan usarla sin
+    dependencia circular. Este wrapper lazy preserva el nombre/import histórico
+    en core.autopilot sin cambiar comportamiento.
+    """
+    from frontend.editorial import _resolve_book_languages as _resolve
+    return _resolve(book)
+
 # Reintentos por defecto por fase (no infinitos).
 DEFAULT_MAX_ATTEMPTS = 2
 DEFAULT_BACKOFF_STEP = 2.0
@@ -552,6 +584,8 @@ def run_job(
                 # conserva "Capítulo N". Tras planner PASS, actualizamos los títulos reales.
                 if phase["id"] == "planner" and result.metrics:
                     planner_chapters = result.metrics.get("chapters") or []
+                    planner_title_en = result.metrics.get("title_en") or ""
+                    planner_desc_en = result.metrics.get("description_en") or ""
                     if planner_chapters:
                         try:
                             from frontend import editorial as _ed
@@ -570,6 +604,21 @@ def run_job(
                                     _ed.update_chapter_outline(
                                         job["book_id"], number, sections
                                     )
+                                # §17 #21 (Opción A): persistir traducciones EN
+                                # si el planner bilingüe las generó (None/vacío
+                                # = no escribir → fallback ES intacto).
+                                title_en = ch.get("title_en")
+                                if number and title_en:
+                                    _ed.update_chapter_title_en(
+                                        job["book_id"], number, title_en
+                                    )
+                                outline_en = ch.get("outline_en")
+                                if number and outline_en:
+                                    _ed.update_chapter_outline_en(
+                                        job["book_id"], number, outline_en
+                                        if isinstance(outline_en, list)
+                                        else json.loads(outline_en)
+                                    )
                             # También propagar descripción del planner al libro
                             if planner_desc:
                                 _ed.update_book_description(
@@ -583,6 +632,17 @@ def run_job(
                         except Exception as e:
                             log(logger, logging.WARNING,
                                 f"No se pudieron propagar títulos del planner: {e}")
+                    # §17 #21 (Opción A): título/descripción EN del libro.
+                    if planner_title_en or planner_desc_en:
+                        try:
+                            from frontend import editorial as _ed
+                            if planner_title_en:
+                                _ed.update_book_title_en(job["book_id"], planner_title_en)
+                            if planner_desc_en:
+                                _ed.update_book_description_en(job["book_id"], planner_desc_en)
+                        except Exception as e:
+                            log(logger, logging.WARNING,
+                                f"No se pudieron propagar títulos EN del planner: {e}")
                 # ---- PROPAGACIÓN DE FUENTES REAL: Research -> job data.
                 # Las sources reales producidas por Research viajan en el estado
                 # del job para que writer/fact_check las consuman. Fuente de
@@ -758,9 +818,13 @@ def start_worker_daemon(store: BookJobStore, executor: Executor, **kwargs: Any) 
 # Ejecutor de producción (reutiliza scheduler + editorial; sin duplicar lógica)
 # ---------------------------------------------------------------------------
 def build_phase_payload(
-    phase: dict, book_id: int, data: Optional[dict] = None, chapter_id: Optional[int] = None
+    phase: dict, book_id: int, data: Optional[dict] = None, chapter_id: Optional[int] = None,
+    language: Optional[str] = None,
 ) -> dict:
     """Construye el payload real de una fase (reutiliza editorial.build_payload).
+
+    ``language`` (opcional) fuerza el idioma activo en las fases de TEXTO del caso
+    multidioma; si es None, build_payload deriva como antes (idioma única).
 
     QUALITY GATE (final_quality_control) consume un objeto ``book`` igual que el
     Document Builder; se deriva de ahí en lugar de duplicar la lógica.
@@ -768,8 +832,14 @@ def build_phase_payload(
     from frontend import editorial
 
     data = data or {}
+    # kwargs de build_payload: solo se agrega `language` cuando se fuerza un idioma
+    # (caso multidioma). Cuando language is None no se pasa el kwarg, conservando la
+    # compatibilidad con llamadores/firmas que aceptan solo la firma histórica.
+    _bp_kwargs: dict[str, Any] = {}
+    if language is not None:
+        _bp_kwargs["language"] = language
     if phase["id"] == "quality_gate":
-        base = editorial.build_payload(book_id, "docx", data, chapter_id)
+        base = editorial.build_payload(book_id, "docx", data, chapter_id, **_bp_kwargs)
         qc_book = base["book"]
         # Los umbrales de capítulos se derivan del target REAL del libro (ya presente
         # en el book_dict); de no propagarlos el Quality Gate rellenaría los defaults
@@ -782,7 +852,7 @@ def build_phase_payload(
             "target_chapters": target,
             "max_chapters": max(target, 1),
         }
-    return editorial.build_payload(book_id, phase["id"], data, chapter_id)
+    return editorial.build_payload(book_id, phase["id"], data, chapter_id, **_bp_kwargs)
 def _pick_module(modules: dict, cap_map: dict, capability: str) -> Optional[dict]:
     for mid in cap_map.get(capability, []):
         if mid in modules:
@@ -805,13 +875,33 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
     Si se provee ``store``, el subestado por capítulo se persiste tras cada
     capítulo (permite recuperar/progreso determinista sin repetir PASS).
     """
-    def _run_single(phase: dict, job: dict, chapter_id=None) -> PhaseResult:
-        """Ejecuta UN capítulo (o la fase global) vía scheduler real."""
+    def _run_single(phase: dict, job: dict, chapter_id=None, language: Optional[str] = None) -> PhaseResult:
+        """Ejecuta UN capítulo (o la fase global) vía scheduler real.
+
+        ``language`` (opcional) fuerza el idioma activo de la fase (caso
+        multidioma: writer/fact_check/editor/docx). Si es None, se deriva como
+        antes de ``books.languages`` (idioma único histórico).
+        """
         from core import scheduler as _sched
         from core import task_queue as _tq
 
         capability = phase["capability"]
-        payload = build_phase_payload(phase, job["book_id"], job.get("data"), chapter_id)
+        if phase["id"] == "writer":
+            # Resolución dinámica por idioma del libro (§20 tarea 6):
+            # Si el bucle multidioma fuerza un idioma concreto, se usa ese;
+            # si no, se deriva de books.languages (regresión cero en idioma único).
+            if language is not None:
+                capability = "write_chapter_en" if language == "en" else "write_chapter_es"
+            else:
+                from frontend import editorial as _editorial
+
+                try:
+                    _book = _editorial._get_book(job["book_id"])
+                except Exception:
+                    _book = None
+                capability = _resolve_writer_capability(_book)
+            language = language or ("en" if capability == "write_chapter_en" else "es")
+        payload = build_phase_payload(phase, job["book_id"], job.get("data"), chapter_id, language=language)
         task_id = _tq.enqueue_task(capability, payload, max_attempts=1)
         module = _pick_module(modules, cap_map, capability)
 
@@ -1056,8 +1146,13 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             task_id=task_ids[-1] if task_ids else None,
         )
 
-    def _persist_chapter(phase: dict, chapter: dict, result: dict) -> None:
-        """Persiste el resultado real de la fase en la BD ANTES de marcar PASS."""
+    def _persist_chapter(phase: dict, chapter: dict, result: dict, language: Optional[str] = None) -> None:
+        """Persiste el resultado real de la fase en la BD ANTES de marcar PASS.
+
+        ``language`` (opcional) fuerza el campo destino (draft_es/draft_en,
+        edited_es/edited_en) en el caso multidioma. Si es None, se deriva como
+        antes de books.languages (idioma único, regresión cero).
+        """
         from frontend import editorial
 
         cid = chapter["id"]
@@ -1070,18 +1165,46 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                         text = fh.read()
                 if not text:
                     text = str((result.get("metadata") or {}).get("text", ""))
-                field = "draft_es" if phase["id"] == "writer" else "draft_en"
+                if phase["id"] == "writer_en":
+                    field = "draft_en"
+                elif language is not None:
+                    field = "draft_en" if language == "en" else "draft_es"
+                else:  # phase["id"] == "writer": campo según idioma real del libro
+                    try:
+                        _book = editorial._get_book(chapter["book_id"])
+                    except Exception:
+                        _book = None
+                    field = (
+                        "draft_en"
+                        if _resolve_writer_capability(_book) == "write_chapter_en"
+                        else "draft_es"
+                    )
                 editorial.persist_chapter_result(chapter["book_id"], cid, field, text)
                 # Poblar chapters.sources con las URLs REALES de SourceManager
                 # (fuente de verdad única: sources.chapter_ids). Se ejecuta una única
                 # vez por capítulo, aquí en el writer/writer_en (las fases posteriores
-                # per-chapter como editor/image_gen no reescriben la columna).
+                # per-chapter como editor/image_gen no reescriben la columna). En el
+                # caso multidioma se vuelve a persistir de forma idempotente.
                 editorial.persist_chapter_sources(
                     chapter["book_id"], cid, editorial._chapter_source_urls(cid)
                 )
             elif phase["id"] == "editor":
                 text = str(result.get("edited_text") or "")
-                editorial.persist_chapter_result(chapter["book_id"], cid, "edited_es", text)
+                # Campo según idioma activo de la fase (§20 tarea 6): "en" → edited_en;
+                # resto → edited_es. Si language es None, deriva del libro (histórico).
+                if language is not None:
+                    field = "edited_en" if language == "en" else "edited_es"
+                else:
+                    try:
+                        _book_ed = editorial._get_book(chapter["book_id"])
+                    except Exception:
+                        _book_ed = None
+                    field = (
+                        "edited_en"
+                        if _resolve_writer_capability(_book_ed) == "write_chapter_en"
+                        else "edited_es"
+                    )
+                editorial.persist_chapter_result(chapter["book_id"], cid, field, text)
             elif phase["id"] == "image_gen":
                 # Persistir rutas de imágenes generadas a chapters.images
                 results = result.get("results") or []
@@ -1103,14 +1226,37 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         book_id = job["book_id"]
         chapters = editorial.get_chapters(book_id)
 
-        # Subestado persistente (sobrevive retry/recovery)
+        # Idiomas para las fases de TEXTO (writer/fact_check/editor). En el caso
+        # multidioma (languages="es,en") cada idioma ejecuta el módulo una vez por
+        # capítulo y persiste su columna es/en. image_plan/image_gen quedan fuera
+        # (imágenes compartidas); research/docx/quality_gate son globales.
+        text_phase = phase["id"] in ("writer", "fact_check", "editor")
+        try:
+            _book = editorial._get_book(book_id)
+        except Exception:
+            _book = None
+        langs = _resolve_book_languages(_book) if text_phase else ["es"]
+
+        # Subestado persistente (sobrevive retry/recovery). Para multidioma, la clave
+        # del capítulo guarda un dict interno por idioma (los sub-idiomas se marcan
+        # individualmente y solo se considera el capítulo PASS cuando todos lo están).
         subs = phase.setdefault("subs", {})
         cap_subs = subs.setdefault("chapters", {})
         if not cap_subs:
-            cap_subs.update({
-                str(c["id"]): {"status": "PENDING", "attempts": 0}
-                for c in chapters
-            })
+            if text_phase and len(langs) > 1:
+                cap_subs.update({
+                    str(c["id"]): {
+                        "status": "PENDING",
+                        "attempts": 0,
+                        "languages": {lang: {"status": "PENDING"} for lang in langs},
+                    }
+                    for c in chapters
+                })
+            else:
+                cap_subs.update({
+                    str(c["id"]): {"status": "PENDING", "attempts": 0}
+                    for c in chapters
+                })
         subs["total"] = len(chapters)
         subs["done"] = 0
         agg_words = 0
@@ -1118,36 +1264,66 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
 
         for chapter in chapters:
             cid = str(chapter["id"])
-            csub = cap_subs.get(cid) or {"status": "PENDING", "attempts": 0}
+            csub = cap_subs.get(cid) or {"status": "PENDING", "attempts": 0, "languages": None}
             if csub.get("status") == "PASS":
                 continue  # capítulo ya completado: terminal, no se re-ejecuta
             csub["attempts"] = csub.get("attempts", 0) + 1
 
-            res = (
-                _run_image_gen_split(phase, job, chapter["id"])
-                if phase["id"] == "image_gen" else
-                _run_single(phase, job, chapter_id=chapter["id"])
-            )
-            csub["module"] = res.module
-            csub["duration"] = res.metrics.get("duration") if res.ok else None
-            csub["error"] = res.error
-            if res.ok:
-                _persist_chapter(phase, chapter, res.metrics)
+            def _run_chapter_unit(unit_lang: Optional[str]) -> PhaseResult:
+                """Ejecuta una unidad (idioma) del capítulo: la fase real o image_gen."""
+                if phase["id"] == "image_gen":
+                    return _run_image_gen_split(phase, job, chapter["id"])
+                return _run_single(phase, job, chapter_id=chapter["id"], language=unit_lang)
+
+            # En multidioma, ejecutar cada idioma secuencialmente; si alguno falla,
+            # se detiene el capítulo (orquestador reintenta la fase; los sub-chunks PASS
+            # por idioma no se re-ejecutan gracias al sub-languages del subestado).
+            multi = text_phase and len(langs) > 1
+            langs_sub = langs if multi else [None]
+            ok_all = True
+            first_err = None
+            last_metrics = None
+            for ulang in langs_sub:
+                if multi:
+                    lang_sub = (csub.setdefault("languages", {})
+                                .setdefault(ulang, {"status": "PENDING"}))
+                    if lang_sub.get("status") == "PASS":
+                        continue  # ese idioma ya completado (retry)
+                    lang_sub["attempts"] = lang_sub.get("attempts", 0) + 1
+
+                res = _run_chapter_unit(ulang)
+                csub["module"] = res.module
+                csub["duration"] = res.metrics.get("duration") if res.ok else None
+                csub["error"] = res.error
+                if res.ok:
+                    if multi:
+                        lang_sub["status"] = "PASS"
+                        lang_sub["metrics"] = res.metrics
+                    _persist_chapter(phase, chapter, res.metrics, language=ulang)
+                    agg_words += int(res.metrics.get("words", 0) or 0)
+                    agg_module = res.module
+                    last_metrics = res.metrics
+                else:
+                    if multi:
+                        lang_sub["status"] = "FAIL"
+                    first_err = res.error
+                    ok_all = False
+                    break
+
+            if ok_all:
                 csub["status"] = "PASS"
-                csub["metrics"] = res.metrics
-                agg_words += int(res.metrics.get("words", 0) or 0)
-                agg_module = res.module
+                csub["metrics"] = last_metrics if last_metrics is not None else {}
                 subs["done"] = sum(1 for s in cap_subs.values() if s.get("status") == "PASS")
                 if store is not None:
                     store.save(job)  # progreso determinista por capítulo
                 continue
             # fallo en este capítulo: detener (el orquestador reintenta la fase;
-            # los capítulos PASS no se repiten en el reintento).
+            # los capítulos/sub-idiomas PASS no se repiten en el reintento).
             csub["status"] = "FAIL"
             subs["done"] = sum(1 for s in cap_subs.values() if s.get("status") == "PASS")
             return PhaseResult(
                 ok=False,
-                error=f"{phase['id']}#{cid}: {res.error}",
+                error=f"{phase['id']}#{cid}: {first_err}",
                 metrics={"subs": {"total": len(chapters), "done": subs["done"]},
                          "words": agg_words, "per_chapter": True},
                 module=agg_module,
@@ -1165,9 +1341,155 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             progress={"done": subs["done"], "total": subs["total"]},
         )
 
+    def _run_docx(phase: dict, job: dict) -> PhaseResult:
+        """Fase DOCX (global): genera UN DOCX por idioma del libro.
+
+        - Idiomas únicos ("es" o "en") → comportamiento idéntico a hoy (un solo
+          build_book_docx con el idioma del libro).
+        - ``languages="es,en"`` → invoca build_book_docx DOS veces (una por idioma),
+          con el Mismo book_dict pero distinto ``language``/columnas fuente. El
+          naming actual (book_{id}_{lang}.docx) ya produce ficheros separados.
+        El PhaseResult es ok=True solo si TODOS los DOCX existen; `docx_path`
+        apunta al del primer idioma y `metrics["docx_paths"]` lista todos.
+        """
+        from frontend import editorial
+
+        langs = _resolve_book_languages(editorial._get_book(job["book_id"]))
+        paths: list[str] = []
+        module_id = None
+        task_ids: list = []
+        for lang in langs:
+            res = _run_single(phase, job, language=lang)
+            if not res.ok:
+                return res
+            p = res.docx_path or (res.metrics or {}).get("docx_path")
+            if not (p and os.path.isfile(p)):
+                return PhaseResult(
+                    ok=False,
+                    error=f"Document Builder no produjo un DOCX válido para {lang}: {p}",
+                    metrics=res.metrics, module=res.module, task_id=res.task_id,
+                )
+            paths.append(p)
+            module_id = res.module
+            task_id = res.task_id
+        return PhaseResult(
+            ok=True,
+            metrics={**({"docx_paths": paths} if len(paths) > 1 else {}),
+                     "docx_path": paths[0] if paths else None},
+            module=module_id,
+            task_id=task_id if task_id else None,
+            docx_path=paths[0] if paths else None,
+        )
+
+    def _run_research_multilang(phase: dict, job: dict) -> PhaseResult:
+        """Fase research (fix book_56 / deuda §19 P3): UNA pasada POR IDIOMA.
+
+        - Libros monolingües ("es" o "en") → una única pasada con el idioma del
+          libro (un libro "en" ya NO consulta es.wikipedia).
+        - ``languages="es,en"`` → DOS pasadas (es.wikipedia + en.wikipedia, cada
+          una con su red + curación LLM). Las fuentes de cada idioma se guardan
+          en ``job.data.sources_by_lang[lang]`` para que build_payload entregue
+          a CADA writer solo las de su idioma (prompt LLM y backstop determinista
+          sin hechos mezclados). El PhaseResult final fusiona ambas listas
+          (dedupe por URL) con el MISMO shape histórico, de modo que la
+          propagación Research -> job.data.sources -> SourceManager de run_job
+          funciona sin cambios.
+        """
+        from frontend import editorial
+
+        langs = _resolve_book_languages(editorial._get_book(job["book_id"]))
+        if len(langs) <= 1:
+            return _run_single(phase, job, language=langs[0])
+
+        merged_sources: list[dict] = []
+        seen_urls: set[str] = set()
+        per_lang_counts: dict[str, int] = {}
+        per_lang_status: dict[str, str] = {}
+        last_metrics: dict = {}
+        module_id = None
+        task_id = None
+        # FIX book_62 (fallback research bilingüe): si la pasada del idioma
+        # SECUNDARIO falla SOLO por gate de source_count insuficiente (misma
+        # condición que construye _run_single para research), no aborta el job:
+        # se copian las fuentes del idioma primario a sources_by_lang[secundario]
+        # y se registra warning. Cualquier otro fallo (excepción/timeout/error
+        # real) o fallo del idioma PRIMARIO sigue abortando igual que antes.
+        warnings: list[str] = []
+        for idx, lang in enumerate(langs):
+            res = _run_single(phase, job, language=lang)
+            if not res.ok:
+                if (
+                    idx > 0
+                    and isinstance(res.error, str)
+                    and res.error.startswith("research#")
+                    and "source_count=" in res.error
+                ):
+                    primary = langs[0]
+                    data = job.setdefault("data", {})
+                    src_by_lang = data.setdefault("sources_by_lang", {})
+                    src_by_lang[lang] = list(src_by_lang.get(primary) or [])
+                    warning = (
+                        f"research idioma {lang}: source_count insuficiente "
+                        f"({res.error}); fallback: se reutilizan "
+                        f"{len(src_by_lang[lang])} fuentes del idioma primario '{primary}'"
+                    )
+                    log(logger, logging.WARNING, warning)
+                    warnings.append(warning)
+                    per_lang_counts[lang] = len(src_by_lang[lang])
+                    per_lang_status[lang] = "FALLBACK"
+                    last_metrics = {
+                        "query": "",
+                        "language": lang,
+                        "status": "PASS",
+                        "execution_mode": "fallback_primary_sources",
+                        "sources": src_by_lang[lang],
+                        "source_count": len(src_by_lang[lang]),
+                    }
+                    continue
+                return PhaseResult(
+                    ok=False,
+                    error=f"{res.error} [research idioma {lang}]",
+                    metrics=res.metrics,
+                    module=res.module,
+                    task_id=res.task_id,
+                )
+            m = res.metrics or {}
+            for s in (m.get("sources") or []):
+                url = (s or {}).get("url")
+                if url and url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                merged_sources.append(s)
+            per_lang_counts[lang] = int(m.get("source_count") or 0)
+            per_lang_status[lang] = str(m.get("status") or "")
+            # Desglose por idioma para el writer (persistido con el job).
+            job.setdefault("data", {}).setdefault("sources_by_lang", {})[lang] = (
+                m.get("sources") or []
+            )
+            last_metrics = m
+            module_id = res.module or module_id
+            task_id = res.task_id or task_id
+        return PhaseResult(
+            ok=True,
+            metrics={
+                **last_metrics,
+                "sources": merged_sources,
+                "source_count": len(merged_sources),
+                "per_language": per_lang_counts,
+                "per_language_status": per_lang_status,
+                **({"warnings": warnings} if warnings else {}),
+            },
+            module=module_id,
+            task_id=task_id,
+        )
+
     def executor(phase: dict, job: dict) -> PhaseResult:
+        if phase["id"] == "research":
+            return _run_research_multilang(phase, job)
         if phase["id"] in PER_CHAPTER_PHASES:
             return _execute_per_chapter(phase, job)
+        if phase["id"] == "docx":
+            return _run_docx(phase, job)
         return _run_single(phase, job)
 
     return executor

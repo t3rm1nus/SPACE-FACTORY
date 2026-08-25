@@ -508,6 +508,9 @@ function bindAutopilotButtons() {
   setButton('autopilot-cancel', cancelAutopilot, !!sel && !loading && !!j && (j.status === 'PENDING' || j.status === 'RUNNING'));
   setButton('autopilot-retry', retryAutopilot, !!sel && !loading && !!j && j.status === 'FAILED');
   setButton('autopilot-view', viewBookDetail, !!j && j.status === 'COMPLETED' && !loading);
+  // Borrar libro: solo cuando NO hay trabajo en ejecución (PENDING/RUNNING).
+  const jobBusy = !!j && (j.status === 'PENDING' || j.status === 'RUNNING');
+  setButton('book-delete', deleteBook, !!sel && !loading && !jobBusy);
 }
 function renderAutopilotControls() {
   const box = document.getElementById('autopilot-actions');
@@ -540,6 +543,10 @@ function renderAutopilotControls() {
   } else if (job.status === 'COMPLETED') {
     html = '<span class="autopilot-chip success">' + esc(JOB_STATUS_LABEL[job.status]) + '</span>'
       + '<button type="button" id="autopilot-view" class="btn btn-success">VER LIBRO</button>';
+  }
+  // Botón de borrado: visible solo con libro seleccionado y sin job en curso.
+  if (sel && !(job && (job.status === 'PENDING' || job.status === 'RUNNING'))) {
+    html += '<button type="button" id="book-delete" class="btn btn-danger" title="Borrar libro">🗑 BORRAR LIBRO</button>';
   }
   box.innerHTML = html;
   bindAutopilotButtons();
@@ -695,6 +702,82 @@ function retryAutopilot() {
     .finally(() => { state.autopilotLoading = false; renderAutopilotControls(); });
 }
 
+// ---------- Borrar libro (confirmación nativa, sin recargar la página) ----------
+function deleteBook() {
+  const id = state.selectedBookId;
+  if (!id || state.autopilotLoading) return;
+  const j = state.autopilot;
+  if (j && (j.status === 'PENDING' || j.status === 'RUNNING')) return; // no borrar un job en ejecución
+  const book = state.books.find(b => String(b.id) === String(id));
+  const title = (book && book.title) || ('#' + id);
+  if (!window.confirm("¿Seguro que quieres borrar '" + title + "'? Esta acción no se puede deshacer.")) return;
+  state.autopilotLoading = true;
+  renderAutopilotControls();
+  apiFetch('/api/books/' + id, { method: 'DELETE' })
+    .then(() => {
+      // Quitar el libro de la lista en memoria y re-renderizar sin recargar.
+      state.books = state.books.filter(b => String(b.id) !== String(id));
+      state.selectedBookId = null;
+      state.autopilot = null;
+      state.currentBookDetail = null;
+      addFeed('failed', 'Libro borrado: ' + title);
+      renderBookSelector();
+      renderBooks();
+    })
+    .catch(e => _showError('No se pudo borrar: ' + e.message))
+    .finally(() => {
+      state.autopilotLoading = false;
+      renderAutopilotControls();
+      renderBookReady();
+    });
+}
+
+// ---------- Borrado masivo (confirmación reforzada en dos pasos) ----------
+function deleteAllBooks() {
+  if (state.autopilotLoading) return;
+  const total = state.books.length;
+  if (!total) { _showError('No hay libros que borrar'); return; }
+  const runningIds = new Set(
+    (state.jobs || [])
+      .filter(j => j.status === 'PENDING' || j.status === 'RUNNING')
+      .map(j => String(j.book_id))
+  );
+  const skipped = state.books.filter(b => runningIds.has(String(b.id))).length;
+  const toDelete = total - skipped;
+
+  // Paso 1: confirmación con aviso de libros en ejecución (si aplica).
+  let msg1 = "Vas a borrar TODOS los libros (" + total + "). Esta acción no se puede deshacer.";
+  if (skipped > 0) msg1 = skipped + " libro(s) no se borrarán por estar en ejecución.\n\n" + msg1;
+  if (!window.confirm(msg1)) return;
+  // Paso 2: verificación escribiendo el número exacto de libros a borrar.
+  const answer = window.prompt("Escribe " + toDelete + " para confirmar el borrado.");
+  if (answer === null) return;
+  if (answer.trim() !== String(toDelete)) { _showError('Confirmación cancelada: el número no coincide'); return; }
+
+  state.autopilotLoading = true;
+  apiFetch('/api/books', { method: 'DELETE' })
+    .then(res => {
+      const deletedSet = new Set((res.deleted || []).map(String));
+      // Quitar solo los borrados; los skipped_running permanecen.
+      state.books = state.books.filter(b => !deletedSet.has(String(b.id)));
+      if (state.selectedBookId && deletedSet.has(String(state.selectedBookId))) {
+        state.selectedBookId = null;
+        state.autopilot = null;
+        state.currentBookDetail = null;
+      }
+      addFeed('failed', 'Borrado masivo: ' + (res.deleted || []).length + ' borrado(s), ' + (res.skipped_running || []).length + ' saltado(s)');
+      _showError('BORRADOS ' + (res.deleted || []).length + ' · SALTADOS (en ejecución) ' + (res.skipped_running || []).length);
+      renderBookSelector();
+      renderBooks();
+    })
+    .catch(e => _showError('No se pudo borrar: ' + e.message))
+    .finally(() => {
+      state.autopilotLoading = false;
+      renderAutopilotControls();
+      renderBookReady();
+    });
+}
+
 function viewBookDetail() {
   if (state.autopilot && state.autopilot.docx_path) addFeed('completed', 'Libro listo: ' + state.autopilot.docx_path);
   showView('control-room');
@@ -730,9 +813,15 @@ async function createNewBook() {
       body_alignment: layout_alignment,
     },
   };
+  // Idioma(s): "es" | "en" | "es,en". Dos checkboxes independientes; se envía
+  // como `language` para que editorial.create_book lo persista en books.languages.
+  const langEs = !!(document.getElementById('new-book-lang-es') || {}).checked;
+  const langEn = !!(document.getElementById('new-book-lang-en') || {}).checked;
+  if (!langEs && !langEn) { _showError('Selecciona al menos un idioma'); return; }
+  const language = langEs && langEn ? 'es,en' : (langEn ? 'en' : 'es');
   if (!title) { _showError('Indica un título'); return; }
   try {
-    const book = await apiFetch('/api/books', { method: 'POST', body: JSON.stringify({ title, target_chapters: chapters || 1, idea, author, genre, target_audience, image_count, image_search_ratio, layout_config }) });
+    const book = await apiFetch('/api/books', { method: 'POST', body: JSON.stringify({ title, target_chapters: chapters || 1, idea, author, genre, target_audience, image_count, image_search_ratio, layout_config, language }) });
     const id = book.book_id || book.id;
     closeCreateBook();
     state.selectedBookId = id;
@@ -819,6 +908,8 @@ function initApp() {
   if (btnCreate) btnCreate.addEventListener('click', createNewBook);
   const btnCancelCreate = document.getElementById('btn-cancel-create');
   if (btnCancelCreate) btnCancelCreate.addEventListener('click', closeCreateBook);
+  const btnDeleteAllBooks = document.getElementById('btn-delete-all-books');
+  if (btnDeleteAllBooks) btnDeleteAllBooks.addEventListener('click', deleteAllBooks);
   connectSSE();
   refreshData();
   setCmdStatus('SISTEMA LISTO', 'online');

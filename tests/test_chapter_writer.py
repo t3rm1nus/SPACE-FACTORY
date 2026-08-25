@@ -11,6 +11,8 @@ import pytest
 
 from modules.chapter_writer.main import (
     _build_prompt,
+    _build_prompt_en,
+    _build_prompt_es,
     _build_section_continuation_prompt,
     _build_subsections_map,
     _canonicalize_headings,
@@ -92,6 +94,28 @@ def test_build_prompt_includes_anti_repetition_rules_en() -> None:
     assert "self-contained unit" in prompt
     assert "Do not turn the conclusion into a detailed summary" in prompt
     assert "The conclusion must not reproduce the body of the chapter" in prompt
+
+
+def test_build_prompt_en_excludes_es_skeleton() -> None:
+    """_build_prompt_en no debe contener las frases del esqueleto/pie es español; sí sus equivalentes EN."""
+    prompt_en = _build_prompt_en(_payload())
+    for frase in (
+        "El objetivo de longitud es un REQUISITO",
+        "No añadas relleno",
+        "Devuelve únicamente el capítulo Markdown",
+    ):
+        assert frase not in prompt_en
+    assert "The length objective is a REQUIREMENT" in prompt_en
+    assert "Do not add filler" in prompt_en
+    assert "Return ONLY the final Markdown chapter" in prompt_en
+
+
+def test_build_prompt_es_keeps_es_skeleton() -> None:
+    """_build_prompt_es conserva el esqueleto/pie en español."""
+    prompt_es = _build_prompt_es(_payload())
+    assert "El objetivo de longitud es un REQUISITO" in prompt_es
+    assert "No añadas relleno" in prompt_es
+    assert "Devuelve únicamente el capítulo Markdown" in prompt_es
 
 
 def test_build_prompt_includes_conclusion_synthesis_rule() -> None:

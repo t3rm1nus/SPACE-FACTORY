@@ -246,8 +246,10 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS books (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                title_en TEXT,
                 subtitle TEXT,
                 description TEXT,
+                description_en TEXT,
                 author TEXT,
                 target_audience TEXT,
                 genre TEXT,
@@ -274,6 +276,8 @@ def init_db() -> None:
                                 research TEXT,
                 sources TEXT NOT NULL DEFAULT '[]',
                 outline TEXT,
+                outline_en TEXT,
+                title_en TEXT,
                 draft_es TEXT,
                 draft_en TEXT,
                 edited_es TEXT,
@@ -299,6 +303,27 @@ def init_db() -> None:
         # Migración: añadir image_search_ratio en bases existentes
         try:
             conn.execute("ALTER TABLE books ADD COLUMN image_search_ratio REAL NOT NULL DEFAULT 0.0")
+        except Exception:
+            pass  # columna ya existe
+        # §17 #21 (Opción A): título/descripción del libro en inglés para la
+        # edición EN de libros bilingües (NULL = sin traducción → fallback ES).
+        try:
+            conn.execute("ALTER TABLE books ADD COLUMN title_en TEXT")
+        except Exception:
+            pass  # columna ya existe
+        try:
+            conn.execute("ALTER TABLE books ADD COLUMN description_en TEXT")
+        except Exception:
+            pass  # columna ya existe
+        # §17 #21 (Opción A): título y outline del capítulo en inglés
+        # (outline_en = JSON [{heading, objective}] en inglés, misma forma que
+        # `chapters.outline`). NULL = sin traducción → fallback ES intacto.
+        try:
+            conn.execute("ALTER TABLE chapters ADD COLUMN title_en TEXT")
+        except Exception:
+            pass  # columna ya existe
+        try:
+            conn.execute("ALTER TABLE chapters ADD COLUMN outline_en TEXT")
         except Exception:
             pass  # columna ya existe
         conn.execute(

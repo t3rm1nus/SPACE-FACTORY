@@ -355,3 +355,201 @@ def test_execute_dedupes_repeated_claims(monkeypatch: pytest.MonkeyPatch) -> Non
     # Se conserva la PRIMERA aparición de cada claim único
     assert claims[0] == "Latveria es una nación ficticia de Marvel"
     assert claims[1] == "Doom fue lanzado en 2016"
+
+
+# ---------------------------------------------------------------------------
+# §17 #20 PASO 1 — fabricación factual (caso REAL book_59 cap.2)
+# ---------------------------------------------------------------------------
+
+BOOK59_SOURCES = [
+    {
+        "title": "Limpieza étnica, ocupación militar y genocidio en Palestina - EHU",
+        "url": "https://www.ehu.eus/es/web/campusa/-/limpieza-etnica-ocupacion-militar-y-genocidio-en-palestina",
+        "source_type": "web_searxng",
+        "content": "Entre 1947-1949, las milicias sionistas expulsaron del territorio de la Palestina histórica.",
+    },
+    {
+        "title": "Palestina: genocidio y guerra de liberación - litci.org",
+        "url": "https://litci.org/es/palestina-genocidio-y-guerra-de-liberacion/",
+        "source_type": "web_searxng",
+        "content": "Estos gobiernos se limitan a realizar protestas verbales contra el genocidio.",
+    },
+    {
+        "title": "Genocidio cultural",
+        "url": "https://es.wikipedia.org/wiki/Genocidio_cultural",
+        "source_type": "web_searxng",
+        "content": "El genocidio cultural es la destrucción deliberada del patrimonio cultural.",
+    },
+    {
+        "title": "Guerra de Gaza - Wikipedia",
+        "url": "https://es.wikipedia.org/wiki/Guerra_de_Gaza",
+        "source_type": "web_searxng",
+        "content": "La guerra de Gaza comenzó el 7 de octubre de 2023.",
+    },
+]
+
+# Claims exactas detectadas por fact_checker en task 472 (book_59 cap.2):
+# el LLM las clasificó WARNING pese a no tener ningún soporte en las fuentes.
+BOOK59_CLAIMS = [
+    {
+        "claim": (
+            "The first major concentration camp in Palestine was established "
+            "in 1942, during World War II."
+        ),
+        "severity": "WARNING",
+        "reason": (
+            "This statement is not supported by any of the provided sources. "
+            "The sources focus on the genocidio and do not mention "
+            "concentration camps specifically."
+        ),
+        "source_url": None,
+        "suggestion": None,
+    },
+    {
+        "claim": (
+            "Adolf Eichmann's plan was to create a series of camps that would "
+            "serve multiple purposes: housing displaced Palestinians, serving "
+            "as labor sources for the German military, and ultimately "
+            "facilitating their eventual extermination."
+        ),
+        "severity": "WARNING",
+        "reason": (
+            "This statement is not supported by any of the provided sources. "
+            "The sources focus on the genocidio and do not mention Eichmann's "
+            "plans specifically."
+        ),
+        "source_url": None,
+        "suggestion": None,
+    },
+]
+
+
+def test_fabrication_signature_detection() -> None:
+    """La firma estructural fecha+nombre propio+cifra se detecta correctamente."""
+    from modules.fact_checker.main import _has_fabrication_signature
+
+    assert _has_fabrication_signature(
+        "The first major concentration camp in Palestine was established in 1942."
+    )
+    assert _has_fabrication_signature(
+        "Majdal Shams albergó entre 50,000 y 100,000 prisioneros hasta 1948."
+    )
+    # Sin cifra/fecha concreta NO hay firma
+    assert not _has_fabrication_signature(
+        "El conflicto causó un gran sufrimiento a la población palestina."
+    )
+
+
+def _fake_provider(llm_json: str) -> tuple:
+    class FakeResult:
+        text = llm_json
+        provider = "ollama"
+        model = "llama3.1"
+        input_tokens = 10
+        output_tokens = 20
+        cost = 0.0
+        raw_response = {"model": "llama3.1", "response": llm_json}
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def generate(self, *args: Any, **kwargs: Any) -> FakeResult:
+            return FakeResult()
+
+    return FakeProvider()
+
+
+def test_book59_fabricated_claims_escalate_to_error_and_fail_gate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Caso REAL book_59 cap.2: claims de campos de concentración sin soporte.
+
+    El LLM devolvió WARNING para afirmaciones fabricadas (Eichmann, 1942-1948,
+    cifras de víctimas) que ninguna de las 4 fuentes reales menciona. Con el
+    fix §17 #20 deben salir ERROR y quality_gate=FAIL dentro del módulo.
+    """
+    import modules.fact_checker.main as main
+
+    llm_json = json.dumps(
+        {
+            "status": "FAIL",
+            "claims_checked": 12,
+            "issues": BOOK59_CLAIMS,
+            "corrections": [],
+            "unsupported_claims": [],
+            "supported_claims": 0,
+            "conflicting_claims": 0,
+        }
+    )
+
+    provider = _fake_provider(llm_json)
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    payload = _payload()
+    payload["chapter_text"] = (
+        "## Los Eventos Trágicos\n\n"
+        "The first major concentration camp in Palestine was established in "
+        "1942, during World War II. Adolf Eichmann's plan was to create a "
+        "series of camps that would serve multiple purposes. Conditions inside "
+        "the concentration camps were abysmal and forced labor was common, "
+        "with estimates ranging from fifty thousand to one hundred thousand "
+        "victims between 1942 and 1948 in Majdal Shams, Nahariyya, Jaffa and "
+        "Safed."
+    )
+    payload["sources"] = BOOK59_SOURCES
+
+    out = execute(payload)
+
+    assert out["status"] == "FAIL"
+    # Ambas claims fabricadas escalan a ERROR
+    severities = {i["severity"] for i in out["issues"]}
+    assert severities == {"ERROR"}
+    for issue in out["issues"]:
+        assert "fabricación factual" in issue["reason"]
+        assert issue["source_url"] is None  # nunca se inventa fuente
+    # La pieza clave: el gate del MÓDULO ahora bloquea
+    assert out["quality_gate"] == "FAIL"
+
+
+def test_supported_specific_claim_not_escalated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Una claim con fuente asociada (source_url) NO debe escalar a ERROR."""
+    import modules.fact_checker.main as main
+
+    llm_json = json.dumps(
+        {
+            "status": "PASS",
+            "claims_checked": 1,
+            "issues": [
+                {
+                    "claim": "La guerra de Gaza comenzó el 7 de octubre de 2023 según Wikipedia.",
+                    "severity": "INFO",
+                    "reason": "Fecha verificable en la fuente citada.",
+                    "source_url": "https://es.wikipedia.org/wiki/Guerra_de_Gaza",
+                    "suggestion": None,
+                }
+            ],
+            "corrections": [],
+            "unsupported_claims": [],
+            "supported_claims": 1,
+            "conflicting_claims": 0,
+        }
+    )
+
+    provider = _fake_provider(llm_json)
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    payload = _payload()
+    payload["chapter_text"] = (
+        "La guerra de Gaza comenzó el 7 de octubre de 2023 según la fuente "
+        "citada, con consecuencias documentadas para la población civil."
+    )
+    payload["sources"] = BOOK59_SOURCES
+
+    out = execute(payload)
+    assert out["quality_gate"] == "PASS"
+    assert out["status"] in ("PASS", "WARNING")

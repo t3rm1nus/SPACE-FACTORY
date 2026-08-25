@@ -112,6 +112,10 @@
                             <span class="btn-command-icon" aria-hidden="true">⚙</span>
                             <span class="btn-command-label">ESTADO DEL SISTEMA</span>
                         </button>
+                        <button class="btn-command-secondary btn-danger" id="btn-delete-all-books" type="button">
+                            <span class="btn-command-icon" aria-hidden="true">🗑</span>
+                            <span class="btn-command-label">BORRAR TODOS LOS LIBROS</span>
+                        </button>
                         <div class="autopilot-bar">
                             <span class="autopilot-book-label">LIBRO:</span>
                             <select id="book-selector" class="book-select-input">
@@ -237,6 +241,11 @@
             <input id="new-book-genre" class="enqueue-input" type="text" placeholder="Género (ej. Divulgación)">
             <label for="new-book-audience">Público objetivo</label>
             <input id="new-book-audience" class="enqueue-input" type="text" placeholder="Público objetivo (ej. General)">
+            <label>Idioma(s)</label>
+            <div class="radio-group" id="new-book-languages">
+                <label class="radio-inline"><input type="checkbox" id="new-book-lang-es" checked> Español</label>
+                <label class="radio-inline"><input type="checkbox" id="new-book-lang-en"> English</label>
+            </div>
             <label for="new-book-images">Imágenes por capítulo</label>
             <div class="radio-group" id="new-book-images">
                 <label class="radio-inline"><input type="radio" name="images_per_chapter" value="0"> 0</label>

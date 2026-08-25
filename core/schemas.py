@@ -107,6 +107,10 @@ class BookPlanPayload(TaskPayload):
     desired_length: Optional[str] = Field(default=None, max_length=100)
     style: Optional[str] = Field(default=None, max_length=200)
     subject_constraints: Optional[str] = Field(default=None, max_length=5000)
+    # §17 #20 PASO 3: fuentes reales (resumidas) para anclar el outline.
+    # Opcional con default None — retrocompatible; mismo patrón de lista de
+    # fuentes que ChapterWritePayload.sources.
+    sources: Optional[list] = Field(default=None)
 
 
 class BookPlanOutput(BaseModel):

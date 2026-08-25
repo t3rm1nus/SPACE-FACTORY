@@ -551,3 +551,294 @@ def test_prompt_requires_sections_field() -> None:
     prompt = _build_prompt(BookPlanPayload(**_payload()))
     assert "sections" in prompt
     assert "Nunca omitas sections" in prompt
+
+# ---------------------------------------------------------------------------
+# §17 #20 PASO 3 — anclaje del outline a fuentes reales (caso book_59)
+# ---------------------------------------------------------------------------
+
+
+def test_build_prompt_includes_sources_when_present() -> None:
+    """Payload con sources → el prompt incluye títulos de fuentes + anclaje."""
+    payload = _payload()
+    payload["sources"] = [
+        {"title": "Guerra de Gaza - Wikipedia", "url": "https://es.wikipedia.org/wiki/Guerra_de_Gaza", "summary": "La guerra comenzó el 7 de octubre de 2023."},
+        {"title": "Genocidio cultural", "url": "https://es.wikipedia.org/wiki/Genocidio_cultural", "summary": "Destrucción deliberada del patrimonio cultural."},
+    ]
+    prompt = _build_prompt(BookPlanPayload(**payload))
+    assert "Guerra de Gaza - Wikipedia" in prompt
+    assert "Fuentes disponibles:" in prompt
+    assert "REGLA DE ANCLAJE A FUENTES" in prompt
+    assert "sin inventar hechos, nombres propios ni cifras específicas" in prompt
+
+
+def test_build_prompt_unchanged_without_sources() -> None:
+    """Sin sources (None) el prompt es IDÉNTICO al histórico (cero regresión
+    para ficción / libros sin research)."""
+    base = _payload()
+    p_old = BookPlanPayload(**base)
+    prompt_none = _build_prompt(p_old)
+    # Sin bloque de fuentes ni mención de anclaje
+    assert "Fuentes disponibles:" not in prompt_none
+    assert "REGLA DE ANCLAJE A FUENTES" not in prompt_none
+    # Fragmentos clave del prompt histórico intactos y en orden
+    assert "No inventar hechos; separar hechos de hipótesis cuando aplique." in prompt_none
+    assert prompt_none.index("Restricciones temáticas") < prompt_none.index("REGLAS:")
+    # Y con sources=[] explícito, mismo resultado que None
+    base2 = dict(base)
+    base2["sources"] = []
+    assert _build_prompt(BookPlanPayload(**base2)) == prompt_none
+
+
+def test_reproduces_book59_scenario() -> None:
+    """Caso REAL book_59: idea sensible + las 4 fuentes reales cortas.
+
+    El prompt debe incluir las fuentes y la instrucción de anclaje, y NO debe
+    contener mecanismo alguno que fuerce secciones no ancladas (el outline
+    cerrado/obligatorio se mantiene, pero ahora se genera con material real).
+    """
+    payload = {
+        "idea": "Historia Completa del Genocidio en Palestina",
+        "target_chapters": 3,
+        "language": "es",
+        "sources": [
+            {"title": "Limpieza étnica, ocupación militar y genocidio en Palestina - EHU", "url": "https://www.ehu.eus/es/web/campusa/-/limpieza-etnica-ocupacion-militar-y-genocidio-en-palestina", "summary": "Entre 1947-1949, las milicias sionistas expulsaron del territorio de la Palestina histórica."},
+            {"title": "Palestina: genocidio y guerra de liberación - litci.org", "url": "https://litci.org/es/palestina-genocidio-y-guerra-de-liberacion/", "summary": "Estos gobiernos se limitan a realizar protestas verbales contra el genocidio."},
+            {"title": "Genocidio cultural", "url": "https://es.wikipedia.org/wiki/Genocidio_cultural", "summary": "El genocidio cultural es la destrucción deliberada del patrimonio cultural."},
+            {"title": "Guerra de Gaza - Wikipedia", "url": "https://es.wikipedia.org/wiki/Guerra_de_Gaza", "summary": "La guerra de Gaza comenzó el 7 de octubre de 2023."},
+        ],
+    }
+    prompt = _build_prompt(BookPlanPayload(**payload))
+    assert "Historia Completa del Genocidio en Palestina" in prompt
+    for title in (
+        "EHU",
+        "litci.org",
+        "Genocidio cultural",
+        "Guerra de Gaza",
+    ):
+        assert title in prompt
+    assert "ancla los headings y objectives de cada sección a temas que ellas soporten" in prompt
+    # No existe instrucción que obligue a cubrir temas sin soporte
+    assert "inventar hechos, nombres propios ni cifras específicas" in prompt
+
+
+# ---------------------------------------------------------------------------
+# §17 #21 (Opción A) — plan bilingüe: traducción EN con UNA llamada LLM extra,
+# validación all-or-nothing y fallback determinista sin red.
+# ---------------------------------------------------------------------------
+def _bilingual_payload() -> dict:
+    p = _payload()
+    p["target_chapters"] = 2
+    p["language"] = "es,en"
+    return p
+
+
+_ES_PLAN = {
+    "title": "Alimentacion sana",
+    "subtitle": "Sub",
+    "description": "Guia de vida longeva",
+    "chapters": [
+        {
+            "number": 1,
+            "title": "Fundamentos de la alimentacion",
+            "objective": "Objetivo 1",
+            "estimated_words": 3000,
+            "sections": [
+                {"heading": "Introducción", "objective": "Presentar el tema"},
+                {"heading": "Desarrollo", "objective": "Desarrollar puntos"},
+                {"heading": "Conclusión", "objective": "Sintetizar ideas"},
+            ],
+        },
+        {
+            "number": 2,
+            "title": "Ejercicio y longevidad",
+            "objective": "Objetivo 2",
+            "estimated_words": 3000,
+            "sections": [
+                {"heading": "Introducción", "objective": "Presentar el ejercicio"},
+                {"heading": "Conclusión", "objective": "Cerrar el capítulo"},
+            ],
+        },
+    ],
+}
+
+_EN_TRANSLATION_OK = {
+    "title_en": "Healthy Eating",
+    "description_en": "Guide to a long life",
+    "chapters": [
+        {
+            "title_en": "Foundations of nutrition",
+            "sections": [
+                {"heading_en": "Introduction", "objective_en": "Present the topic"},
+                {"heading_en": "Development", "objective_en": "Develop points"},
+                {"heading_en": "Conclusion", "objective_en": "Synthesize ideas"},
+            ],
+        },
+        {
+            "title_en": "Exercise and longevity",
+            "sections": [
+                {"heading_en": "Introduction", "objective_en": "Present exercise"},
+                {"heading_en": "Conclusion", "objective_en": "Close the chapter"},
+            ],
+        },
+    ],
+}
+
+
+class _FakeResult:
+    def __init__(self, text: str):
+        self.text = text
+        self.provider = "ollama"
+        self.model = "llama3.1"
+        self.input_tokens = 0
+        self.output_tokens = 0
+        self.cost = 0.0
+        self.raw_response = {}
+
+
+class _FakeSeqProvider:
+    """Proveedor controlado: devuelve respuestas en orden y registra prompts."""
+
+    name = "ollama"
+    model = "llama3.1"
+    timeout = None
+
+    def __init__(self, texts: list):
+        self._texts = list(texts)
+        self.prompts: list[str] = []
+
+    def generate(self, prompt, **kwargs):
+        self.prompts.append(prompt)
+        if not self._texts:
+            raise RuntimeError("no stub response left")
+        item = self._texts.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return _FakeResult(item)
+
+
+def _run_execute(monkeypatch, provider):
+    import modules.book_planner.main as main
+
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+    return execute(_bilingual_payload()), provider
+
+
+def test_j_bilingual_plan_translates_titles_and_sections_llm_ok(monkeypatch) -> None:
+    """Traducción exitosa: título/descripción del libro + títulos/secciones de
+    TODOS los capítulos quedan poblados, mismo orden y mismo conteo."""
+    provider = _FakeSeqProvider([
+        json.dumps(_ES_PLAN),
+        json.dumps(_EN_TRANSLATION_OK),
+    ])
+    out, provider = _run_execute(monkeypatch, provider)
+    assert out["title_en"] == "Healthy Eating"
+    assert out["description_en"] == "Guide to a long life"
+    assert [c["title_en"] for c in out["chapters"]] == [
+        "Foundations of nutrition", "Exercise and longevity",
+    ]
+    first_outline = out["chapters"][0]["outline_en"]
+    assert isinstance(first_outline, list)
+    assert [s["heading"] for s in first_outline] == [
+        "Introduction", "Development", "Conclusion",
+    ]
+    # La llamada de traducción incluyó título y descripción del libro (Amendment 1).
+    assert len(provider.prompts) == 2
+    assert "Alimentacion sana" in provider.prompts[1]
+    assert "Guia de vida longeva" in provider.prompts[1]
+
+
+def test_k_bilingual_plan_chapter_count_mismatch_discards_translation(monkeypatch) -> None:
+    """LLM devuelve menos capítulos de los esperado → TODO descartado a None,
+    sin excepción propagada."""
+    bad = json.loads(json.dumps(_EN_TRANSLATION_OK))
+    bad["chapters"] = bad["chapters"][:1]
+    provider = _FakeSeqProvider([json.dumps(_ES_PLAN), json.dumps(bad)])
+    out, _ = _run_execute(monkeypatch, provider)
+    assert out["title_en"] is None
+    assert out["description_en"] is None
+    for c in out["chapters"]:
+        assert c["title_en"] is None and c["outline_en"] is None
+
+
+def test_l_bilingual_plan_section_mismatch_in_one_chapter_discards_all(monkeypatch) -> None:
+    """Un solo capítulo con nº de secciones distinto → se descarta el resultado
+    COMPLETO (nunca traducción parcial)."""
+    bad = json.loads(json.dumps(_EN_TRANSLATION_OK))
+    bad["chapters"][1]["sections"].append(
+        {"heading_en": "Extra", "objective_en": "Extra objective"}
+    )
+    provider = _FakeSeqProvider([json.dumps(_ES_PLAN), json.dumps(bad)])
+    out, _ = _run_execute(monkeypatch, provider)
+    assert out["title_en"] is None
+    for c in out["chapters"]:
+        assert c["title_en"] is None and c["outline_en"] is None
+
+
+def test_m_bilingual_plan_discards_when_translation_empty_or_identical(monkeypatch) -> None:
+    """Regla dura: heading_en vacío en un capítulo → todo descartado."""
+    bad = json.loads(json.dumps(_EN_TRANSLATION_OK))
+    bad["chapters"][0]["sections"][0]["heading_en"] = "   "
+    provider = _FakeSeqProvider([json.dumps(_ES_PLAN), json.dumps(bad)])
+    out, _ = _run_execute(monkeypatch, provider)
+    assert out["title_en"] is None
+    for c in out["chapters"]:
+        assert c["title_en"] is None and c["outline_en"] is None
+
+
+def test_n_bilingual_plan_identical_to_spanish_discards(monkeypatch) -> None:
+    """JSON devuelto byte-idéntico al original ES (sin traducir) → descartado."""
+    identical = {
+        "title_en": _ES_PLAN["title"],
+        "description_en": _ES_PLAN["description"],
+        "chapters": [
+            {
+                "title_en": ch["title"],
+                "sections": [
+                    {"heading_en": s["heading"], "objective_en": s["objective"]}
+                    for s in ch["sections"]
+                ],
+            }
+            for ch in _ES_PLAN["chapters"]
+        ],
+    }
+    provider = _FakeSeqProvider([json.dumps(_ES_PLAN), json.dumps(identical)])
+    out, _ = _run_execute(monkeypatch, provider)
+    assert out["title_en"] is None
+    for c in out["chapters"]:
+        assert c["title_en"] is None and c["outline_en"] is None
+
+
+def test_o_monolingual_es_plan_skips_translation_no_extra_llm_call(monkeypatch) -> None:
+    """Regresión cero: libro 'es' → una sola llamada LLM, campos _en None."""
+    import modules.book_planner.main as main
+
+    provider = _FakeSeqProvider([json.dumps(_ES_PLAN)])
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+    out = execute(_payload())
+    assert len(provider.prompts) == 1
+    assert out["title_en"] is None
+    for c in out["chapters"]:
+        assert c["title_en"] is None and c["outline_en"] is None
+    # Comportamiento histórico intacto
+    assert out["title"] == "Alimentacion sana"
+    assert len(out["chapters"]) == 2
+
+
+def test_p_fallback_plan_populates_outline_en_deterministically(monkeypatch) -> None:
+    """Fallback determinista SIN segunda llamada LLM: outline_en solo si las
+    secciones son las canónicas ES (mapeo Introducción→Introduction etc.);
+    title_en/description_en quedan None."""
+    provider = _FakeSeqProvider([RuntimeError("ollama caído")])
+    out, provider = _run_execute(monkeypatch, provider)
+    # Solo hubo 1 intento de generate (el plan); ninguna llamada de traducción.
+    assert len(provider.prompts) <= 1
+    assert out["title_en"] is None
+    assert out["description_en"] is None
+    # El fallback determinista inyecta las secciones canónicas ES → mapeo EN aplica.
+    for c in out["chapters"]:
+        oe = c["outline_en"]
+        assert oe is not None
+        assert [s["heading"] for s in oe] == ["Introduction", "Development", "Conclusion"]
+        assert c["title_en"] is None

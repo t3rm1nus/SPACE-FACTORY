@@ -221,6 +221,82 @@ def _autopilot_pipeline(job: dict) -> list:
 
 
 
+def _book_docx_paths(book_id: int) -> list[str]:
+    """Rutas absolutas de los DOCX reales generados para un libro.
+
+    Patrón de identidad 1:1 por book_id (8E.7): output/docx/book_{id}_{language}.docx.
+    Aislado en helper a nivel de módulo para poder testear el borrado sin
+    tocar el directorio output/ real.
+    """
+    proj_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    docx_dir = os.path.join(proj_root, "output", "docx")
+    if not os.path.isdir(docx_dir):
+        return []
+    prefix = f"book_{book_id}_"
+    return [
+        os.path.join(docx_dir, name)
+        for name in os.listdir(docx_dir)
+        if name.startswith(prefix) and name.endswith(".docx")
+    ]
+
+
+def _delete_book_core(book_id: int) -> tuple[int, dict]:
+    """Lógica compartida de borrado de UN libro (individual y masivo).
+
+    Devuelve (status_code, body):
+    - 404 si el libro no existe.
+    - 409 si el job autopilot del libro está PENDING/RUNNING (no se
+      permite borrar un trabajo en ejecución).
+    - 200 tras borrar filas de `chapters` y `books` en una sola transacción.
+
+    Reglas (idénticas para borrado individual y masivo):
+    - NO toca la tabla `sources`: las fuentes son compartidas/reutilizables
+      entre libros vía `chapter_ids` y el anti-reciclaje por `url_hash`.
+      Los chapter_ids huérfanos que puedan quedar son inofensivos.
+    - Borra best-effort los DOCX reales en output/docx/book_{id}_*.docx;
+      si el archivo no existe la operación NO falla.
+    - TODO (fuera del alcance autorizado): imágenes en
+      data/images/books/{book_id}/, checkpoints en
+      data/checkpoints/{book_id}/, artefactos en data/artifacts/{book_id}/
+      y el job JSON en data/autopilot/jobs/book_{id}.json quedan sin borrar.
+    """
+    store = get_autopilot_store()
+    job = store.load_by_book(book_id)
+    if job is not None and job.get("status") in (
+        autopilot.JOB_PENDING, autopilot.JOB_RUNNING
+    ):
+        return 409, {
+            "error": "No se puede borrar un libro con el autopilot en ejecución",
+        }
+
+    conn = get_db()
+    try:
+        exists = conn.execute(
+            "SELECT id FROM books WHERE id = ?", (book_id,)
+        ).fetchone()
+        if not exists:
+            return 404, {"error": f"Libro {book_id} no encontrado"}
+        conn.execute("DELETE FROM chapters WHERE book_id = ?", (book_id,))
+        conn.execute("DELETE FROM books WHERE id = ?", (book_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+    # DOCX best-effort: nunca fallar la request por un archivo ausente.
+    docx_removed = []
+    for docx_path in _book_docx_paths(book_id):
+        try:
+            os.remove(docx_path)
+            docx_removed.append(os.path.basename(docx_path))
+        except OSError as e:
+            logger.warning(
+                "No se pudo borrar el DOCX %s del libro %s: %s",
+                docx_path, book_id, e,
+            )
+
+    return 200, {"deleted": book_id, "docx_removed": docx_removed}
+
+
 def create_app() -> Flask:
     """Crea y configura la aplicacion Flask."""
     app = Flask(__name__, static_folder=None)
@@ -488,11 +564,16 @@ def create_app() -> Flask:
             book = conn.execute("SELECT * FROM books WHERE id = ?", (book_id,)).fetchone()
             if not book:
                 return jsonify({"error": f"Libro {book_id} no encontrado"}), 404
+            # sqlite3.Row no soporta .get(); convertir a dict para acceso seguro.
+            book = dict(book)
 
-            chapters = conn.execute(
-                "SELECT * FROM chapters WHERE book_id = ? ORDER BY number",
-                (book_id,),
-            ).fetchall()
+            chapters = [
+                dict(c)
+                for c in conn.execute(
+                    "SELECT * FROM chapters WHERE book_id = ? ORDER BY number",
+                    (book_id,),
+                ).fetchall()
+            ]
 
             chapter_list = []
             for c in chapters:
@@ -540,6 +621,55 @@ def create_app() -> Flask:
             })
         finally:
             conn.close()
+
+    @app.route("/api/books/<int:book_id>", methods=["DELETE"])
+    def api_book_delete(book_id: int):
+        """DELETE -> borra un libro existente y sus capítulos asociados.
+
+        Reglas:
+        - 404 si el libro no existe.
+        - 409 si el job autopilot del libro está PENDING/RUNNING (no se
+          permite borrar un trabajo en ejecución).
+        - Delega en _delete_book_core (lógica compartida con el borrado
+          masivo de DELETE /api/books).
+        """
+        status, body = _delete_book_core(book_id)
+        return jsonify(body), status
+
+    @app.route("/api/books", methods=["DELETE"])
+    def api_books_delete_all():
+        """DELETE -> borrado masivo de TODOS los libros.
+
+        Reutiliza exactamente la misma lógica por libro que el borrado
+        individual (_delete_book_core), sin duplicarla:
+        - los libros con job PENDING/RUNNING se SALTAN (quedan excluidos,
+          la operación NO se corta);
+        - BD vacía -> 200 con listas vacías (nunca 404);
+        - 200 con resumen {"deleted", "skipped_running", "total_books"}.
+        """
+        conn = get_db()
+        try:
+            rows = conn.execute("SELECT id FROM books ORDER BY id").fetchall()
+        finally:
+            conn.close()
+
+        deleted: list[int] = []
+        skipped_running: list[int] = []
+        for row in rows:
+            book_id = row["id"]
+            status, _body = _delete_book_core(book_id)
+            if status == 200:
+                deleted.append(book_id)
+            elif status == 409:
+                skipped_running.append(book_id)
+            # 404 no debería ocurrir (el id viene de esta misma transacción);
+            # se ignora sin cortar el resto.
+
+        return jsonify({
+            "deleted": deleted,
+            "skipped_running": skipped_running,
+            "total_books": len(rows),
+        }), 200
 
     @app.route("/api/enqueue", methods=["POST"])
     def api_enqueue():

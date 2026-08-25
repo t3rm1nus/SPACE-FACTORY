@@ -21,9 +21,44 @@ from core.providers.base import LLMInvalidResponseError
 
 logger = get_logger(__name__)
 
-WIKI_BASE = "https://es.wikipedia.org/w/api.php"
-WIKI_REST_BASE = "https://es.wikipedia.org/api/rest_v1/page/summary"
+# ---- Research parametrizado por idioma (fix book_56 / deuda §19 P3) --------
+# Cada idioma soportado usa SU Wikipedia; el pipeline bilingüe ejecuta research
+# una vez por idioma y el writer de cada idioma recibe fuentes del idioma correcto.
+WIKI_API_BASES = {
+    "es": "https://es.wikipedia.org/w/api.php",
+    "en": "https://en.wikipedia.org/w/api.php",
+}
+WIKI_REST_BASES = {
+    "es": "https://es.wikipedia.org/api/rest_v1/page/summary",
+    "en": "https://en.wikipedia.org/api/rest_v1/page/summary",
+}
+WIKI_PAGE_URLS = {
+    "es": "https://es.wikipedia.org/wiki/",
+    "en": "https://en.wikipedia.org/wiki/",
+}
+# Retrocompatibilidad con el código/tests que importaba las constantes históricas.
+WIKI_BASE = WIKI_API_BASES["es"]
+WIKI_REST_BASE = WIKI_REST_BASES["es"]
 WIKIDATA_BASE = "https://www.wikidata.org/w/api.php"
+
+
+def _norm_language(language) -> str:
+    """Normaliza el idioma activo a 'es'/'en' (tolerante a None/'es,en'/listas)."""
+    if isinstance(language, (list, tuple)):
+        for part in language:
+            p = str(part).strip().lower()
+            if p.startswith("en"):
+                return "en"
+            if p.startswith("es"):
+                return "es"
+        return "es"
+    s = str(language or "").strip().lower()
+    if "," in s:
+        # Bilingüe "es,en": para UNA pasada de research el orden define el idioma
+        # principal histórico ('es'); cada idioma tiene su propia pasada aparte.
+        s = s.split(",")[0].strip()
+    return "en" if s.startswith("en") else "es"
+
 USER_AGENT = "SpaceLair/1.0 (research agent)"
 
 # --- Timeouts y presupuesto de la capa multi-fuente (PASO 3) ------------------
@@ -85,7 +120,8 @@ def _request(url: str, timeout: int = 20) -> tuple[int, bytes]:
     except urllib.error.URLError as e:
         raise RuntimeError(f"Error de red en {url}: {e.reason}") from e
 
-def _wiki_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
+def _wiki_search(query: str, limit: int = 5, language: str = "es") -> list[dict[str, Any]]:
+    lang = _norm_language(language)
     params = urllib.parse.urlencode({
         "action": "query",
         "list": "search",
@@ -93,7 +129,7 @@ def _wiki_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
         "srlimit": str(limit),
         "format": "json",
     })
-    url = f"{WIKI_BASE}?{params}"
+    url = f"{WIKI_API_BASES[lang]}?{params}"
     status, body = _request(url)
     if status != 200:
         return []
@@ -104,13 +140,14 @@ def _wiki_search(query: str, limit: int = 5) -> list[dict[str, Any]]:
             "title": item.get("title", ""),
             "pageid": item.get("pageid"),
             "snippet": re.sub(r"<[^>]+>", "", item.get("snippet", "")),
-            "url": f"https://es.wikipedia.org/wiki/{urllib.parse.quote(item.get('title', ''))}",
+            "url": f"{WIKI_PAGE_URLS[lang]}{urllib.parse.quote(item.get('title', ''))}",
             "timestamp": item.get("timestamp"),
         })
     return results
 
 
-def _wiki_extract(title: str, sentences: int = 8) -> Optional[dict[str, Any]]:
+def _wiki_extract(title: str, sentences: int = 8, language: str = "es") -> Optional[dict[str, Any]]:
+    lang = _norm_language(language)
     params = urllib.parse.urlencode({
         "action": "query",
         "prop": "extracts",
@@ -120,7 +157,7 @@ def _wiki_extract(title: str, sentences: int = 8) -> Optional[dict[str, Any]]:
         "titles": title,
         "format": "json",
     })
-    url = f"{WIKI_BASE}?{params}"
+    url = f"{WIKI_API_BASES[lang]}?{params}"
     status, body = _request(url)
     if status != 200:
         return None
@@ -133,13 +170,14 @@ def _wiki_extract(title: str, sentences: int = 8) -> Optional[dict[str, Any]]:
     return {
         "title": page.get("title", title),
         "extract": extract,
-        "url": f"https://es.wikipedia.org/wiki/{urllib.parse.quote(title)}",
+        "url": f"{WIKI_PAGE_URLS[_norm_language(language)]}{urllib.parse.quote(title)}",
     }
 
 
-def _wiki_rest_summary(title: str) -> Optional[dict[str, Any]]:
+def _wiki_rest_summary(title: str, language: str = "es") -> Optional[dict[str, Any]]:
+    lang = _norm_language(language)
     safe = urllib.parse.quote(title.replace(" ", "_"))
-    url = f"{WIKI_REST_BASE}/{safe}"
+    url = f"{WIKI_REST_BASES[lang]}/{safe}"
     status, body = _request(url)
     if status != 200:
         return None
@@ -215,17 +253,18 @@ def _candidate_key(cand: dict[str, Any]) -> str:
     )
 
 
-def _backend_wikipedia(query: str, per_backend_limit: int, timeout: int) -> list[dict[str, Any]]:
-    """Backend Wikipedia (es): búsqueda + extracción real del resumen introductorio."""
+def _backend_wikipedia(query: str, per_backend_limit: int, timeout: int, language: str = "es") -> list[dict[str, Any]]:
+    """Backend Wikipedia (idioma parametrizado): búsqueda + extracción real del resumen introductorio."""
+    lang = _norm_language(language)
     out: list[dict[str, Any]] = []
     try:
-        items = _wiki_search(query, limit=per_backend_limit)
+        items = _wiki_search(query, limit=per_backend_limit, language=lang)
     except Exception as e:
         logger.warning("Backend wikipedia falló durante búsqueda multi-fuente: %s", e)
         return out
     for item in items[:per_backend_limit]:
         title = str(item.get("title") or "")
-        extract_data = _wiki_rest_summary(title) or _wiki_extract(title)
+        extract_data = _wiki_rest_summary(title, language=lang) or _wiki_extract(title, language=lang)
         if not extract_data:
             continue
         text = str(extract_data.get("extract") or "").strip()
@@ -243,12 +282,13 @@ def _backend_wikipedia(query: str, per_backend_limit: int, timeout: int) -> list
     return out
 
 
-def _backend_wikidata(query: str, per_backend_limit: int, timeout: int) -> list[dict[str, Any]]:
-    """Backend Wikidata: búsqueda de entidades (wbsearchentities)."""
+def _backend_wikidata(query: str, per_backend_limit: int, timeout: int, language: str = "es") -> list[dict[str, Any]]:
+    """Backend Wikidata: búsqueda de entidades (wbsearchentities) en el idioma dado."""
+    lang = _norm_language(language)
     params = urllib.parse.urlencode({
         "action": "wbsearchentities",
         "search": query,
-        "language": "es",
+        "language": lang,
         "format": "json",
         "limit": str(per_backend_limit),
     })
@@ -355,19 +395,41 @@ def _search_searxng(query: str, limit: int = 5, timeout: int = 7) -> list[dict[s
     return out
 
 
-def _multi_source_search(query: str, max_sources: int, timeout: int) -> list[dict[str, Any]]:
+def _multi_source_search(query: str, max_sources: int, timeout: int, language: str = "es") -> list[dict[str, Any]]:
     """Búsqueda multi-backend con dedupe determinista y tope duro por backend.
 
     Cada backend aporta a lo sumo ``per_backend_limit`` resultados (tope duro por
     backend) y RESEARCH_TOTAL_TIME_BUDGET frena el proceso si se agota.
+    ``language`` parametriza Wikipedia/Wikidata ('es' | 'en').
+
+    Compatibilidad con mocks de tests: los backends se invocan con la firma
+    histórica ``(query, n, timeout=timeout)``; el idioma solo se pasa como kwarg
+    si el callable lo acepta (los mocks antiguos ``lambda q, n, timeout`` siguen
+    funcionando sin cambios).
     """
+    lang = _norm_language(language)
     per_backend_limit = max(max_sources, 1)
     started = time.monotonic()
     collected: list[dict[str, Any]] = []
 
+    def _call(fn, *args, **kwargs):
+        try:
+            return fn(*args, language=lang, **kwargs)
+        except TypeError:
+            return fn(*args, **kwargs)
+
+    def _wiki_backend(q, n, timeout):
+        # globals() para respetar monkeypatch de tests sobre _backend_wikipedia.
+        fn = globals().get("_backend_wikipedia")
+        return _call(fn, q, n, timeout)
+
+    def _wdata_backend(q, n, timeout):
+        fn = globals().get("_backend_wikidata")
+        return _call(fn, q, n, timeout)
+
     backends: list[tuple] = [
-        (_backend_wikipedia, "wikipedia"),
-        (_backend_wikidata, "wikidata"),
+        (_wiki_backend, "wikipedia"),
+        (_wdata_backend, "wikidata"),
         (_search_searxng, "searxng"),
     ]
     if RESEARCH_ARCHIVE_ENABLED:
@@ -624,8 +686,9 @@ def _curate_with_llm(
 
 def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: str = "es",
                  topic: Optional[str] = None) -> dict[str, Any]:
+    lang = _norm_language(language)
     try:
-        candidates = _multi_source_search(query, max_sources, timeout)
+        candidates = _multi_source_search(query, max_sources, timeout, language=lang)
     except Exception as e:
         return {
             "query": query,
@@ -707,6 +770,7 @@ def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: 
     status = "PASS" if len(stored) >= 1 else "FAIL"
     return {
         "query": query,
+        "language": lang,
         "status": status,
         "execution_mode": execution_mode,
         "sources": results,
@@ -817,6 +881,10 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
     # SOLO para anclar el filtro de relevancia; NO se toca validate_payload ni
     # su dict de retorno.
     topic = payload.get("topic")
+    # Idioma activo de la pasada de research ('es'|'en'): parametriza Wikipedia/
+    # Wikidata (fix book_56 / deuda §19 P3). Llega desde editorial.build_payload
+    # vía el Autopilot, que ejecuta UNA pasada por idioma en libros bilingües.
+    language = _norm_language(payload.get("language"))
 
     # Capability fetch_url y extract_text no requieren research_required
     if capability == "fetch_url":
@@ -839,7 +907,7 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
         }
 
     try:
-        result = research_web(query, max_sources=max_sources, timeout=timeout, topic=topic)
+        result = research_web(query, max_sources=max_sources, timeout=timeout, language=language, topic=topic)
     except Exception as e:
         result = {
             "query": query,
@@ -854,6 +922,7 @@ def execute(payload: dict, capability: str = "research_web") -> dict[str, Any]:
 
     result.setdefault("execution_mode", "real")
     result.setdefault("query", query)
+    result.setdefault("language", language)
     result.setdefault("sources", [])
     result.setdefault("stored_sources", [])
     result.setdefault("source_count", 0)

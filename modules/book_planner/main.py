@@ -238,8 +238,183 @@ def health_check() -> dict:
     }
 
 
+def _build_translation_prompt(
+    book_title: str,
+    book_description: str,
+    chapters: list[Any],
+) -> str:
+    """Prompt de la llamada única de traducción ES→EN del plan completo."""
+    ch_payload = []
+    for c in chapters:
+        ch_payload.append({
+            "title": c.title,
+            "sections": [
+                {"heading": (s or {}).get("heading"), "objective": (s or {}).get("objective")}
+                for s in (c.sections or [])
+            ],
+        })
+    payload_json = json.dumps({
+        "book_title": (book_title or "")[:200],
+        "book_description": (book_description or "")[:_TRANSLATE_DESC_MAX_CHARS],
+        "chapters": ch_payload,
+    }, ensure_ascii=False)
+    return (
+        "You are a professional editorial translator. Translate the following "
+        "Spanish book plan into natural, professional English.\n\n"
+        f"{payload_json}\n\n"
+        "RULES:\n"
+        "- Return ONLY valid JSON, no extra text.\n"
+        '- Exact JSON shape: {"title_en":"...","description_en":"...",'
+        '"chapters":[{"title_en":"...","sections":[{"heading_en":"...",'
+        '"objective_en":"..."}]}]}\n'
+        '- The returned "chapters" array MUST have exactly the same number of '
+        "chapters, in the same order, and each chapter MUST have exactly the same "
+        "number of sections as the input.\n"
+        "- Every string must be non-empty and actually translated to English "
+        "(never copy the Spanish text unchanged).\n"
+    )
+
+
+def _validate_translation(
+    raw: dict[str, Any],
+    book_title: str,
+    book_description: str,
+    chapters: list[Any],
+) -> Optional[tuple[str, str, list[dict]]]:
+    """Validación all-or-nothing de la traducción. None = descartar TODO.
+
+    Reglas duras: estructura/tipos correctos; nº de capítulos idéntico índice a
+    índice; por capítulo, nº de secciones idéntico índice a índice; ningún
+    title_en/heading_en/description_en vacío; y el resultado no puede ser
+    byte-idéntico (strip/lower) al original ES (LLM no tradujo nada).
+    """
+    try:
+        t_en = str(raw.get("title_en") or "").strip()
+        d_en = str(raw.get("description_en") or "").strip()
+        chs = raw.get("chapters")
+        if not t_en or not d_en or not isinstance(chs, list):
+            return None
+        if len(chs) != len(chapters):
+            return None
+        translated: list[dict] = []
+        for src_ch, tr_ch in zip(chapters, chs):
+            if not isinstance(tr_ch, dict):
+                return None
+            tr_title = str(tr_ch.get("title_en") or "").strip()
+            if not tr_title:
+                return None
+            tr_secs_raw = tr_ch.get("sections")
+            src_secs = [
+                {
+                    "heading": (s or {}).get("heading"),
+                    "objective": (s or {}).get("objective"),
+                }
+                for s in (src_ch.sections or [])
+            ]
+            if not isinstance(tr_secs_raw, list) or len(tr_secs_raw) != len(src_secs):
+                return None
+            tr_secs: list[dict] = []
+            for tr_s in tr_secs_raw:
+                if not isinstance(tr_s, dict):
+                    return None
+                h_en = str(tr_s.get("heading_en") or "").strip()
+                o_en = str(tr_s.get("objective_en") or "").strip()
+                if not h_en or not o_en:
+                    return None
+                tr_secs.append({"heading": h_en, "objective": o_en})
+            translated.append({"title_en": tr_title, "sections": tr_secs})
+        # Anti no-op: si TODO lo devuelto coincide byte-idéntico (strip/lower)
+        # con el original ES, el LLM no tradujo nada → descartar.
+        all_pairs = [(book_title, t_en), (book_description, d_en)]
+        for src_ch, tr_ch in zip(chapters, translated):
+            all_pairs.append((src_ch.title, tr_ch["title_en"]))
+        identical = sum(1 for a, b in all_pairs if _norm_cmp(a) == _norm_cmp(b))
+        if identical == len(all_pairs):
+            return None
+        return t_en, d_en, translated
+    except Exception:
+        return None
+
+
+def _translate_plan(
+    validated_output: BookPlanOutput,
+) -> tuple[Optional[str], Optional[str], dict[int, dict]]:
+    """Llama al LLM UNA vez para traducir el plan ES completo (§17 #21).
+
+    Devuelve ``(title_en, description_en, {chapter_number: {title_en,
+    outline_en}})``; todo None/vacío si la traducción falla o no valida
+    (all-or-nothing, nunca parcial). Timeout interno propio
+    (PLANNER_TRANSLATE_PROVIDER_TIMEOUT) sobre instancia de proveedor local.
+    """
+    chapters = validated_output.chapters or []
+    if not chapters:
+        return None, None, {}
+    try:
+        provider = get_provider()
+        # Instancia local nueva por llamada (registry.get) → seguro mutar el
+        # timeout sin afectar a otros módulos (mismo patrón que editor).
+        provider.timeout = PLANNER_TRANSLATE_PROVIDER_TIMEOUT
+        prompt = _build_translation_prompt(
+            validated_output.title or "",
+            validated_output.description or "",
+            chapters,
+        )
+        result = provider.generate(
+            prompt,
+            system="Devuelve solo JSON válido, sin texto adicional.",
+            model=DEFAULT_ROUTER_MODEL,
+            max_tokens=1500,
+            temperature=0.2,
+        )
+        raw = _extract_json(result.text)
+        validated_tr = _validate_translation(
+            raw,
+            validated_output.title or "",
+            validated_output.description or "",
+            chapters,
+        )
+        if validated_tr is None:
+            log(logger, logging.WARNING,
+                "[§17 #21] Traducción EN del plan inválida o desalineada → "
+                "descartada (all-or-nothing); campos _en quedan None.")
+            return None, None, {}
+        t_en, d_en, translated = validated_tr
+        per_chapter: dict[int, dict] = {}
+        for src_ch, tr_ch in zip(chapters, translated):
+            per_chapter[src_ch.number] = {
+                "title_en": tr_ch["title_en"],
+                # outline_en como LISTA [{heading, objective}] en inglés.
+                "outline_en": tr_ch["sections"],
+            }
+        return t_en, d_en, per_chapter
+    except Exception as e:
+        log(logger, logging.WARNING,
+            f"[§17 #21] Falla la traducción EN del plan ({e}) → campos _en None.")
+        return None, None, {}
+
+
 def _build_prompt(validated: BookPlanPayload) -> str:
     """Construye un prompt estructurado para generar el plan editorial."""
+    # §17 #20 PASO 3: si hay fuentes reales, incluirlas (título + resumen) y
+    # pedir anclaje. Sin fuentes, el prompt queda EXACTAMENTE igual que antes
+    # (cero regresión para ficción / libros sin research).
+    sources_block = ""
+    if getattr(validated, "sources", None):
+        source_lines = "\n".join(
+            f"- {s.get('title') or s.get('url')}: {(s.get('summary') or '')[:300]}"
+            for s in validated.sources[:10]
+            if isinstance(s, dict)
+        )
+        if source_lines:
+            sources_block = (
+                "\nFuentes disponibles:\n"
+                f"{source_lines}\n\n"
+                "REGLA DE ANCLAJE A FUENTES: Si dispones de fuentes, ancla los headings y "
+                "objectives de cada sección a temas que ellas soporten. Si las fuentes no "
+                "cubren un tema necesario para completar la estructura, formúlalo en términos "
+                "generales, sin inventar hechos, nombres propios ni cifras específicas que no "
+                "estén en las fuentes.\n"
+            )
     return (
         "Eres un editor profesional. Genera un plan editorial JSON estricto a partir de la idea dada.\n\n"
         f"Idea: {validated.idea}\n"
@@ -248,7 +423,8 @@ def _build_prompt(validated: BookPlanPayload) -> str:
         f"Público objetivo: {validated.target_audience or 'No especificado'}\n"
         f"Longitud deseada: {validated.desired_length or 'No especificada'}\n"
         f"Estilo: {validated.style or 'No especificado'}\n"
-        f"Restricciones temáticas: {validated.subject_constraints or 'Ninguna'}\n\n"
+        f"Restricciones temáticas: {validated.subject_constraints or 'Ninguna'}\n"
+        f"{sources_block}\n"
         "REGLAS:\n"
         "- Objetivo recomendado: 30 capítulos; permitir entre 20 y 40.\n"
         "- Progresión lógica; cada capítulo aporta información nueva.\n"
@@ -371,6 +547,70 @@ def _extract_json(text: str) -> dict[str, Any]:
     return json.loads(text[start : end + 1])
 
 
+# ---------------------------------------------------------------------------
+# §17 #21 (Opción A): traducción EN del plan para libros bilingües ("es,en").
+# UNA sola llamada LLM adicional que traduce título+descripción del libro y
+# títulos+secciones de TODOS los capítulos en un único payload/respuesta.
+# Validación all-or-nothing: cualquier desalineación, cadena vacía, resultado
+# idéntico al ES o excepción → descarte completo (campos None, fase PASS).
+# ---------------------------------------------------------------------------
+PLANNER_TRANSLATE_PROVIDER_TIMEOUT = int(
+    os.environ.get("PLANNER_TRANSLATE_TIMEOUT", "60")
+)
+# Truncado de descripción larga en el prompt de traducción (mismo criterio
+# conservador que _short_idea_title: acotar input, no inventar). 600 chars
+# cubren holgadamente una contraportada sin inflar el payload.
+_TRANSLATE_DESC_MAX_CHARS = 600
+
+
+def _plan_languages(lang_value: Any) -> list[str]:
+    """Parsea el campo ``language`` del planner ("es", "es,en", ...) a lista.
+
+    Misma semántica que frontend.editorial._resolve_book_languages pero sobre
+    el string crudo que llega en el payload (el planner no recibe el book dict).
+    """
+    if isinstance(lang_value, (list, tuple)):
+        parts = [str(p).strip().lower() for p in lang_value]
+    else:
+        parts = [p.strip().lower() for p in str(lang_value or "").split(",")]
+    parts = [p for p in parts if p]
+    if not parts:
+        return ["es"]
+    # Orden canónico: "es" primero si presente (idioma primario).
+    ordered = ["es"] if "es" in parts else []
+    ordered += [p for p in parts if p != "es"]
+    return ordered
+
+
+def _norm_cmp(text: Any) -> str:
+    """Normaliza para comparación idéntico-al-original (strip + lower)."""
+    return str(text or "").strip().lower()
+
+
+def _deterministic_outline_en(sections: list[dict]) -> Optional[list[dict]]:
+    """Mapea headings canónicos ES→EN SIN red (fallback del fallback).
+
+    Solo aplica cuando TODAS las secciones del capítulo coinciden exactamente
+    con _DEFAULT_SECTION_HEADINGS["es"]; en ese caso devuelve las EN. Cualquier
+    otro caso → None (no se inventa traducción).
+    """
+    es_map = {h: o for h, o in _DEFAULT_SECTION_HEADINGS["es"]}
+    if not sections:
+        return None
+    # Mapa posicional ES→EN: misma posición en las listas canónicas.
+    en_by_pos = {
+        h_es: h_en
+        for (h_es, _), (h_en, _) in zip(_DEFAULT_SECTION_HEADINGS["es"], _DEFAULT_SECTION_HEADINGS["en"])
+    }
+    out: list[dict] = []
+    for s in sections:
+        heading = str((s or {}).get("heading") or "").strip()
+        if heading not in es_map:
+            return None
+        out.append({"heading": en_by_pos[heading], "objective": (s or {}).get("objective")})
+    return out
+
+
 def execute(payload: dict) -> dict:
     """Genera un plan editorial estructurado a partir de una idea de libro.
 
@@ -402,6 +642,7 @@ def execute(payload: dict) -> dict:
         input_tokens = result.input_tokens
         output_tokens = result.output_tokens
         plan_data = _extract_json(result.text)
+        used_fallback = False
     except Exception as e:
         if provider is not None:
             provider_name = provider.name
@@ -411,6 +652,7 @@ def execute(payload: dict) -> dict:
             f"Fallo al generar plan con LLM ({provider_name}): {e}. Usando fallback.",
         )
         plan_data = _fallback_plan(model_validated)
+        used_fallback = True
 
     # Normalizar respuestas imperfectas del LLM ANTES de validar el esquema
     plan_data = _normalize_plan(plan_data, payload)
@@ -425,6 +667,32 @@ def execute(payload: dict) -> dict:
     if len(chapters) > 40:
         chapters = chapters[:40]
     validated_output.chapters = chapters
+
+    # ---- §17 #21 (Opción A): plan bilingüe. Si el libro declara MÁS de un
+    # idioma (p.ej. "es,en"), traducir título+descripción del libro y
+    # títulos+secciones de todos los capítulos con UNA llamada LLM extra
+    # (validación all-or-nothing). En fallback determinista NO hay llamada LLM:
+    # outline_en solo si las secciones son las canónicas (mapeo sin red);
+    # title_en/description_en quedan None.
+    plan_langs = _plan_languages(model_validated.language)
+    title_en: Optional[str] = None
+    description_en: Optional[str] = None
+    per_chapter_en: dict[int, dict] = {}
+    if len(plan_langs) > 1 and "en" in plan_langs and validated_output.chapters:
+        if used_fallback:
+            log(logger, logging.INFO,
+                "[§17 #21] Plan generado por fallback determinista: se intenta "
+                "mapeo EN sin red para secciones canónicas (sin llamada LLM).")
+            for c in validated_output.chapters:
+                det = _deterministic_outline_en(c.sections or [])
+                if det:
+                    per_chapter_en[c.number] = {
+                        "title_en": None, "outline_en": det,
+                    }
+        else:
+            title_en, description_en, per_chapter_en = _translate_plan(
+                validated_output
+            )
 
     cost = 0.0
     if provider is not None:
@@ -447,12 +715,24 @@ def execute(payload: dict) -> dict:
         f"Plan editorial generado: {validated_output.title} ({len(chapters)} capítulos)",
     )
 
+    out_chapters = []
+    for c in validated_output.chapters:
+        d = c.model_dump()
+        tr = per_chapter_en.get(c.number) or {}
+        # §17 #21: campos _en SIEMPRE presentes (None explícito si no hubo
+        # traducción válida) para consumo/persistencia sin ambigüedad.
+        d["title_en"] = tr.get("title_en")
+        d["outline_en"] = tr.get("outline_en")
+        out_chapters.append(d)
+
     return {
         "title": validated_output.title,
         "subtitle": validated_output.subtitle,
         "description": validated_output.description,
+        "title_en": title_en,
+        "description_en": description_en,
         "target_audience": validated_output.target_audience,
-        "chapters": [c.model_dump() for c in validated_output.chapters],
+        "chapters": out_chapters,
         "language": plan_language,
         "genre": plan_genre,
         "provider": provider_name,

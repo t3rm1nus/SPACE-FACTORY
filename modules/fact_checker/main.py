@@ -25,6 +25,79 @@ _NUM_PATTERN = re.compile(r"\b(?:\d+[\d,\.]*%|\d{4}|\$\d+|\d+ millones|\d+ billi
 _QUOTE_PATTERN = re.compile(r'"[^"]+"|' + r"'[^']+'")
 _DATE_PATTERN = re.compile(r"\b(?:(?:19|20)\d{2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b")
 
+# §17 #20 (PASO 1): detección estructural de fabricación factual.
+# Una claim SIN SOPORTE que combina (a) fecha/año concreto, (b) nombre propio
+# y (c) cifra numérica tiene la firma de un hecho fabricado con apariencia
+# factual y debe clasificarse ERROR, no WARNING.
+# Nota de diseño: un año de 4 dígitos cuenta simultáneamente como fecha y como
+# cifra ("establecido en 1942" ya es una cuantificación concreta del hecho).
+_UNSUPPORTED_MARKER = re.compile(
+    r"sin\s+(fuente|soporte|respaldo)|no\s+tiene\s+una\s+fuente|not\s+supported|"
+    r"does\s+not\s+(?:mention|provide)|no\s+se\s+menciona|no\s+proporciona|"
+    r"unsupported|sin\s+fuentes?",
+    re.IGNORECASE,
+)
+_PROPER_NOUN_PATTERN = re.compile(r"(?<!^)(?<![.!?\x22\x27]\s)(?<!\n)\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]{2,}\b")
+# Bigrama capitalizado (ej. "Adolf Eichmann", "Majdal Shams"): entidad propia
+# concreta y verificable. Una claim sin soporte que la nombra es fabricación
+# potencial aunque no incluya fecha ni cifra (caso book_59 claim Eichmann).
+_PROPER_NOUN_PAIR_PATTERN = re.compile(
+    r"\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+\s+(?:[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+|de\s+[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)"
+)
+
+
+def _is_unsupported_issue(issue: dict[str, Any]) -> bool:
+    """True si el issue indica que la claim carece de soporte en las fuentes."""
+    if issue.get("source_url"):
+        return False
+    text = f"{issue.get('claim', '')} {issue.get('reason', '')}"
+    return bool(_UNSUPPORTED_MARKER.search(text))
+
+
+def _has_fabrication_signature(claim_text: str) -> bool:
+    """True si la claim tiene especificidad factual verificable sin soporte.
+
+    Firma aceptada (cualquiera de):
+    - fecha/año + cifra numérica (el año cuenta como cifra) + nombre propio;
+    - nombre propio COMPUESTO (bigrama capitalizado: "Adolf Eichmann",
+      "Majdal Shams"), que identifica una entidad concreta verificable.
+    """
+    has_date = bool(_DATE_PATTERN.search(claim_text))
+    # La cifra puede ser la propia fecha (año de 4 dígitos) u otro número.
+    has_number = bool(re.search(r"\d[\d,.]*", claim_text))
+    if has_date and has_number and _PROPER_NOUN_PATTERN.search(claim_text):
+        return True
+    return bool(_PROPER_NOUN_PAIR_PATTERN.search(claim_text))
+
+
+def _escalate_fabrication_issue(issue: dict[str, Any]) -> dict[str, Any]:
+    """Eleva a ERROR una claim sin soporte con firma de fabricación factual.
+
+    §17 #20: el LLM clasificaba estas claims como WARNING ("sin soporte"),
+    dejando pasar hechos fabricados (ej. book_59 cap.2: campos de concentración
+    en Palestina atribuidos a Eichmann, 1942-1948, sin ninguna base en las
+    fuentes). La combinación fecha + nombre propio + cifra SIN soporte es una
+    señal estructural de fabricación, independiente de lo grave que sea el tema.
+    """
+    if str(issue.get("severity", "")).upper() == "ERROR":
+        return issue
+    claim = str(issue.get("claim", ""))
+    if _has_fabrication_signature(claim) and _is_unsupported_issue(issue):
+        issue = dict(issue)
+        issue["severity"] = "ERROR"
+        issue["reason"] = (
+            f"{issue.get('reason') or ''} "
+            "[Elevado a ERROR: afirmación sin soporte en fuentes que combina "
+            "fecha + nombre propio + cifra numérica — patrón de fabricación factual]"
+        ).strip()
+        if not issue.get("suggestion"):
+            issue["suggestion"] = (
+                "Eliminar o reformular la afirmación: no puede publicarse "
+                "especificidad factual (fechas, nombres, cifras) sin fuente."
+            )
+    return issue
+
+
 
 def _heuristic_issues(text: str, sources: list[dict]) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
@@ -209,13 +282,15 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
         if claim_key in seen_claims:
             continue
         seen_claims.add(claim_key)
-        normalized_issues.append({
-            "claim": issue.get("claim", ""),
-            "severity": issue.get("severity", "INFO"),
-            "reason": issue.get("reason", ""),
-            "source_url": issue.get("source_url"),
-            "suggestion": issue.get("suggestion"),
-        })
+        normalized_issues.append(
+            _escalate_fabrication_issue({
+                "claim": issue.get("claim", ""),
+                "severity": issue.get("severity", "INFO"),
+                "reason": issue.get("reason", ""),
+                "source_url": issue.get("source_url"),
+                "suggestion": issue.get("suggestion"),
+            })
+        )
 
     unsupported = result_data.get("unsupported_claims") or []
     corrections = result_data.get("corrections") or []
@@ -242,6 +317,12 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
     if not chapter_text or len(chapter_text.split()) < 10:
         quality_gate = "FAIL"
         quality_reasons.append("no hay contenido suficiente para verificar")
+    # §17 #20 (PASO 1): un issue ERROR (incluidas claims de fabricación factual
+    # escaladas) debe bloquear el gate AQUÍ, en el módulo, para que el contenido
+    # fabricado no llegue al DOCX. El gate compuesto de autopilot.py no se toca.
+    if any(i.get("severity") == "ERROR" for i in normalized_issues):
+        quality_gate = "FAIL"
+        quality_reasons.append("claims con severidad ERROR sin soporte en fuentes")
 
     # Métricas
     supported = int(result_data.get("supported_claims", 0))

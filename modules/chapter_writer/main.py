@@ -808,24 +808,17 @@ def _contains_markdown_heading(text: str) -> bool:
     )
 
 
-def _build_section_continuation_prompt(
+def _build_section_continuation_prompt_en(
     target_section: str,
     current_section_words: int,
     target_continuation_words: int,
     section_text: str,
     research: str,
-    language: str,
     existing_chapter: str = "",
 ) -> str:
-    """Construye un prompt de continuacion dirigido a una seccion concreta.
-
-    ``existing_chapter`` es el contenido completo del capítulo ya redactado; se
-    incluye como contexto prohibido (lo que no debe repetirse) para evitar que el
-    modelo re-escriba el capítulo o la sección objetivo.
-    """
+    """Construye el prompt de continuación en inglés para una sección concreta."""
     research = (research or "").strip()
-    if language and str(language).lower().startswith("en"):
-        return (
+    return (
             f"Generate ONLY new content for the existing section:\n\n"
             f"Generate ONLY new content for the existing section: '{target_section}' (write only plain paragraphs, NO markdown headings, NO '##', NO '###').\n\n"
             f"The section already contains approximately {current_section_words} words.\n"
@@ -848,7 +841,18 @@ def _build_section_continuation_prompt(
             f"FULL chapter already written (do NOT reproduce ANY of this):\n\n{existing_chapter or '(none)'}\n\n"
             f"Relevant background/research:\n\n{research or '(none)'}\n\n"
             f"Only output the NEW paragraphs that should be inserted into this existing section. If you repeat content from the chapter, your response will be rejected."
-        )
+    )
+
+def _build_section_continuation_prompt_es(
+    target_section: str,
+    current_section_words: int,
+    target_continuation_words: int,
+    section_text: str,
+    research: str,
+    existing_chapter: str = "",
+) -> str:
+    """Construye el prompt de continuación en español para una sección concreta."""
+    research = (research or "").strip()
     return (
         f"Genera SOLO contenido nuevo para la seccion existente:\n\n"
                                         f"Genera SOLO contenido nuevo para la seccion existente: '{target_section}' (escribe solo parrafos planos, NADA de encabezados Markdown, NADA de '##', NADA de '###').\n\n"
@@ -878,6 +882,34 @@ def _build_section_continuation_prompt(
         f"CAPITULO COMPLETO YA REDACTADO (NO reproduzcas NADA de esto):\n\n{existing_chapter or '(ninguno)'}\n\n"
         f"Contexto/investigacion relevante:\n\n{research or '(ninguno)'}\n\n"
         f"Entrega SOLO los parrafos nuevos que deben insertarse en esta seccion existente. Si repites contenido del capítulo, tu respuesta sera rechazada."
+    )
+
+def _build_section_continuation_prompt(
+    target_section: str,
+    current_section_words: int,
+    target_continuation_words: int,
+    section_text: str,
+    research: str,
+    language: str,
+    existing_chapter: str = "",
+) -> str:
+    """Wrapper: elige la variante ES o EN del prompt de continuación."""
+    if language and str(language).lower().startswith("en"):
+        return _build_section_continuation_prompt_en(
+            target_section,
+            current_section_words,
+            target_continuation_words,
+            section_text,
+            research,
+            existing_chapter,
+        )
+    return _build_section_continuation_prompt_es(
+        target_section,
+        current_section_words,
+        target_continuation_words,
+        section_text,
+        research,
+        existing_chapter,
     )
 def _plan_continuation_deficit(
     current_words: int,
@@ -982,8 +1014,8 @@ def health_check() -> dict:
     }
 
 
-def _build_prompt(validated: dict | ChapterWritePayload, language: str = "es") -> str:
-    """Construye un prompt editorial para redactar el capítulo."""
+def _build_prompt_en(validated: dict | ChapterWritePayload) -> str:
+    """Construye un prompt editorial en inglés para redactar el capítulo."""
     data = validated.model_dump() if not isinstance(validated, dict) else validated
     outline = data.get("chapter_outline") or {}
     sections = outline.get("sections", [])
@@ -1003,110 +1035,156 @@ def _build_prompt(validated: dict | ChapterWritePayload, language: str = "es") -
     research = data.get("research") or "None"
     target_word_count = data.get("target_word_count", 3000)
 
-    if language == "en":
-        writer_line = (
-            "You are a senior editorial writer. Write a complete, "
-            "publish-ready chapter in natural, professional English."
-        )
-        rules = [
-            "Write as if the text was originally authored in English. Avoid literal translation patterns from Spanish.",
-            "Preserve all provided facts, structure, references, citations, meaning, tone, and approximate length.",
-            "Do not invent information, statistics, quotes, sources, or people.",
-            "Only state facts supported by the provided research or listed sources.",
-            "When evidence is mixed or incomplete, acknowledge uncertainty explicitly instead of fabricating certainty.",
-            "Follow the chapter outline structure exactly and avoid thematic drift.",
-            "Adapt idioms and culturally specific expressions into natural English equivalents when needed.",
-            "Avoid repetition, redundancy, and awkward phrasing.",
-            "Treat each outline section as a self-contained unit with its own content; do not repeat information already explained in previous sections.",
-            "If a concept was already explained, a later section may only reference it briefly to connect ideas, never re-define or re-explain it.",
-            "Do not repeat examples, lists, arguments, or complete explanations across sections.",
-            "Do not turn the conclusion into a detailed summary of all sections.",
-            "The conclusion must not reproduce the body of the chapter. It should synthesize the central thesis in a concise closing perspective and may mention previously discussed concepts only briefly. Do not introduce a second detailed treatment of topics already covered.",
-            "Especially avoid repeating: definitions, chronologies, examples, technology lists, causes and consequences, technical explanations, recommendations, and conclusions already developed earlier.",
-            "Write an engaging introduction and a strong, conclusive ending.",
-            "Use natural transitions between sections.",
-            "Keep the tone consistent with the book metadata and style guide.",
-            "Do not mention AI, LLMs, drafts, placeholders, or internal editorial process.",
-            "If research is insufficient, state it explicitly and proceed only with supported content.",
-            "Return Markdown with clear headings and sections.",
-            "Do not include any sources, references, or bibliography section at the end of the chapter — the system adds them automatically from the book's real sources. If you need to cite something within the body, do so naturally in the prose, without creating a dedicated heading or list.",
-            f"Generate a complete chapter of approximately {target_word_count} words. Operational minimum: 1800 words.",
-            "Develop ALL sections of the outline in detail without summarizing or truncating.",
-            "Do not end prematurely; extend as needed to reach the target length.",
-            "Do not use phrases like 'etc.', 'and so on', or leave sections incomplete.",
-            "Do not substitute sections with brief instructions, outlines, or bullet lists instead of prose.",
-            "Deliver only the final chapter in Markdown, without metadata or comments.",
-            "The provided outline is a CLOSED and MANDATORY structure.",
-            "Do not create new main sections `##` that are not present in the outline.",
-            "Do not turn secondary topics into new main sections; integrate them inside the matching outline section.",
-            "Respect exactly the order of the outline sections.",
-            "Do not add any section after `Conclusion`.",
-            "The `Conclusion` section must appear exactly once and be the last editorial section of the chapter.",
-            "The conclusion must synthesize only the points already developed; do not introduce new concepts, examples, technologies, dates, or arguments in the conclusion.",
-            "Do not repeat complete paragraphs from earlier sections.",
-            "Subsections `###` are allowed only when truly necessary and must belong to an existing `##` outline section; do not create chains of subsections to extend length.",
-            "Prioritize precision, coverage, and coherence over length. Do not repeat information to increase the word count.",
-            "Do not add lists of technologies, companies, platforms, protocols, or examples merely to increase length, and do not invent information to reach the word objective.",
-            "Format: exactly one occurrence of each main outline section, exactly one `## Conclusion`, no editorial `##` after `Conclusion`, and no invented main heading.",
-            "Before writing each section, consider what has already been covered; do not re-explain an idea with the same level of detail in several sections; each section must add new information; the conclusion must synthesize, not re-develop.",
-        ]
-    else:
-        writer_line = (
-            "Eres un redactor editorial profesional en español. Redacta un capítulo completo "
-            "y listo para publicar."
-        )
-        rules = [
-            "Escribe en español natural y editorial, sin traducciones literales.",
-            "No inventes información, estadísticas, citas ni fuentes.",
-            "Solo afirma hechos respaldados por la investigación o fuentes listadas.",
-            "Distingue claramente hechos de inferencias cuando sea relevante.",
-            "Respeta EXACTAMENTE el outline proporcionado; no inventes secciones adicionales ni desvíos temáticos.",
-            "Cada sección debe aportar información nueva; si un concepto ya se explicó antes, solo haz una referencia breve, no lo vuelvas a definir desde cero.",
-            "Prohibido repetir párrafos completos o bloques de texto con cambios mínimos de palabras.",
-            "Prohibido utilizar estructuras de plantilla repetitivas del tipo: 'Fue lanzado por... se ha convertido en uno de los más populares... Su capacidad para... lo ha hecho muy popular entre los usuarios.'",
-            "Prohibido rellenar longitud con listas enumeradas de productos, servicios o tecnologías usando la misma estructura.",
-            "Evita frases comodín como: 'Como hemos visto', 'Es importante destacar', 'En este sentido', 'A medida que... crecía y se expandía, se dieron cuenta de...', 'Los ingenieros necesitaban...'.",
-            "No repitas literalmente fechas, nombres o acontecimientos sin aportar contexto nuevo.",
-            "No repitas información ya explicada en secciones anteriores; cada sección debe ser una unidad con contenido propio.",
-            "Si un concepto ya fue explicado, en una sección posterior solo puede mencionarse de forma breve cuando sea necesario para conectar ideas, nunca volver a definirlo o explicarlo en profundidad.",
-            "No repitas ejemplos, listas, argumentos ni explicaciones completas.",
-            "No conviertas la conclusión en un resumen detallado de todas las secciones del capítulo.",
-            "Evita especialmente repetir: definiciones, cronologías, ejemplos, listas de tecnologías, causas y consecuencias, explicaciones técnicas, recomendaciones y contenidos ya desarrollados previamente.",
-            "Prohibido reexplicar en la conclusión los mismos temas desarrollados en el cuerpo (como el futuro de Internet, la IA, la realidad virtual/aumentada o el acceso a Internet); la conclusión solo puede mencionarlos de forma breve para aportar cierre.",
-            "Crea una introducción atractiva y una conclusión que cierre el capítulo sin repetir la introducción ni recitar el índice.",
-            "La conclusión debe cerrar el capítulo de forma sintética. No debe repetir detalladamente las secciones anteriores ni crear nuevas secciones. No debe volver a desarrollar conceptos ya explicados.",
-            "La conclusión debe sintetizar la tesis central con una perspectiva de cierre breve, no reexplicar el cuerpo ni introducir un segundo desarrollo detallado de temas ya cubiertos.",
-            "Genera transiciones naturales entre secciones.",
-            "Mantén el tono coherente con el libro y la guía de estilo.",
-            "No menciones que eres una IA ni incluyas metacomentarios.",
-            "No hagas referencia a borradores, drafts o proceso interno.",
-            "Si la investigación es insuficiente, indícalo explícitamente.",
-            "Devuelve el resultado en formato Markdown con título y secciones claras.",
-            "No incluyas ninguna sección de fuentes, referencias ni bibliografía al final del capítulo — el sistema las añade automáticamente a partir de las fuentes reales del libro. Si necesitas citar algo dentro del cuerpo del texto, hazlo de forma natural en la prosa, sin crear un listado ni un heading dedicado.",
-            f"Genera un capítulo completo de aproximadamente {target_word_count} palabras. Objetivo operativo mínimo: 1800 palabras.",
-            "Desarrolla TODAS las secciones del outline con detalle, sin resumir.",
-            "No termines prematuramente; extiéndete lo necesario para alcanzar la longitud objetivo.",
-            "No uses frases como 'etc.', 'y así sucesivamente' ni dejes secciones incompletas.",
-            "No sustituyas secciones por indicaciones, esquemas o listas breves en lugar de prosa.",
-            "Entrega únicamente el capítulo final en Markdown, sin metadatos ni comentarios.",
-            "Evita mezclar inglés innecesario en texto en español; usa términos naturalmente aceptados en español.",
-            "El outline proporcionado es una estructura CERRADA y OBLIGATORIA.",
-            "El título del capítulo es un heading H1 (`# Título`). No lo escribas como `##`.",
-            "Todas las secciones del outline son headings H2 (`## Sección`). No las escribas como `###`.",
-            "No inventes un heading `##` con el título del capítulo; el título va como H1.",
-            "No crees nuevas secciones principales `##` que no aparezcan en el outline.",
-            "No conviertas temas secundarios en nuevas secciones principales; intégralos dentro de la sección del outline que corresponda.",
-            "Respeta exactamente el orden de las secciones del outline.",
-            "No añadas ninguna sección después de `Conclusión`.",
-            "La sección `Conclusión` debe aparecer una sola vez y ser la última sección editorial del capítulo.",
-            "La conclusión debe sintetizar únicamente los puntos ya desarrollados; no introduzcas en ella conceptos, ejemplos, tecnologías, fechas o argumentos nuevos.",
-            "No repitas párrafos completos de secciones anteriores.",
-            "Las subsecciones `###` solo se permiten cuando son necesarias y deben pertenecer a una sección `##` del outline; no crees cadenas de subsecciones para alargar.",
-            "Prioriza precisión, cobertura y coherencia sobre longitud. No repitas información para aumentar el número de palabras.",
-            "No añadas listas de tecnologías, empresas, plataformas, protocolos o ejemplos únicamente para aumentar longitud, ni inventes información para alcanzar el objetivo de palabras.",
-            "Formato: una única aparición de cada sección principal del outline, exactamente una `## Conclusión`, ninguna sección editorial `##` después de `Conclusión`, y ningún heading principal inventado.",
-            "Antes de escribir cada sección, considera qué información ya se ha cubierto; no vuelvas a explicar una idea con el mismo nivel de detalle en varias secciones; cada sección debe aportar información nueva; la conclusión debe sintetizar, no volver a desarrollar.",
-        ]
+    writer_line = (
+        "You are a senior editorial writer. Write a complete, "
+        "publish-ready chapter in natural, professional English."
+    )
+    rules = [
+        "Write as if the text was originally authored in English. Avoid literal translation patterns from Spanish.",
+        "Preserve all provided facts, structure, references, citations, meaning, tone, and approximate length.",
+        "Do not invent information, statistics, quotes, sources, or people.",
+        "Only state facts supported by the provided research or listed sources.",
+        "When evidence is mixed or incomplete, acknowledge uncertainty explicitly instead of fabricating certainty.",
+        "Follow the chapter outline structure exactly and avoid thematic drift.",
+        "Adapt idioms and culturally specific expressions into natural English equivalents when needed.",
+        "Avoid repetition, redundancy, and awkward phrasing.",
+        "Treat each outline section as a self-contained unit with its own content; do not repeat information already explained in previous sections.",
+        "If a concept was already explained, a later section may only reference it briefly to connect ideas, never re-define or re-explain it.",
+        "Do not repeat examples, lists, arguments, or complete explanations across sections.",
+        "Do not turn the conclusion into a detailed summary of all sections.",
+        "The conclusion must not reproduce the body of the chapter. It should synthesize the central thesis in a concise closing perspective and may mention previously discussed concepts only briefly. Do not introduce a second detailed treatment of topics already covered.",
+        "Especially avoid repeating: definitions, chronologies, examples, technology lists, causes and consequences, technical explanations, recommendations, and conclusions already developed earlier.",
+        "Write an engaging introduction and a strong, conclusive ending.",
+        "Use natural transitions between sections.",
+        "Keep the tone consistent with the book metadata and style guide.",
+        "Do not mention AI, LLMs, drafts, placeholders, or internal editorial process.",
+        "If research is insufficient, state it explicitly and proceed only with supported content.",
+        "Return Markdown with clear headings and sections.",
+        "Do not include any sources, references, or bibliography section at the end of the chapter — the system adds them automatically from the book's real sources. If you need to cite something within the body, do so naturally in the prose, without creating a dedicated heading or list.",
+        f"Generate a complete chapter of approximately {target_word_count} words. Operational minimum: 1800 words.",
+        "Develop ALL sections of the outline in detail without summarizing or truncating.",
+        "Do not end prematurely; extend as needed to reach the target length.",
+        "Do not use phrases like 'etc.', 'and so on', or leave sections incomplete.",
+        "Do not substitute sections with brief instructions, outlines, or bullet lists instead of prose.",
+        "Deliver only the final chapter in Markdown, without metadata or comments.",
+        "The provided outline is a CLOSED and MANDATORY structure.",
+        "Do not create new main sections `##` that are not present in the outline.",
+        "Do not turn secondary topics into new main sections; integrate them inside the matching outline section.",
+        "Respect exactly the order of the outline sections.",
+        "Do not add any section after `Conclusion`.",
+        "The `Conclusion` section must appear exactly once and be the last editorial section of the chapter.",
+        "The conclusion must synthesize only the points already developed; do not introduce new concepts, examples, technologies, dates, or arguments in the conclusion.",
+        "Do not repeat complete paragraphs from earlier sections.",
+        "Subsections `###` are allowed only when truly necessary and must belong to an existing `##` outline section; do not create chains of subsections to extend length.",
+        "Prioritize precision, coverage, and coherence over length. Do not repeat information to increase the word count.",
+        "Do not add lists of technologies, companies, platforms, protocols, or examples merely to increase length, and do not invent information to reach the word objective.",
+        "Format: exactly one occurrence of each main outline section, exactly one `## Conclusion`, no editorial `##` after `Conclusion`, and no invented main heading.",
+        "Before writing each section, consider what has already been covered; do not re-explain an idea with the same level of detail in several sections; each section must add new information; the conclusion must synthesize, not re-develop.",
+    ]
+
+    rules_text = "\n".join(f"- {rule}" for rule in rules)
+    return (
+        f"{writer_line}\n\n"
+        f"Book metadata: {json.dumps(book_meta, ensure_ascii=False)}\n\n"
+        f"Chapter outline:\n{json.dumps(outline, ensure_ascii=False)}\n\n"
+        f"Target sections:\n{sections_text}\n\n"
+        f"Available research:\n{research}\n\n"
+        f"Allowed sources:\n{sources_text or 'None'}\n\n"
+        f"Previous chapter summaries (for continuity):\n{previous_text or 'None'}\n\n"
+        f"Target word count: {target_word_count}\n"
+        "The length objective is a REQUIREMENT, not a suggestion. Write the chapter up to "
+        f"about {target_word_count} words and do not consider the reply finished just because every section already contains some text.\n"
+        "Each main section must be developed in a substantial and original way before the chapter ends; do not finish while sections are only superficially covered.\n"
+        "The anti-repetition rules forbid literal or near-literal repetition; they do NOT allow reducing the chapter to just a few phrases per section to shorten it.\n"
+        "Do not add filler, repetitions, or artificial lists to inflate the length; provide original, substantive content.\n"
+        "Reach, whenever possible, at least the operational minimum of "
+        f"{_required_min_words(validated)} words and keep developing original content until you approach the target of "
+        f"{target_word_count} words.\n"
+        "Return ONLY the final Markdown chapter. Do not explain that you cannot reach the length and do not include a summary.\n"
+        f"Style guide: {style}\n\n"
+        f"STRICT RULES:\n{rules_text}\n\n"
+        "Return ONLY the chapter Markdown, no extra text."
+    )
+
+
+def _build_prompt_es(validated: dict | ChapterWritePayload) -> str:
+    """Construye un prompt editorial en español para redactar el capítulo."""
+    data = validated.model_dump() if not isinstance(validated, dict) else validated
+    outline = data.get("chapter_outline") or {}
+    sections = outline.get("sections", [])
+    sections_text = "\n".join(
+        f"- {s.get('heading', '')}: {s.get('objective', '')}" for s in sections
+    )
+    sources_text = "\n".join(
+        f"- {s.get('title') or s.get('url')} ({s.get('source_type') or 'web'})"
+        for s in (data.get("sources") or [])[:20]
+    )
+    previous_text = "\n".join(
+        f"- {summary}" for summary in (data.get("previous_chapter_summaries") or [])[:10]
+    )
+
+    book_meta = data.get("book_metadata") or {}
+    style = data.get("style_guide") or "neutral, clear and fluid"
+    research = data.get("research") or "None"
+    target_word_count = data.get("target_word_count", 3000)
+
+    writer_line = (
+        "Eres un redactor editorial profesional en español. Redacta un capítulo completo "
+        "y listo para publicar."
+    )
+    rules = [
+        "Escribe en español natural y editorial, sin traducciones literales.",
+        "No inventes información, estadísticas, citas ni fuentes.",
+        "Solo afirma hechos respaldados por la investigación o fuentes listadas.",
+        "Distingue claramente hechos de inferencias cuando sea relevante.",
+        "Respeta EXACTAMENTE el outline proporcionado; no inventes secciones adicionales ni desvíos temáticos.",
+        "Cada sección debe aportar información nueva; si un concepto ya se explicó antes, solo haz una referencia breve, no lo vuelvas a definir desde cero.",
+        "Prohibido repetir párrafos completos o bloques de texto con cambios mínimos de palabras.",
+        "Prohibido utilizar estructuras de plantilla repetitivas del tipo: 'Fue lanzado por... se ha convertido en uno de los más populares... Su capacidad para... lo ha hecho muy popular entre los usuarios.'",
+        "Prohibido rellenar longitud con listas enumeradas de productos, servicios o tecnologías usando la misma estructura.",
+        "Evita frases comodín como: 'Como hemos visto', 'Es importante destacar', 'En este sentido', 'A medida que... crecía y se expandía, se dieron cuenta de...', 'Los ingenieros necesitaban...'.",
+        "No repitas literalmente fechas, nombres o acontecimientos sin aportar contexto nuevo.",
+        "No repitas información ya explicada en secciones anteriores; cada sección debe ser una unidad con contenido propio.",
+        "Si un concepto ya fue explicado, en una sección posterior solo puede mencionarse de forma breve cuando sea necesario para conectar ideas, nunca volver a definirlo o explicarlo en profundidad.",
+        "No repitas ejemplos, listas, argumentos ni explicaciones completas.",
+        "No conviertas la conclusión en un resumen detallado de todas las secciones del capítulo.",
+        "Evita especialmente repetir: definiciones, cronologías, ejemplos, listas de tecnologías, causas y consecuencias, explicaciones técnicas, recomendaciones y contenidos ya desarrollados previamente.",
+        "Prohibido reexplicar en la conclusión los mismos temas desarrollados en el cuerpo (como el futuro de Internet, la IA, la realidad virtual/aumentada o el acceso a Internet); la conclusión solo puede mencionarlos de forma breve para aportar cierre.",
+        "Crea una introducción atractiva y una conclusión que cierre el capítulo sin repetir la introducción ni recitar el índice.",
+        "La conclusión debe cerrar el capítulo de forma sintética. No debe repetir detalladamente las secciones anteriores ni crear nuevas secciones. No debe volver a desarrollar conceptos ya explicados.",
+        "La conclusión debe sintetizar la tesis central con una perspectiva de cierre breve, no reexplicar el cuerpo ni introducir un segundo desarrollo detallado de temas ya cubiertos.",
+        "Genera transiciones naturales entre secciones.",
+        "Mantén el tono coherente con el libro y la guía de estilo.",
+        "No menciones que eres una IA ni incluyas metacomentarios.",
+        "No hagas referencia a borradores, drafts o proceso interno.",
+        "Si la investigación es insuficiente, indícalo explícitamente.",
+        "Devuelve el resultado en formato Markdown con título y secciones claras.",
+        "No incluyas ninguna sección de fuentes, referencias ni bibliografía al final del capítulo — el sistema las añade automáticamente a partir de las fuentes reales del libro. Si necesitas citar algo dentro del cuerpo del texto, hazlo de forma natural en la prosa, sin crear un listado ni un heading dedicado.",
+        f"Genera un capítulo completo de aproximadamente {target_word_count} palabras. Objetivo operativo mínimo: 1800 palabras.",
+        "Desarrolla TODAS las secciones del outline con detalle, sin resumir.",
+        "No termines prematuramente; extiéndete lo necesario para alcanzar la longitud objetivo.",
+        "No uses frases como 'etc.', 'y así sucesivamente' ni dejes secciones incompletas.",
+        "No sustituyas secciones por indicaciones, esquemas o listas breves en lugar de prosa.",
+        "Entrega únicamente el capítulo final en Markdown, sin metadatos ni comentarios.",
+        "Evita mezclar inglés innecesario en texto en español; usa términos naturalmente aceptados en español.",
+        "El outline proporcionado es una estructura CERRADA y OBLIGATORIA.",
+        "El título del capítulo es un heading H1 (`# Título`). No lo escribas como `##`.",
+        "Todas las secciones del outline son headings H2 (`## Sección`). No las escribas como `###`.",
+        "No inventes un heading `##` con el título del capítulo; el título va como H1.",
+        "No crees nuevas secciones principales `##` que no aparezcan en el outline.",
+        "No conviertas temas secundarios en nuevas secciones principales; intégralos dentro de la sección del outline que corresponda.",
+        "Respeta exactamente el orden de las secciones del outline.",
+        "No añadas ninguna sección después de `Conclusión`.",
+        "La sección `Conclusión` debe aparecer una sola vez y ser la última sección editorial del capítulo.",
+        "La conclusión debe sintetizar únicamente los puntos ya desarrollados; no introduzcas en ella conceptos, ejemplos, tecnologías, fechas o argumentos nuevos.",
+        "No repitas párrafos completos de secciones anteriores.",
+        "Las subsecciones `###` solo se permiten cuando son necesarias y deben pertenecer a una sección `##` del outline; no crees cadenas de subsecciones para alargar.",
+        "Prioriza precisión, cobertura y coherencia sobre longitud. No repitas información para aumentar el número de palabras.",
+        "No añadas listas de tecnologías, empresas, plataformas, protocolos o ejemplos únicamente para aumentar longitud, ni inventes información para alcanzar el objetivo de palabras.",
+        "Formato: una única aparición de cada sección principal del outline, exactamente una `## Conclusión`, ninguna sección editorial `##` después de `Conclusión`, y ningún heading principal inventado.",
+        "Antes de escribir cada sección, considera qué información ya se ha cubierto; no vuelvas a explicar una idea con el mismo nivel de detalle en varias secciones; cada sección debe aportar información nueva; la conclusión debe sintetizar, no volver a desarrollar.",
+    ]
+
 
     rules_text = "\n".join(f"- {rule}" for rule in rules)
     return (
@@ -1133,6 +1211,13 @@ def _build_prompt(validated: dict | ChapterWritePayload, language: str = "es") -
         f"STRICT RULES:\n{rules_text}\n\n"
         "Return ONLY the chapter Markdown, no extra text."
     )
+
+
+def _build_prompt(validated: dict | ChapterWritePayload, language: str = "es") -> str:
+    """Wrapper: elige la variante ES o EN del prompt editorial."""
+    if language == "en":
+        return _build_prompt_en(validated)
+    return _build_prompt_es(validated)
 
 # ---------------------------------------------------------------------------
 # GENERACIÓN DETERMINISTA DE RESPALDO (FASE 7.9D.7)
@@ -1247,30 +1332,40 @@ def _extract_research_facts(
     return facts
 
 
-def _elaborate_fact_deterministic(fact: str, language: str, seed: int) -> str:
-    """Redacta de forma determinista una oración de desarrollo a partir de un hecho."""
-    es = language != "en"
-    openers = _DET_OPENERS_ES if es else _DET_OPENERS_EN
-    closers = _DET_CLOSERS_ES if es else _DET_CLOSERS_EN
+def _elaborate_fact_deterministic_es(fact: str, seed: int) -> str:
+    """Oración determinista en español a partir de un hecho."""
+    openers = _DET_OPENERS_ES
+    closers = _DET_CLOSERS_ES
     op = openers[seed % len(openers)]
     cl = closers[(seed // 3) % len(closers)]
     fact = fact.rstrip(" .").strip()
     return f"{op} {fact}. {cl}"
 
 
-def _elaborate_fact_pair_deterministic(
-    fact_a: str, fact_b: str, language: str, seed: int
-) -> str:
-    """Redacta un párrafo determinista que COMBINA dos hechos (re-fix book_43).
+def _elaborate_fact_deterministic_en(fact: str, seed: int) -> str:
+    """Oración determinista en inglés a partir de un hecho."""
+    openers = _DET_OPENERS_EN
+    closers = _DET_CLOSERS_EN
+    op = openers[seed % len(openers)]
+    cl = closers[(seed // 3) % len(closers)]
+    fact = fact.rstrip(" .").strip()
+    return f"{op} {fact}. {cl}"
 
-    Multiplica el espacio combinatorio del backstop cuando el pool tiene >=2
-    hechos: opener (12) x puente (5) x closer (7) x par ordenado (N*(N-1)).
+
+def _elaborate_fact_deterministic(fact: str, seed: int, language: str = "es") -> str:
+    """Wrapper: elige la variante ES o EN de la oración determinista."""
+    if language == "en":
+        return _elaborate_fact_deterministic_en(fact, seed)
+    return _elaborate_fact_deterministic_es(fact, seed)
+
+
+def _elaborate_fact_pair_deterministic_es(fact_a: str, fact_b: str, seed: int) -> str:
+    """Párrafo determinista en español que COMBINA dos hechos (re-fix book_43).
     Determinista: mismo seed → mismo párrafo.
     """
-    es = language != "en"
-    openers = _DET_OPENERS_ES if es else _DET_OPENERS_EN
-    closers = _DET_CLOSERS_ES if es else _DET_CLOSERS_EN
-    bridges = _DET_BRIDGES_ES if es else _DET_BRIDGES_EN
+    openers = _DET_OPENERS_ES
+    closers = _DET_CLOSERS_ES
+    bridges = _DET_BRIDGES_ES
 
     s = seed
     op = openers[s % len(openers)]
@@ -1284,53 +1379,118 @@ def _elaborate_fact_pair_deterministic(
     return f"{op} {fa}. {br} {fb}. {cl}"
 
 
-def _deterministic_section_paragraphs(
+def _elaborate_fact_pair_deterministic_en(fact_a: str, fact_b: str, seed: int) -> str:
+    """Párrafo determinista en inglés que COMBINA dos hechos (re-fix book_43).
+    Determinista: mismo seed → mismo párrafo.
+    """
+    openers = _DET_OPENERS_EN
+    closers = _DET_CLOSERS_EN
+    bridges = _DET_BRIDGES_EN
+
+    s = seed
+    op = openers[s % len(openers)]
+    s //= len(openers)
+    br = bridges[s % len(bridges)]
+    s //= len(bridges)
+    cl = closers[s % len(closers)]
+
+    fa = fact_a.rstrip(" .").strip()
+    fb = fact_b.rstrip(" .").strip()
+    return f"{op} {fa}. {br} {fb}. {cl}"
+
+
+def _elaborate_fact_pair_deterministic(fact_a: str, fact_b: str, seed: int, language: str = "es") -> str:
+    """Wrapper: elige la variante ES o EN del párrafo de dos hechos."""
+    if language == "en":
+        return _elaborate_fact_pair_deterministic_en(fact_a, fact_b, seed)
+    return _elaborate_fact_pair_deterministic_es(fact_a, fact_b, seed)
+
+def _deterministic_section_paragraphs_es(
     section: str,
     objective: str,
     facts: list[str],
-    language: str,
     target_words: int,
     seed: int,
 ) -> str:
-    """Genera párrafos deterministas para una sección hasta alcanzar ``target_words``.
-
-    No produce headings (`#`/`##`/`###`), no introduce placeholders y varía la
-    redacción por ``seed`` para evitar repetición literal entre párrafos.
-    """
-    es = language != "en"
+    """Párrafos deterministas en español para una sección hasta alcanzar target_words."""
     paragraphs: list[str] = []
-    if es:
-        paragraphs.append(
-            f"En este apartado, dedicado a «{section}», se desarrolla el siguiente eje: {objective}. "
-            "A continuación se exponen las consideraciones más relevantes sobre este punto."
-        )
-    else:
-        paragraphs.append(
-            f"This section, devoted to «{section}», develops the following axis: {objective}. "
-            "Below are the most relevant considerations on this point."
-        )
+    paragraphs.append(
+        f"En este apartado, dedicado a «{section}», se desarrolla el siguiente eje: {objective}. "
+        "A continuación se exponen las consideraciones más relevantes sobre este punto."
+    )
     anchor = objective or section
     i = 0
     wc = sum(len(p.split()) for p in paragraphs)
     while wc < target_words and i < ABSOLUTE_HARD_LIMIT * 6:
         if len(facts) >= 2:
-            # Re-fix book_43: con pool >= 2 hechos se combinan PARES ordenados
-            # (multiplica el espacio combinatorio; con 1 hecho, ruta simple).
             n = len(facts)
             ia = (seed + i) % n
             ib = (ia + 1 + ((seed + i) // n) % (n - 1)) % n
-            paras = _elaborate_fact_pair_deterministic(
-                facts[ia], facts[ib], language, seed + i
+            paras = _elaborate_fact_pair_deterministic_es(
+                facts[ia], facts[ib], seed + i
             )
         elif facts:
             fact = facts[(seed + i) % len(facts)]
-            paras = _elaborate_fact_deterministic(fact, language, seed + i)
+            paras = _elaborate_fact_deterministic_es(fact, seed + i)
         else:
-            paras = _elaborate_fact_deterministic(anchor, language, seed + i)
+            paras = _elaborate_fact_deterministic_es(anchor, seed + i)
         paragraphs.append(paras)
         wc += len(paras.split())
         i += 1
     return "\n\n".join(paragraphs)
+
+
+def _deterministic_section_paragraphs_en(
+    section: str,
+    objective: str,
+    facts: list[str],
+    target_words: int,
+    seed: int,
+) -> str:
+    """Párrafos deterministas en inglés para una sección hasta alcanzar target_words."""
+    paragraphs: list[str] = []
+    paragraphs.append(
+        f"This section, devoted to «{section}», develops the following axis: {objective}. "
+        "Below are the most relevant considerations on this point."
+    )
+    anchor = objective or section
+    i = 0
+    wc = sum(len(p.split()) for p in paragraphs)
+    while wc < target_words and i < ABSOLUTE_HARD_LIMIT * 6:
+        if len(facts) >= 2:
+            n = len(facts)
+            ia = (seed + i) % n
+            ib = (ia + 1 + ((seed + i) // n) % (n - 1)) % n
+            paras = _elaborate_fact_pair_deterministic_en(
+                facts[ia], facts[ib], seed + i
+            )
+        elif facts:
+            fact = facts[(seed + i) % len(facts)]
+            paras = _elaborate_fact_deterministic_en(fact, seed + i)
+        else:
+            paras = _elaborate_fact_deterministic_en(anchor, seed + i)
+        paragraphs.append(paras)
+        wc += len(paras.split())
+        i += 1
+    return "\n\n".join(paragraphs)
+
+
+def _deterministic_section_paragraphs(
+    section: str,
+    objective: str,
+    facts: list[str],
+    language: str = "es",
+    target_words: int = 0,
+    seed: int = 0,
+) -> str:
+    """Wrapper: elige la variante ES o EN de los párrafos deterministas de sección."""
+    if language == "en":
+        return _deterministic_section_paragraphs_en(
+            section, objective, facts, target_words, seed
+        )
+    return _deterministic_section_paragraphs_es(
+        section, objective, facts, target_words, seed
+    )
 
 
 def _deterministic_complete(
@@ -1429,8 +1589,8 @@ def _deterministic_complete(
     return current, wc
 
 
-def _fallback_chapter(validated: ChapterWritePayload, language: str = "es") -> dict[str, Any]:
-    """Borrador editorial de respaldo (100% Python, sin LLM).
+def _fallback_chapter_es(validated: ChapterWritePayload) -> dict[str, Any]:
+    """Borrador editorial de respaldo en español (100% Python, sin LLM).
 
     Usa EXCLUSIVAMENTE las secciones del outline. Si el outline ya define
     Introducción/Conclusión como secciones, no se crean headings duplicados;
@@ -1438,24 +1598,15 @@ def _fallback_chapter(validated: ChapterWritePayload, language: str = "es") -> d
     válido que el backstop determinista ampliará hasta el mínimo operativo.
     """
     outline = validated.get("chapter_outline") or {}
-    title = outline.get("title") or ("Untitled Chapter" if language == "en" else "Capítulo sin título")
+    title = outline.get("title") or "Capítulo sin título"
     objective = outline.get("objective") or ""
     sections = outline.get("sections") or []
-    if language == "en":
-        intro_heading = "Introduction"
-        concl_heading = "Conclusion"
-        sources_heading = "## Sources used"
-        no_sources = "(No sources provided)"
-        intro = objective or "This chapter develops the topic proposed in the outline."
-        conclusion = "The chapter synthesizes the key points covered and sets up the transition to the next chapter."
-    else:
-        intro_heading = "Introducción"
-        concl_heading = "Conclusión"
-        sources_heading = "## Fuentes utilizadas"
-        no_sources = "(Sin fuentes proporcionadas)"
-        intro = objective or "Este capítulo desarrolla el tema propuesto en el outline."
-        conclusion = "El capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente."
-
+    intro_heading = "Introducción"
+    concl_heading = "Conclusión"
+    sources_heading = "## Fuentes utilizadas"
+    no_sources = "(Sin fuentes proporcionadas)"
+    intro = objective or "Este capítulo desarrolla el tema propuesto en el outline."
+    conclusion = "El capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente."
     # Si el outline ya define Introducción/Conclusión como secciones, no se duplican
     # los headings (el outline real los incluye explícitamente).
     norm_headings = {(s.get("heading") or "").strip().lower() for s in sections}
@@ -1483,8 +1634,56 @@ def _fallback_chapter(validated: ChapterWritePayload, language: str = "es") -> d
         "sources_used": [s.get("url") for s in (validated.get("sources") or []) if s.get("url")],
     }
 
+def _fallback_chapter_en(validated: ChapterWritePayload) -> dict[str, Any]:
+    """Borrador editorial de respaldo en inglés (100% Python, sin LLM).
 
+    Usa EXCLUSIVAMENTE las secciones del outline. Si el outline ya define
+    Introduction/Conclusion como secciones, no se crean headings duplicados;
+    en caso contrario, se aportan como cierre abierto. Garantiza un esqueleto
+    válido que el backstop determinista ampliará hasta el mínimo operativo.
+    """
+    outline = validated.get("chapter_outline") or {}
+    title = outline.get("title") or "Untitled Chapter"
+    objective = outline.get("objective") or ""
+    sections = outline.get("sections") or []
+    intro_heading = "Introduction"
+    concl_heading = "Conclusion"
+    sources_heading = "## Sources used"
+    no_sources = "(No sources provided)"
+    intro = objective or "This chapter develops the topic proposed in the outline."
+    conclusion = "The chapter synthesizes the key points covered and sets up the transition to the next chapter."
+    # Si el outline ya define Introducción/Conclusión como secciones, no se duplican
+    # los headings (el outline real los incluye explícitamente).
+    norm_headings = {(s.get("heading") or "").strip().lower() for s in sections}
+    has_intro = intro_heading.lower() in norm_headings
+    has_concl = concl_heading.lower() in norm_headings
 
+    parts: list[str] = [f"# {title}", ""]
+    if not has_intro:
+        parts += [f"## {intro_heading}", intro, ""]
+    for s in sections:
+        heading = s.get("heading") or (intro_heading if not has_intro else "Sección")
+        parts.append(f"## {heading}")
+        parts.append(s.get("objective", "") or "")
+    if not has_concl:
+        parts += [f"## {concl_heading}", conclusion, ""]
+    parts.append(sources_heading)
+    md = "\n".join(parts) + "\n"
+    if validated.get("sources"):
+        md += "\n".join(f"- {s.get('url')}" for s in validated.get("sources") if s.get("url"))
+    else:
+        md += f"- {no_sources}"
+    return {
+        "chapter_md": md,
+        "word_count": max(validated.get("target_word_count", 3000), 500),
+        "sources_used": [s.get("url") for s in (validated.get("sources") or []) if s.get("url")],
+    }
+
+def _fallback_chapter(validated: ChapterWritePayload, language: str = "es") -> dict[str, Any]:
+    """Wrapper: elige la variante ES o EN del borrador de respaldo."""
+    if language == "en":
+        return _fallback_chapter_en(validated)
+    return _fallback_chapter_es(validated)
 def _write_artifacts(book_id: str | None, chapter_number: int, md: str, meta: dict[str, Any]) -> str:
     """Guarda el draft del capítulo como artefacto independiente."""
     base_dir = os.path.join("data", "artifacts")

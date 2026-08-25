@@ -138,3 +138,234 @@ def test_f_job_data_sources_preserved(store):
     assert [s["url"] for s in stored["data"]["sources"]] == [
         "https://real.example/a", "https://real.example/b",
     ]
+
+
+# ---------------------------------------------------------------------------
+# G/H — Research parametrizado por idioma (fix book_56 / §19 P3).
+# Reutiliza el patrón de test_autopilot_document_output.py: executor de
+# producción REAL (default_executor_factory) con un módulo research FALSO que
+# registra las llamadas y devuelve fuentes etiquetadas por idioma.
+# ---------------------------------------------------------------------------
+def _fake_research_module(calls: list):
+    """Módulo research controlado: registra el idioma de cada llamada y devuelve
+    3 fuentes de la Wikipedia del idioma pedido (pasa el gate de min_sources=3)."""
+
+    def research_execute(payload, capability="research_web"):
+        lang = str(payload.get("language") or "es")
+        calls.append(lang)
+        srcs = [
+            {
+                "url": f"https://{lang}.wikipedia.org/wiki/Art{i}",
+                "title": f"Art{i} ({lang})",
+                "source_type": "web_wikipedia",
+            }
+            for i in range(1, 4)
+        ]
+        return {
+            "status": "PASS",
+            "execution_mode": "real",
+            "query": payload.get("query") or "",
+            "language": lang,
+            "sources": srcs,
+            "stored_sources": [],
+            "source_count": len(srcs),
+            "error": None,
+            "quality_gate": "PASS",
+        }
+
+    return {
+        "research": {
+            "manifest": {"id": "research", "config": {"timeout_seconds": 30}},
+            "execute": research_execute,
+        }
+    }
+
+
+def _job_ready_at_research(store, book_id, data=None):
+    job = autopilot.create_job(store, book_id, data or {"idea": "x", "target_chapters": 1})
+    for ph in job["phases"]:
+        ph["status"] = (
+            autopilot.PHASE_PENDING if ph["id"] == "research" else autopilot.PHASE_PASS
+        )
+        if ph["id"] == "research":
+            ph["attempts"] = 0
+    store.save(job)
+    return store.load(job["job_id"])
+
+
+def test_g_bilingual_book_runs_research_once_per_language(store):
+    """Libro bilingüe (es,en): research se ejecuta EXACTAMENTE 1 vez por idioma
+    (2 llamadas totales), cada pasada consulta su Wikipedia, y las fuentes quedan
+    separadas por idioma en job.data.sources_by_lang sin mezcla ni duplicados."""
+    b = create_book({"title": "Libro bilingüe", "target_chapters": 1, "language": "es,en"})
+    calls: list = []
+    modules = _fake_research_module(calls)
+    executor = autopilot.default_executor_factory(modules, {"research_web": ["research"]}, store)
+    job = _job_ready_at_research(store, b["book_id"])
+    final = autopilot.run_job(job, store, executor, max_attempts=1, sleep_fn=lambda s: None)
+
+    res = next(p for p in final["phases"] if p["id"] == "research")
+    assert res["status"] == autopilot.PHASE_PASS
+    # Exactamente UNA llamada por idioma, 2 en total.
+    assert sorted(calls) == ["en", "es"]
+
+    data = final["data"]
+    # Separación por idioma, SIN mezcla.
+    assert set((data.get("sources_by_lang") or {}).keys()) == {"es", "en"}
+    for lang in ("es", "en"):
+        srcs = data["sources_by_lang"][lang]
+        assert len(srcs) == 3
+        assert all(s["url"].startswith(f"https://{lang}.wikipedia.org/") for s in srcs), srcs
+    # Fusión histórica (job.data.sources): unión deduplicada por URL, 6 únicas.
+    merged_urls = [s["url"] for s in data["sources"]]
+    assert len(merged_urls) == 6
+    assert len(set(merged_urls)) == 6
+
+
+def test_h_monolingual_es_book_still_single_research_call(store):
+    """Regresión cero: libro monolingüe 'es' → UNA sola llamada total (sin pasada
+    EN) y comportamiento histórico intacto (sin sources_by_lang)."""
+    b = create_book({"title": "Libro español", "target_chapters": 1})  # languages='es'
+    calls: list = []
+    modules = _fake_research_module(calls)
+    executor = autopilot.default_executor_factory(modules, {"research_web": ["research"]}, store)
+    job = _job_ready_at_research(store, b["book_id"])
+    final = autopilot.run_job(job, store, executor, max_attempts=1, sleep_fn=lambda s: None)
+
+    res = next(p for p in final["phases"] if p["id"] == "research")
+    assert res["status"] == autopilot.PHASE_PASS
+    assert calls == ["es"]
+    data = final["data"]
+    assert [s["url"] for s in data["sources"]] == [
+        f"https://es.wikipedia.org/wiki/Art{i}" for i in range(1, 4)
+    ]
+    assert "sources_by_lang" not in data
+
+
+# ---------------------------------------------------------------------------
+# §17 #20 PASO 3 — build_payload("outline") incluye fuentes resumidas
+# ---------------------------------------------------------------------------
+
+def test_outline_payload_includes_summarized_sources(store):
+    """La fase outline recibe las fuentes reales de job.data (título + resumen
+    300 chars), para que book_planner pueda anclar el outline (§17 #20)."""
+    from frontend.editorial import build_payload
+
+    b = create_book({"title": "Libro Outline", "target_chapters": 1})
+    sources = [
+        {
+            "url": "https://real.example/a",
+            "title": "Fuente A",
+            "source_type": "web_wikipedia",
+            "content": "x" * 500,
+        }
+    ]
+    data = {"sources_by_lang": {"es": sources}, "idea": "Historia de prueba"}
+    payload = build_payload(b["book_id"], "outline", data, language="es")
+    assert payload["sources"] is not None
+    src = payload["sources"][0]
+    assert src["title"] == "Fuente A"
+    assert len(src["summary"]) == 300  # resumido, no el contenido completo
+
+
+def test_outline_payload_without_sources_is_none(store):
+    """Sin research (lista vacía), sources va None — comportamiento previo intacto."""
+    from frontend.editorial import build_payload
+
+    b = create_book({"title": "Libro Sin Research", "target_chapters": 1})
+    payload = build_payload(b["book_id"], "outline", {"idea": "Novela"}, language="es")
+    assert payload["sources"] is None
+
+
+# ---------------------------------------------------------------------------
+# FIX book_62 — fallback research bilingüe: la pasada del idioma SECUNDARIO
+# que falla SOLO por gate de source_count insuficiente no aborta el job.
+# ---------------------------------------------------------------------------
+def _fake_research_module_en_short(calls: list, es_sources=None):
+    """Módulo research controlado (caso book_62 real): pasada 'es' PASS con 5
+    fuentes; pasada 'en' FAIL por gate source_count=1 < min_sources=3 (el error
+    es EXACTAMENTE el string que construye _run_single para research)."""
+
+    def research_execute(payload, capability="research_web"):
+        lang = str(payload.get("language") or "es")
+        calls.append(lang)
+        if lang == "es":
+            srcs = es_sources or [
+                {
+                    "url": f"https://es.wikipedia.org/wiki/ES{i}",
+                    "title": f"ES{i}",
+                    "source_type": "web_wikipedia",
+                }
+                for i in range(1, 6)
+            ]
+            return {
+                "status": "PASS",
+                "execution_mode": "real",
+                "query": payload.get("query") or "",
+                "language": lang,
+                "sources": srcs,
+                "stored_sources": [],
+                "source_count": len(srcs),
+                "error": None,
+                "quality_gate": "PASS",
+            }
+        # Pasada 'en' con solo 1 fuente (título español sin traducir → filtro
+        # de anclaje descarta casi todo). El gate lo construye _run_single.
+        one = [{
+            "url": "https://en.wikipedia.org/wiki/Longevity",
+            "title": "Longevity",
+            "source_type": "web_wikipedia",
+        }]
+        return {
+            "status": "FAIL",
+            "execution_mode": "llm",
+            "query": payload.get("query") or "",
+            "language": lang,
+            "sources": one,
+            "stored_sources": [],
+            "source_count": 1,
+            "error": None,
+            "quality_gate": "FAIL",
+        }
+
+    return {
+        "research": {
+            "manifest": {"id": "research", "config": {"timeout_seconds": 30}},
+            "execute": research_execute,
+        }
+    }
+
+
+def test_i_bilingual_secondary_lang_low_source_count_falls_back(store):
+    """book_62: libro bilingüe donde la pasada 'en' devuelve 1 fuente (<min=3).
+    La fase NO aborta el job: sources_by_lang['en'] = copia de sources_by_lang
+    ['es'], warning registrado en las métricas, fase PASS. La lista global
+    job.data.sources NO se duplica."""
+    b = create_book({"title": "Libro bilingüe", "target_chapters": 1, "language": "es,en"})
+    calls: list = []
+    modules = _fake_research_module_en_short(calls)
+    executor = autopilot.default_executor_factory(modules, {"research_web": ["research"]}, store)
+    job = _job_ready_at_research(store, b["book_id"])
+    final = autopilot.run_job(job, store, executor, max_attempts=1, sleep_fn=lambda s: None)
+
+    # (1) el job NO aborta en research; ambas pasadas se ejecutaron.
+    assert sorted(calls) == ["en", "es"]
+    res = next(p for p in final["phases"] if p["id"] == "research")
+    assert res["status"] == autopilot.PHASE_PASS
+
+    data = final["data"]
+    sb = data.get("sources_by_lang") or {}
+    # (2) fallback: sources_by_lang["en"] == copia de sources_by_lang["es"]
+    assert sb["en"] == sb["es"]
+    assert len(sb["en"]) == 5
+    # job.data.sources (lista global fusionada) SIN duplicados del fallback:
+    # solo las fuentes reales de la pasada primaria; la única fuente "en" que
+    # devolvió la pasada fallida NO entra en la fusión (no pasó el gate).
+    urls = [s["url"] for s in data["sources"]]
+    assert urls.count("https://en.wikipedia.org/wiki/Longevity") == 0
+    assert len(urls) == 5
+
+    # (3) warning registrado en las métricas de la fase.
+    warns = res.get("metrics", {}).get("warnings") or []
+    assert any("research idioma en" in w and "source_count" in w for w in warns), warns
+    assert res["metrics"]["per_language_status"]["en"] == "FALLBACK"
