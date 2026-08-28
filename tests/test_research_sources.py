@@ -441,3 +441,59 @@ def test_anchor_topic_doom_descarta_edad_media_sin_mencionar_doom(monkeypatch):
     assert out_con["source_count"] == 0
     assert out_con["status"] == "FAIL"
     assert out_con["quality_gate"] == "FAIL"
+
+
+# ---- §17 #27 — Denylist de redes sociales (caso real book_66 / chapter_id=458) ----
+
+def test_social_media_candidates_discarded_before_curation(monkeypatch):
+    """Caso real book_66: SearXNG devuelve posts de TikTok/Instagram con metadata de
+    engagement; deben descartarse ANTES de curación/ranking sin ocupar slot. Los
+    candidatos legítimos de la misma búsqueda pasan sin cambio de comportamiento."""
+    searxng_results = [
+        {"title": "RAGE ... - TikTok", "url": "https://www.tiktok.com/@teban_cometacos/video/7599456109065227538",
+         "content": "25 ene 2026 ... 1181 me gusta,30 comentarios."},
+        {"title": "¿Sabías que GTA V... - Instagram", "url": "https://www.instagram.com/reel/DaVGOLrRGWL/",
+         "content": "3 jul 2026 ... pong."},
+        # Legítimos (mismos dominios que la búsqueda real de book_66):
+        {"title": "GTA 6 ... ping-pong - 3DJuegos",
+         "url": "https://www.3djuegos.com/juegos/grand-theft-auto-vi/noticias/gta-6-ping-pong",
+         "content": "Rockstar lanzó Rockstar Games Presents Table Tennis sobre el motor RAGE de GTA."},
+        {"title": "El juego de ping pong que cambió GTA - Meristation",
+         "url": "https://as.com/meristation/noticias/el-juego-de-ping-pong-que-cambio-gta/",
+         "content": "Table Tennis fue el primer juego construido sobre RAGE, el motor de GTA IV y GTA V."},
+        {"title": "El camino hacia GTA 6 - Infobae",
+         "url": "https://www.infobae.com/tecno/2026/08/03/el-camino-hacia-gta-6/",
+         "content": "Las misiones de Rockstar definieron las mecánicas del mundo abierto de GTA V."},
+        {"title": "Grand Theft Auto", "url": "https://es.wikipedia.org/wiki/Grand_Theft_Auto",
+         "content": "Grand Theft Auto es una saga de videojuegos de Rockstar Games con motor RAGE."},
+        # Subdominio social también debe caer (comparación por contenido).
+        {"title": "m.tiktok", "url": "https://es.tiktok.com/@alguien/video/123",
+         "content": "post viral"},
+    ]
+    monkeypatch.setattr(research, "_backend_wikipedia", lambda q, n, timeout: [])
+    monkeypatch.setattr(research, "_backend_wikidata", lambda q, n, timeout: [])
+    monkeypatch.setattr(research, "_search_searxng", lambda q, n, timeout: searxng_results)
+    monkeypatch.setattr(research, "RESEARCH_USE_LLM", "0")  # ranking determinista
+
+    results = research._multi_source_search("rockstar ping pong rage gta", max_sources=8, timeout=5)
+    urls = [r["url"] for r in results]
+    assert all("tiktok.com" not in u and "instagram.com" not in u for u in urls)
+    for legit in (
+        "https://www.3djuegos.com/juegos/grand-theft-auto-vi/noticias/gta-6-ping-pong",
+        "https://as.com/meristation/noticias/el-juego-de-ping-pong-que-cambio-gta/",
+        "https://www.infobae.com/tecno/2026/08/03/el-camino-hacia-gta-6/",
+        "https://es.wikipedia.org/wiki/Grand_Theft_Auto",
+    ):
+        assert legit in urls
+
+
+def test_is_social_media_helper():
+    assert research._is_social_media("https://www.tiktok.com/@x/video/1")
+    assert research._is_social_media("https://es.instagram.com/reel/abc/")
+    assert research._is_social_media("https://facebook.com/page")
+    assert research._is_social_media("https://twitter.com/user/status/1")
+    assert research._is_social_media("https://x.com/user")
+    assert not research._is_social_media("https://www.3djuegos.com/noticia")
+    assert not research._is_social_media("https://es.wikipedia.org/wiki/GTA")
+    assert not research._is_social_media(None)
+    assert not research._is_social_media("")
