@@ -692,14 +692,53 @@ function cancelAutopilot() {
     .catch(e => _showError('No se pudo cancelar: ' + e.message))
     .finally(() => { state.autopilotLoading = false; renderAutopilotControls(); });
 }
+// §17 #36 Fase 5: deduce la fase de origen del FAIL de quality_gate.
+// Devuelve el origin_phase más upstream (según AUTOPILOT_PHASES) o null
+// si ningún check en fallo lo expone.
+function resetOriginPhase() {
+  const j = state.autopilot;
+  const qg = (j && j.phases || []).find(p => p.id === 'quality_gate');
+  const qc = qg && qg.metrics || null;
+  if (!qc) return null;
+  const origins = new Set();
+  ['book_checks', 'chapter_checks', 'language_checks', 'source_checks',
+   'image_checks', 'document_checks'].forEach(list => {
+    (qc[list] || []).forEach(item => {
+      if (item && item.status === 'FAIL' && item.origin_phase) origins.add(item.origin_phase);
+    });
+  });
+  if (!origins.size) return null;
+  // Más upstream = primero en el orden real de fases del pipeline.
+  for (const ph of AUTOPILOT_PHASES) {
+    if (origins.has(ph.id)) return ph.id;
+  }
+  return origins.values().next().value;
+}
 function retryAutopilot() {
   if (!state.selectedBookId || state.autopilotLoading) return;
   state.autopilotLoading = true;
   renderAutopilotControls();
-  apiFetch('/api/books/' + state.selectedBookId + '/autopilot/retry', { method: 'POST' })
-    .then(job => { state.autopilot = job; addFeed('retry', 'Reintentando autopilot (job ' + (job.job_id || '') + ')'); refreshData(); })
-    .catch(e => _showError('No se pudo reintentar: ' + e.message))
-    .finally(() => { state.autopilotLoading = false; renderAutopilotControls(); });
+  const origin = resetOriginPhase();
+  let call;
+  if (origin) {
+    const ok = confirm("Se va a reintentar desde la fase '" + origin +
+      "'. Esto también reiniciará las fases posteriores (incluida quality_gate y docx). ¿Continuar?");
+    if (!ok) {
+      state.autopilotLoading = false;
+      renderAutopilotControls();
+      return;
+    }
+    call = apiFetch('/api/books/' + state.selectedBookId + '/autopilot/reset',
+      { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from_phase: origin }) })
+      .then(job => { state.autopilot = job; addFeed('retry', 'Reiniciando desde fase ' + origin + ' (job ' + (job.job_id || '') + ')'); refreshData(); })
+      .catch(e => _showError('No se pudo reiniciar: ' + e.message));
+  } else {
+    call = apiFetch('/api/books/' + state.selectedBookId + '/autopilot/retry', { method: 'POST' })
+      .then(job => { state.autopilot = job; addFeed('retry', 'Reintentando autopilot (job ' + (job.job_id || '') + ')'); refreshData(); })
+      .catch(e => _showError('No se pudo reintentar: ' + e.message));
+  }
+  call.finally(() => { state.autopilotLoading = false; renderAutopilotControls(); });
 }
 
 // ---------- Borrar libro (confirmación nativa, sin recargar la página) ----------
