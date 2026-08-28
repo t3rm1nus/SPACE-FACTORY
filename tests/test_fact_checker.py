@@ -10,6 +10,7 @@ import pytest
 
 from modules.fact_checker.main import (
     _build_prompt,
+    _escalate_fabrication_issue,
     _fallback_result,
     _heuristic_issues,
     _parse_llm_output,
@@ -135,7 +136,9 @@ def test_execute_llm_success(monkeypatch: pytest.MonkeyPatch) -> None:
                     "claim": "Ventas +45%",
                     "severity": "ERROR",
                     "reason": "Sin fuente que lo respalde.",
-                    "source_url": None,
+                    # Con source_url presente la segunda pasada SÍ se ejecuta
+                    # (ajuste de diseño: sin fuente el ERROR degrada directo).
+                    "source_url": "https://example.com/report",
                     "suggestion": "Aportar informe auditable.",
                 }
             ],
@@ -186,8 +189,8 @@ def test_execute_llm_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert out["claims_checked"] == 1
     assert out["issues"][0]["severity"] == "ERROR"  # segunda pasada CONFIRMA
     assert out["issues"][0]["consistency_check"] == "CONFIRMED"
-    # La fuente no se inventa: sigue null en el issue
-    assert out["issues"][0]["source_url"] is None
+    # La fuente SÍ está presente en el issue (no se inventa, viene del LLM)
+    assert out["issues"][0]["source_url"] == "https://example.com/report"
     assert out["unsupported_claims"] == ["Ventas +45%"]
 
     # El resultado valida contra el esquema de salida
@@ -538,7 +541,9 @@ def test_llm_error_downgraded_when_consistency_check_disagrees(
     """ERROR subjetivo del LLM + segunda pasada que disiente -> WARNING."""
     import modules.fact_checker.main as main
 
-    provider = _two_pass_provider(_liberica_llm_json(), "DEFENDIBLE")
+    provider = _two_pass_provider(
+        _liberica_llm_json(source_url="https://example.com/report"), "DEFENDIBLE"
+    )
     monkeypatch.setattr(main, "get_provider", lambda: provider)
     monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
 
@@ -557,7 +562,9 @@ def test_llm_error_kept_when_consistency_check_agrees(
     """Ambas pasadas ERROR -> el ERROR se mantiene y el gate falla."""
     import modules.fact_checker.main as main
 
-    provider = _two_pass_provider(_liberica_llm_json(), "ERROR")
+    provider = _two_pass_provider(
+        _liberica_llm_json(source_url="https://example.com/report"), "ERROR"
+    )
     monkeypatch.setattr(main, "get_provider", lambda: provider)
     monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
 
@@ -679,7 +686,9 @@ def test_consistency_check_timeout_defaults_to_downgrade(
         "no sé",  # salida inválida: ni ERROR ni DEFENDIBLE
         "",       # vacía
     ):
-        provider = _two_pass_provider(_liberica_llm_json(), bad_second)
+        provider = _two_pass_provider(
+            _liberica_llm_json(source_url="https://example.com/report"), bad_second
+        )
         monkeypatch.setattr(main, "get_provider", lambda p=provider: p)
         monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
 
@@ -695,16 +704,21 @@ def test_book65_liberica_real_case_reproduction(
 ) -> None:
     """Reproducción del caso real book_65 en ambos escenarios del mock.
 
-    - Escenario A (lo observado en producción: juicio subjetivo no replicable):
-      la segunda pasada disiente -> la claim se degrada y la fase ya no agota
-      reintentos.
+    - Escenario A (lo observado en producción antes del ajuste de diseño:
+      juicio subjetivo no replicable): la segunda pasada disiente -> la claim
+      se degrada y la fase ya no agota reintentos.
     - Escenario B: si la segunda pasada confirma, el ERROR se mantiene (el fix
       no oculta errores reales).
+    Ambos escenarios usan una fuente presente para forzar la ruta de segunda
+    pasada; el caso real SIN fuente se cubre en
+    test_error_without_source_url_skips_consistency_check_and_downgrades.
     """
     import modules.fact_checker.main as main
 
     # Escenario A: disiente -> WARNING
-    provider_a = _two_pass_provider(_liberica_llm_json(), "DEFENDIBLE")
+    provider_a = _two_pass_provider(
+        _liberica_llm_json(source_url="https://example.com/report"), "DEFENDIBLE"
+    )
     monkeypatch.setattr(main, "get_provider", lambda: provider_a)
     monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
     out_a = execute(_payload())
@@ -713,11 +727,62 @@ def test_book65_liberica_real_case_reproduction(
     assert out_a["quality_gate"] == "PASS"
 
     # Escenario B: confirma -> ERROR intacto
-    provider_b = _two_pass_provider(_liberica_llm_json(), "ERROR")
+    provider_b = _two_pass_provider(
+        _liberica_llm_json(source_url="https://example.com/report"), "ERROR"
+    )
     monkeypatch.setattr(main, "get_provider", lambda: provider_b)
     out_b = execute(_payload())
     assert out_b["issues"][0]["severity"] == "ERROR"
     assert out_b["quality_gate"] == "FAIL"
+
+
+def test_error_without_source_url_skips_consistency_check_and_downgrades(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Caso real book_65 (tasks 890/891): ERROR subjetivo SIN source_url.
+
+    Se degrada DIRECTAMENTE a WARNING sin invocar la verificación de
+    consistencia (CERO llamadas LLM extra) y con trazabilidad
+    consistency_check="SKIPPED_NO_SOURCE".
+    """
+    import modules.fact_checker.main as main
+
+    provider = _two_pass_provider(_liberica_llm_json(), "ERROR")
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    out = execute(_payload())
+    issue = out["issues"][0]
+    assert provider.calls == 1  # SOLO la primera pasada: skip sin llamada extra
+    assert issue["severity"] == "WARNING"
+    assert (
+        "[Degradado a WARNING: ERROR sin source_url y sin firma de "
+        "fabricación estructural]" in issue["reason"]
+    )
+    assert issue["consistency_check"] == "SKIPPED_NO_SOURCE"
+    assert main._CONSISTENCY_DOWNGRADE_NOTE not in issue["reason"]
+    assert out["quality_gate"] == "PASS"
+
+
+def test_error_with_source_url_still_uses_consistency_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regresión: con source_url presente la segunda pasada sigue ocurriendo."""
+    import modules.fact_checker.main as main
+
+    # Confirma -> ERROR intacto vía _verify_error_consistency
+    provider = _two_pass_provider(
+        _liberica_llm_json(source_url="https://example.com/report"), "ERROR"
+    )
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    out = execute(_payload())
+    issue = out["issues"][0]
+    assert provider.calls == 2  # primera pasada + verificación de consistencia
+    assert issue["severity"] == "ERROR"
+    assert issue["consistency_check"] == "CONFIRMED"
+    assert out["quality_gate"] == "FAIL"
 
 
 # ---------------------------------------------------------------------------
@@ -765,8 +830,12 @@ def _two_pass_provider(first_json: str, second_answer):
     return Provider()
 
 
-def _liberica_llm_json() -> str:
-    """Reproducción EXACTA del caso real book_65 cap.431 (task 888)."""
+def _liberica_llm_json(source_url: str | None = None) -> str:
+    """Reproducción EXACTA del caso real book_65 cap.431 (task 888).
+
+    En producción real source_url es None (tasks 890/891); los tests que
+    ejercitan la segunda pasada usan una fuente presente para forzar esa ruta.
+    """
     return json.dumps(
         {
             "status": "FAIL",
@@ -785,7 +854,7 @@ def _liberica_llm_json() -> str:
                         "vulnerabilidad ante enfermedades son temas de debate "
                         "entre los expertos."
                     ),
-                    "source_url": None,
+                    "source_url": source_url,
                     "suggestion": (
                         "El texto debería ser corregido para reflejar la "
                         "realidad del café Liberica."
@@ -798,3 +867,289 @@ def _liberica_llm_json() -> str:
             "conflicting_claims": 0,
         }
     )
+
+
+def test_consistency_budget_exhausted_downgrades_remaining_claims(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Techo agregado (fix task 895): >6 claims ERROR con source_url presente.
+
+    Cada verificación "tarda" >20s (reloj simulado): las primeras claims se
+    verifican contra el provider mientras quede presupuesto; en cuanto el
+    presupuesto agregado ya no cubre otra llamada completa
+    (FACT_CHECK_CONSISTENCY_TIMEOUT), las restantes se degradan DIRECTAMENTE
+    a WARNING con consistency_check="SKIPPED_BUDGET_EXHAUSTED", sin llamar al
+    provider para esas.
+    """
+    import modules.fact_checker.main as main
+
+    n_claims = 7
+    issues = [
+        {
+            "claim": (
+                "La variedad descrita en el capítulo no es tan escasa como "
+                f"se afirma en la afirmación número {idx + 1}."
+            ),
+            "severity": "ERROR",
+            "reason": (
+                "La información del capítulo no es precisa según el análisis "
+                f"editorial de la afirmación número {idx + 1}."
+            ),
+            "source_url": "https://example.com/report",
+            "suggestion": "Revisar la afirmación contra la fuente citada.",
+        }
+        for idx in range(n_claims)
+    ]
+    first_json = json.dumps(
+        {
+            "status": "FAIL",
+            "claims_checked": n_claims,
+            "issues": issues,
+            "corrections": [],
+            "unsupported_claims": [],
+            "supported_claims": 0,
+            "conflicting_claims": 0,
+        }
+    )
+
+    provider = _two_pass_provider(first_json, "DEFENDIBLE")
+    monkeypatch.setattr(main, "get_provider", lambda: provider)
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    # Reloj simulado: cada lectura avanza 30s (> FACT_CHECK_CONSISTENCY_TIMEOUT).
+    clock = [0.0]
+
+    def fake_perf_counter() -> float:
+        clock[0] += 30.0
+        return clock[0]
+
+    monkeypatch.setattr(main.time, "perf_counter", fake_perf_counter)
+
+    payload = _payload()
+    payload["chapter_text"] = (
+        "La variedad descrita en el capítulo no es tan escasa como se afirma, "
+        "según el análisis editorial de cada una de sus partes."
+    )
+    out = execute(payload)
+
+    # Lecturas del reloj: start(30) -> c1(60) c2(90) c3(120) quedan dentro del
+    # budget (120s); c4 en adelante exceden -> SKIPPED_BUDGET_EXHAUSTED.
+    verified = [i for i in out["issues"] if i.get("consistency_check") == "DOWNGRADED"]
+    skipped = [
+        i for i in out["issues"] if i.get("consistency_check") == "SKIPPED_BUDGET_EXHAUSTED"
+    ]
+    assert len(out["issues"]) == n_claims
+    assert len(verified) == 3
+    assert len(skipped) == n_claims - 3
+    # Provider: 1 llamada (primera pasada) + SOLO las 3 verificaciones con presupuesto.
+    assert provider.calls == 4
+    for issue in skipped:
+        assert issue["severity"] == "WARNING"
+        assert "[Degradado a WARNING: presupuesto de verificación" in issue["reason"]
+    # Todo degradado -> sin ERROR bloqueante -> gate PASS (fail-safe).
+    assert all(i["severity"] != "ERROR" for i in out["issues"])
+    assert out["quality_gate"] == "PASS"
+
+
+def test_consistency_budget_constant_bounds_total_time() -> None:
+    """El peor caso teórico SIEMPRE cae bajo timeout_seconds=180 del scheduler.
+
+    Con budget=120s solo se inicia una verificación si quedan ≥20s
+    (FACT_CHECK_CONSISTENCY_TIMEOUT), así que el techo agregado es
+    budget + timeout = 140s < 180s, independientemente del número de claims.
+    """
+    import modules.fact_checker.main as main
+
+    worst_case = (
+        float(main.FACT_CHECK_CONSISTENCY_TOTAL_BUDGET)
+        + float(main.FACT_CHECK_CONSISTENCY_TIMEOUT)
+    )
+    assert worst_case < 180.0
+def test_build_prompt_includes_source_content_book69() -> None:
+    """§17 #32-P2: el prompt expone el content real de cada fuente.
+
+    Reproduce el caso book_69/chapter_id=503: una fuente cuyo content SÍ
+    menciona la claim (Carl Johnson / GTA) debe aparecer en el texto final
+    del prompt, para que el LLM pueda anclar la claim a esa source_url.
+    """
+    payload = {
+        "chapter_text": (
+            "Se detalla que Carl Johnson, también conocido como «C.J.», "
+            "es el protagonista jugable de Grand Theft Auto: San Andreas."
+        ),
+        "sources": [
+            {
+                "url": "https://es.wikipedia.org/wiki/Carl_Johnson_(personaje)",
+                "title": "Carl Johnson (personaje)",
+                "source_type": "web_wikipedia",
+                "content": (
+                    "Carl Johnson, también conocido como «C.J.», es un "
+                    "personaje ficticio y el protagonista jugable del "
+                    "videojuego de 2004 Grand Theft Auto: San Andreas."
+                ),
+            },
+        ],
+        "target_language": "es",
+    }
+    prompt = _build_prompt(payload)
+    assert "https://es.wikipedia.org/wiki/Carl_Johnson_(personaje)" in prompt
+    assert "Contenido:" in prompt
+    assert "Carl Johnson, también conocido como" in prompt
+
+
+def test_build_prompt_omits_content_when_empty() -> None:
+    """§17 #32-P2: una fuente sin content no debe añadir línea 'Contenido:'."""
+    payload = {
+        "chapter_text": "Afirmación genérica sin cifras concretas.",
+        "sources": [
+            {"url": "https://example.com/x", "title": "X", "source_type": "web"},
+        ],
+        "target_language": "es",
+    }
+    prompt = _build_prompt(payload)
+    assert "https://example.com/x" in prompt
+    assert "Contenido:" not in prompt
+
+
+def test_book59_fabrication_claim_still_escalates_to_error() -> None:
+    """REGRESIÓN §17 #20/book_59: la barrera de fabricación NO se toca.
+
+    Una claim con firma fecha+nombre+cifra y SIN source_url debe seguir
+    escalando a ERROR igual que antes del cambio de _build_prompt (única
+    prueba que garantiza que la protección anti-fabricación estructural
+    permanece intacta).
+    """
+    issue = {
+        "claim": (
+            "Adolf Eichmann estuvo a cargo de los campos de concentración "
+            "en Palestina entre 1942 y 1948."
+        ),
+        "severity": "WARNING",
+        "reason": "sin soporte en las fuentes permitidas",
+        "source_url": None,
+    }
+    escalated = _escalate_fabrication_issue(issue)
+    assert escalated["severity"] == "ERROR"
+    assert "patrón de fabricación factual" in escalated["reason"]
+
+
+def test_reanchor_matches_verbatim_source_content_book69() -> None:
+    """§17 #32-P3/book_69 cap.1: re-anclaje determinista claim→fuente.
+
+    Una claim con firma de fabricación (fecha+nombre+cifra) PERO cuyo texto
+    contiene un n-grama de 8 palabras presente verbatim en el ``content`` de
+    una fuente permitida NO debe escalar a ERROR: se re-ancla ``source_url``
+    a esa fuente y se conserva la severity del LLM (el problema era un fallo
+    de anclaje del LLM, no fabricación). Content sintético similar al real de
+    Carl_Johnson_(personaje).
+    """
+    from modules.fact_checker import main as fc_main
+
+    content = (
+        "Carl Johnson, también conocido como «C.J.», es un personaje ficticio "
+        "y el protagonista jugable del videojuego de 2004 Grand Theft Auto: "
+        "San Andreas, la quinta entrega principal de la serie."
+    )
+    sources = [
+        {
+            "title": "Carl Johnson (personaje)",
+            "url": "https://es.wikipedia.org/wiki/Carl_Johnson_(personaje)",
+            "source_type": "web_wikipedia",
+            "content": content,
+        },
+        # Fuente con content vacío: debe saltarse (no romper el matching).
+        {
+            "title": "Otra fuente",
+            "url": "https://example.com/otra",
+            "source_type": "web",
+            "content": "",
+        },
+    ]
+    issue = {
+        "claim": (
+            "Carl Johnson es un personaje ficticio y el protagonista jugable "
+            "del videojuego de 2004 Grand Theft Auto San Andreas."
+        ),
+        "severity": "WARNING",
+        "reason": "sin soporte en las fuentes permitidas",
+        "source_url": None,
+    }
+
+    # El claim tiene <8 palabras de match posible solo si no hay solape: aquí
+    # el n-grama "es un personaje ficticio y el protagonista" (8 palabras)
+    # está verbatim en el content (case/espacios normalizados).
+    assert (
+        fc_main._find_reanchor_source(
+            "es un personaje ficticio y el protagonista jugable", sources
+        )
+        == "https://es.wikipedia.org/wiki/Carl_Johnson_(personaje)"
+    )
+    # Claim de menos de 8 palabras: no se puede formar n-grama -> None.
+    assert fc_main._find_reanchor_source("Carl Johnson es C.J.", sources) is None
+
+    result = fc_main._escalate_fabrication_issue(issue, sources)
+    assert (
+        result["source_url"]
+        == "https://es.wikipedia.org/wiki/Carl_Johnson_(personaje)"
+    )
+    # NO escalada: conserva la severity del LLM y el reason sin marcador.
+    assert result["severity"] == "WARNING"
+    assert "patrón de fabricación factual" not in result["reason"]
+
+
+# ---------------------------------------------------------------------------
+# §17 #35 F1 — campo error_type persistente en issues ERROR
+# La clasificación se hace ANTES del filtro de claves "_" dentro de
+# _apply_error_consistency_pass: error_type no lleva prefijo _, por lo que
+# sobrevive al filtrado y queda expuesto a la orquestación (autopilot).
+# ---------------------------------------------------------------------------
+def test_book59_error_type_is_fabrication_structural() -> None:
+    """REGRESIÓN §17 #35 F1/book_59: un ERROR estructural (firma de fabricación,
+    escalado por _escalate_fabrication_issue) recibe error_type=«fabrication_structural»
+    y ese campo sobrevive al filtro de claves internas ("_")."""
+    from modules.fact_checker.main import _apply_error_consistency_pass
+
+    issue = _escalate_fabrication_issue(
+        {
+            "claim": (
+                "Adolf Eichmann estuvo a cargo de los campos de concentración "
+                "en Palestina entre 1942 y 1948."
+            ),
+            "severity": "WARNING",
+            "reason": "sin soporte en las fuentes permitidas",
+            "source_url": None,
+        }
+    )
+    assert issue["severity"] == "ERROR"
+    # Igual que execute() (main.py): un ERROR que la escalada estructural subió
+    # de WARNING se marca internamente antes de la pasada de consistencia.
+    issue["_fabrication_structural"] = True
+
+    out = _apply_error_consistency_pass([issue], context="")
+    assert len(out) == 1
+    assert out[0]["severity"] == "ERROR"
+    # Campo persistente (sin prefijo _) y clasificado como fabricación estructural.
+    assert out[0]["error_type"] == "fabrication_structural"
+    # Ninguna clave interna "_" se filtra hacia el resultado.
+    assert all(not k.startswith("_") for k in out[0])
+
+
+def test_accuracy_partial_error_type_no_fabrication_signature() -> None:
+    """§17 #35 F1: un ERROR NO estructural (sin firma de fabricación, origen LLM)
+    recibe error_type=«accuracy_partial». Aunque la pasada de consistencia lo
+    degrade a WARNING (sin source_url), la clasificación original del ERROR se
+    conserva en error_type."""
+    from modules.fact_checker.main import _apply_error_consistency_pass
+
+    issue = {
+        "claim": "El café Liberica es el más consumido del mundo.",
+        "severity": "ERROR",
+        "reason": "El LLM considera que la afirmación no es exacta.",
+        "source_url": None,
+        "_llm_original_error": True,
+    }
+    out = _apply_error_consistency_pass([issue], context="")
+    assert len(out) == 1
+    # Degradado por consistencia (fail-safe), pero la clasificación original persiste.
+    assert out[0]["error_type"] == "accuracy_partial"
+    assert all(not k.startswith("_") for k in out[0])

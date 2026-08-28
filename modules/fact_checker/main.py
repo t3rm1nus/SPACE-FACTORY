@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any
 
 from core.logger import get_logger, log
@@ -20,6 +21,8 @@ logger = get_logger(__name__)
 
 DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen-agent:latest")
 DEFAULT_ROUTER_MODEL = os.environ.get("ROUTER_MODEL", "qwen-agent:latest")
+# §17 #28: seed fijo → determinismo reproductible (T=0.0 sin seed no basta en este despliegue).
+FACT_CHECK_SEED = 1337
 
 _NUM_PATTERN = re.compile(r"\b(?:\d+[\d,\.]*%|\d{4}|\$\d+|\d+ millones|\d+ billion|\d+ trillion)\b", re.IGNORECASE)
 _QUOTE_PATTERN = re.compile(r'"[^"]+"|' + r"'[^']+'")
@@ -70,7 +73,43 @@ def _has_fabrication_signature(claim_text: str) -> bool:
     return bool(_PROPER_NOUN_PAIR_PATTERN.search(claim_text))
 
 
-def _escalate_fabrication_issue(issue: dict[str, Any]) -> dict[str, Any]:
+_REANCHOR_NGRAM_WORDS = 8  # §17 #32-P3: tamaño del n-grama de re-anclaje
+
+
+def _find_reanchor_source(claim_text: str, sources: list[dict[str, Any]]) -> str | None:
+    """Re-anclaje determinista claim→fuente por n-gramas de 8 palabras (§17 #32-P3).
+
+    Normaliza claim y content (minúsculas, espacios/saltos colapsados, strip),
+    genera los n-gramas de 8 palabras consecutivas del claim y devuelve la URL
+    de la PRIMERA fuente (en orden) cuyo content normalizado contiene
+    CUALQUIERA de esos n-gramas como substring literal. Si el claim tiene
+    menos de 8 palabras, o ninguna fuente matchea (o su content está vacío y
+    se salta), devuelve None.
+    """
+    claim_norm = " ".join(str(claim_text or "").lower().split())
+    words = claim_norm.split()
+    if len(words) < _REANCHOR_NGRAM_WORDS:
+        return None
+    n = _REANCHOR_NGRAM_WORDS
+    ngrams = {
+        " ".join(words[i : i + n]) for i in range(len(words) - n + 1)
+    }
+    for source in sources or []:
+        if not isinstance(source, dict):
+            continue
+        content = " ".join(str(source.get("content") or "").lower().split())
+        if not content:
+            continue
+        for ngram in ngrams:
+            if ngram in content:
+                return source.get("url")
+    return None
+
+
+def _escalate_fabrication_issue(
+    issue: dict[str, Any],
+    sources: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """Eleva a ERROR una claim sin soporte con firma de fabricación factual.
 
     §17 #20: el LLM clasificaba estas claims como WARNING ("sin soporte"),
@@ -78,11 +117,26 @@ def _escalate_fabrication_issue(issue: dict[str, Any]) -> dict[str, Any]:
     en Palestina atribuidos a Eichmann, 1942-1948, sin ninguna base en las
     fuentes). La combinación fecha + nombre propio + cifra SIN soporte es una
     señal estructural de fabricación, independiente de lo grave que sea el tema.
+
+    §17 #32-P3: si se proveen ``sources`` y el claim matchea verbatim (n-grama
+    de 8 palabras) el ``content`` de una fuente permitida, NO es fabricación:
+    se re-ancla ``source_url`` a esa fuente y se conserva la severity del LLM
+    sin escalar (fallback determinista para claims no ancladas por el LLM).
     """
     if str(issue.get("severity", "")).upper() == "ERROR":
         return issue
     claim = str(issue.get("claim", ""))
     if _has_fabrication_signature(claim) and _is_unsupported_issue(issue):
+        # §17 #32-P3: re-anclaje determinista ANTES de escalar. Si el claim
+        # aparece literalmente (n-grama de 8 palabras) en el content de una
+        # fuente permitida, el "sin soporte" era un fallo de anclaje del LLM,
+        # no fabricación: se re-ancla y NO se escala.
+        if sources:
+            reanchor_url = _find_reanchor_source(claim, sources)
+            if reanchor_url:
+                issue = dict(issue)
+                issue["source_url"] = reanchor_url
+                return issue
         issue = dict(issue)
         issue["severity"] = "ERROR"
         issue["reason"] = (
@@ -116,16 +170,28 @@ def _escalate_fabrication_issue(issue: dict[str, Any]) -> dict[str, Any]:
 #
 # Presupuesto: solo se dispara para claims ERROR no estructurales (pocas por
 # capítulo en la práctica). Peor caso: N claims × FACT_CHECK_CONSISTENCY_TIMEOUT
-# (20s default). Con N=5 serían 100s < timeout_seconds=180 del scheduler para
-# fact_check_chapter (modules/fact_checker/module.json). No existe
-# FACT_CHECK_TOTAL_TIME_BUDGET en este módulo; no se añade.
-# ---------------------------------------------------------------------------
+# (20s default). Techo AGREGADO por ejecución de execute():
+# FACT_CHECK_CONSISTENCY_TOTAL_BUDGET (120s default, env-overridable) acota el
+# tiempo TOTAL de todas las verificaciones de consistencia de una misma
+# ejecución, dejando ~33% de holgura bajo timeout_seconds=180 del scheduler
+# para fact_check_chapter (modules/fact_checker/module.json), mismo criterio
+# que WRITER_TOTAL_TIME_BUDGET / RESEARCH_TOTAL_TIME_BUDGET. Caso real task 895
+# (book 65): 10 claims ERROR con source_url × 20s secuenciales = 200s > 180s ->
+# timeout definitivo del scheduler tras agotar reintentos. Con el techo
+# agregado, el peor caso es budget (120s) + una última llamada (≤20s) = 140s
+# < 180s, INDEPENDIENTEMENTE del número de claims.
 FACT_CHECK_CONSISTENCY_TIMEOUT = float(
     os.environ.get("FACT_CHECK_CONSISTENCY_TIMEOUT", "20")
+)
+FACT_CHECK_CONSISTENCY_TOTAL_BUDGET = float(
+    os.environ.get("FACT_CHECK_CONSISTENCY_TOTAL_BUDGET", "120")
 )
 
 _CONSISTENCY_DOWNGRADE_NOTE = (
     "[Degradado a WARNING: verificación de consistencia no confirmó ERROR]"
+)
+_CONSISTENCY_BUDGET_NOTE = (
+    "[Degradado a WARNING: presupuesto de verificación de consistencia agotado]"
 )
 
 
@@ -163,9 +229,10 @@ def _verify_error_consistency(claim_text: str, reason: str, context: str = "") -
                 "Eres un verificador de hechos editorial. Responde únicamente "
                 "con la palabra ERROR o DEFENDIBLE."
             ),
-            model=DEFAULT_ROUTER_MODEL,
+                        model=DEFAULT_ROUTER_MODEL,
             max_tokens=8,
             temperature=0.0,
+            seed=FACT_CHECK_SEED,
         )
         answer = " ".join(str(result.text or "").upper().split())
         if answer.startswith("DEFENDIBLE"):
@@ -189,31 +256,71 @@ def _apply_error_consistency_pass(
       (firma de fabricación factual) y NUNCA pasan por esta verificación.
     - Solo aplica con ejecución LLM real (execution_mode == "real"); en
       fallback/backstop determinista no hay nada que re-verificar.
+    - Ajuste de diseño (book_65 "café Liberica", tasks 890/891): un ERROR del
+      LLM SIN source_url no se somete a segunda pasada: no tiene sentido
+      preguntar "¿es verificable?" cuando no existe fuente contra la que
+      verificar. Se degrada DIRECTAMENTE a WARNING (fail-safe hacia MENOS
+      bloqueo) sin gastar la llamada LLM extra. Con source_url presente se
+      mantiene el comportamiento anterior (segunda pasada binaria).
     - Un ERROR confirmado se mantiene intacto; uno no confirmado (o con
       verificación fallida/timeout) se degrada a WARNING con nota en reason.
     - Las claves internas que empiezan por "_" se eliminan antes de devolver.
     """
     out: list[dict[str, Any]] = []
+    # §17 #35 F1: clasificación persistente de error_type (sin prefijo _) sobre la
+    # lista ORIGINAL de issues (todavía conserva claves internas _) antes de que el
+    # filtro {k:v for k,v in ... if not k.startswith("_")} las elimine. error_type
+    # no lleva prefijo _ por lo que sobrevive al filtrado y se expone a la orquestación.
+    for _issue in issues:
+        if _issue.get("severity") == "ERROR":
+            _issue["error_type"] = (
+                "fabrication_structural" if _issue.get("_fabrication_structural") else "accuracy_partial"
+            )
+    budget_start = time.perf_counter()
     for issue in issues:
         if (
             issue.get("severity") == "ERROR"
             and not issue.get("_fabrication_structural")
             and issue.get("_llm_original_error")
         ):
-            confirmed = _verify_error_consistency(
-                str(issue.get("claim", "")),
-                str(issue.get("reason", "")),
-                context,
-            )
             issue = dict(issue)
-            if confirmed:
-                issue["consistency_check"] = "CONFIRMED"
-            else:
+            if not issue.get("source_url"):
+                # Sin fuente asociada no hay nada que verificar: downgrade
+                # directo sin llamada LLM adicional.
                 issue["severity"] = "WARNING"
                 issue["reason"] = (
-                    f"{issue.get('reason') or ''} {_CONSISTENCY_DOWNGRADE_NOTE}"
+                    f"{issue.get('reason') or ''} "
+                    "[Degradado a WARNING: ERROR sin source_url y sin firma de "
+                    "fabricación estructural]"
                 ).strip()
-                issue["consistency_check"] = "DOWNGRADED"
+                issue["consistency_check"] = "SKIPPED_NO_SOURCE"
+            elif (
+                FACT_CHECK_CONSISTENCY_TOTAL_BUDGET
+                - (time.perf_counter() - budget_start)
+            ) < FACT_CHECK_CONSISTENCY_TIMEOUT:
+                # Techo agregado de la ejecución (fix task 895): sin presupuesto
+                # para otra llamada completa (≤ FACT_CHECK_CONSISTENCY_TIMEOUT),
+                # se degrada DIRECTAMENTE a WARNING sin invocar al provider
+                # (mismo criterio fail-safe que timeout/error individual).
+                issue["severity"] = "WARNING"
+                issue["reason"] = (
+                    f"{issue.get('reason') or ''} {_CONSISTENCY_BUDGET_NOTE}"
+                ).strip()
+                issue["consistency_check"] = "SKIPPED_BUDGET_EXHAUSTED"
+            else:
+                confirmed = _verify_error_consistency(
+                    str(issue.get("claim", "")),
+                    str(issue.get("reason", "")),
+                    context,
+                )
+                if confirmed:
+                    issue["consistency_check"] = "CONFIRMED"
+                else:
+                    issue["severity"] = "WARNING"
+                    issue["reason"] = (
+                        f"{issue.get('reason') or ''} {_CONSISTENCY_DOWNGRADE_NOTE}"
+                    ).strip()
+                    issue["consistency_check"] = "DOWNGRADED"
         out.append({k: v for k, v in issue.items() if not k.startswith("_")})
     return out
 
@@ -262,10 +369,20 @@ def _heuristic_issues(text: str, sources: list[dict]) -> list[dict[str, Any]]:
 def _build_prompt(validated: dict) -> str:
     chapter_text = validated.get("chapter_text", "")
     sources = validated.get("sources") or []
-    sources_text = "\n".join(
-        f"- {s.get('title') or s.get('url')} ({s.get('source_type') or 'web'}): {s.get('url')}"
-        for s in sources[:20]
-    )
+    # §17 #32-P2: exponer el content de cada fuente en el prompt para que el LLM
+    # pueda asociar claims->fuentes reales. Truncado a _PROMPT_CONTENT_TRUNC (200
+    # chars/fuente) para no disparar el tamaño del prompt. Sin content -> se omite
+    # la línea extra, sin romper el formato existente.
+    _PROMPT_CONTENT_TRUNC = 200
+    lines = []
+    for s in sources[:20]:
+        base = f"- {s.get('title') or s.get('url')} ({s.get('source_type') or 'web'}): {s.get('url')}"
+        content = s.get("content") or ""
+        if content:
+            lines.append(f"{base}\n  Contenido: {content[:_PROMPT_CONTENT_TRUNC]}")
+        else:
+            lines.append(base)
+    sources_text = "\n".join(lines)
     return (
         "Eres un verificador de hechos editorial. Analiza el capítulo y las fuentes.\n\n"
         f"Capítulo:\n{chapter_text}\n\n"
@@ -283,7 +400,8 @@ def _build_prompt(validated: dict) -> str:
         "- NUNCA inventes fuentes. Si no hay fuente, no la inventes.\n"
         "- Devuelve SOLO JSON válido con estas claves:\n"
         '{"status":"PASS|WARNING|FAIL","claims_checked":0,"issues":[],"corrections":[],"unsupported_claims":[]}\n'
-        "- Cada issue debe tener: claim, severity, reason, source_url (o null), suggestion (o null)."
+        "- Cada issue debe tener: claim, severity, reason, source_url, suggestion (o null).\n"
+        "  source_url: la URL exacta de la fuente permitida cuyo \'Contenido\' respalda la afirmaci\u00f3n, si existe una; si ninguna fuente permitida la respalda, usa null."
     )
 
 
@@ -363,12 +481,15 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
         provider = get_provider()
         provider_name = provider.name
         prompt = _build_prompt(validated)
+        # §17 #28: temperature=0.0 (antes 0.1, sin justificación documentada) — fix no-determinismo producción:
+        # mismo chapter_text producía ERROR/PASS distinto entre llamadas (book_69 cap.2 ES, tasks 1476/1477).
         result = provider.generate(
             prompt,
             system="Eres un verificador de hechos editorial. Devuelve solo JSON.",
             model=DEFAULT_ROUTER_MODEL,
             max_tokens=4000,
-            temperature=0.1,
+            temperature=0.0,
+            seed=FACT_CHECK_SEED,
         )
         input_tokens = result.input_tokens
         output_tokens = result.output_tokens
@@ -403,13 +524,16 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
             continue
         seen_claims.add(claim_key)
         original_severity = str(issue.get("severity", "INFO")).upper()
-        normalized = _escalate_fabrication_issue({
-            "claim": issue.get("claim", ""),
-            "severity": issue.get("severity", "INFO"),
-            "reason": issue.get("reason", ""),
-            "source_url": issue.get("source_url"),
-            "suggestion": issue.get("suggestion"),
-        })
+        normalized = _escalate_fabrication_issue(
+            {
+                "claim": issue.get("claim", ""),
+                "severity": issue.get("severity", "INFO"),
+                "reason": issue.get("reason", ""),
+                "source_url": issue.get("source_url"),
+                "suggestion": issue.get("suggestion"),
+            },
+            validated.get("sources") or [],
+        )
         # Marcas internas para la pasada de consistencia (§17 #22):
         # - _fabrication_structural: el ERROR lo puso la escalada estructural
         #   (firma de fabricación factual) -> NUNCA se re-verifica.
@@ -497,4 +621,3 @@ def execute(payload: dict, capability: str = "fact_check_chapter") -> dict:
         f"Fact-check finalizado: {status} ({output['claims_checked']} claims, gate={quality_gate})",
     )
     return output
-
