@@ -810,22 +810,14 @@ def run_job(
                                 _ed.update_book_description(
                                     job["book_id"], planner_desc
                                 )
-                            # Propagar el título del planner SOLO si es una mejora real.
-                            # §17 #38 (bug título/idea): el fallback determinista del
-                            # planner (_fallback_plan) devuelve como "title" la idea
-                            # cruda del libro (title == description == validated.idea);
-                            # persistirlo incondicionalmente pisaba el título REAL que
-                            # el usuario introdujo en el formulario. Un título generado
-                            # por LLM es distinto de la descripción, así que se compara
-                            # con planner_desc y solo se persiste si difiere.
-                            if (
-                                planner_title
-                                and planner_title.strip()
-                                and planner_title.strip() != planner_desc.strip()
-                            ):
-                                _ed.update_book_title(
-                                    job["book_id"], planner_title
-                                )
+                            # §17 #38 (completo): el título del planner NUNCA
+                            # sobrescribe books.title — "Título" es obligatorio
+                            # en el formulario (create_book rechaza title vacío,
+                            # §13), así que el usuario siempre escribió uno y
+                            # el planner no debe reemplazarlo ni en fallback
+                            # (title==idea) ni con LLM exitoso. El planner sigue
+                            # propagando description (L.809-812) y el título EN
+                            # (books.title_en, que el usuario no rellena).
                         except Exception as e:
                             log(logger, logging.WARNING,
                                 f"No se pudieron propagar títulos del planner: {e}")

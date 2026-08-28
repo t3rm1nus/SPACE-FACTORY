@@ -161,8 +161,12 @@ def test_planner_fallback_title_equals_idea_does_not_overwrite_real_title(store)
     assert _book_title(book_id) == "TITULO REAL DEL USUARIO"
 
 
-def test_planner_generated_title_distinct_from_description_is_propagated(store):
-    """Título de planner LEGITIMO (distinto de la descripción) sí se propaga."""
+def test_planner_generated_title_does_not_overwrite_user_title(store):
+    """§17 #38 (completo): el planner NUNCA reemplaza books.title (ES) —
+    el título es obligatorio en el formulario (§13) y el usuario ya lo escribió.
+    Aun con planner LLM exitoso (título distinto de la idea), el título del
+    usuario se conserva. El planner sigue poblando description/title_en.
+    """
     d = dict(_META)
     d["title"] = "TITULO PROVISIONAL"
     book_id = create_book(d)["book_id"]
@@ -179,7 +183,8 @@ def test_planner_generated_title_distinct_from_description_is_propagated(store):
         max_attempts=1,
         sleep_fn=_NOSLEEP,
     )
-    assert _book_title(book_id) == "Historia de los videojuegos"
+    # El título del usuario NUNCA se toca, aunque el planner genere otro.
+    assert _book_title(book_id) == "TITULO PROVISIONAL"
 
 
 def test_editor_populates_edited_es_in_db(store):
