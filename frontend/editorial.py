@@ -396,7 +396,13 @@ def _filter_orphaned_local_images(book_id: int, chapter_id: int, image_paths: li
     return out, discarded
 
 
-def persist_chapter_images(book_id: int, chapter_id: int, image_paths: list[str]) -> dict:
+def persist_chapter_images(
+    book_id: int,
+    chapter_id: int,
+    image_paths: Optional[list[str]] = None,
+    *,
+    overwrite: bool = False,
+) -> dict:
     """Persiste las rutas de imágenes generadas a chapters.images.
 
     Serializa la lista como JSON. Usado por autopilot tras image_gen PASS.
@@ -404,13 +410,42 @@ def persist_chapter_images(book_id: int, chapter_id: int, image_paths: list[str]
     huérfanas (sin *.metadata.json que las respalde en el directorio real del
     capítulo) — residuos de una pasada anterior cuya metadata fue sobrescrita
     por una re-generación. comfyui/web sin cambio de comportamiento.
+
+    Fix §17 #31 (precondición §17 #36 Fase 2): FUSIONA con el valor previo de
+    chapters.images en vez de sobrescribirlo — deduplicando por image_path
+    (la nueva gana en caso de path idéntico: es una regeneración intencional).
+    Reglas:
+    - image_paths=[] (lista vacía): NO borra las imágenes previas válidas;
+      solo añade nada (conserva lo existente).
+    - image_paths=None (reset explícito) o overwrite=True: reemplaza el valor
+      previo completo (comportamiento overwrite histórico disponible).
     """
     import json
+    reset_requested = image_paths is None
     image_paths, discarded_local = _filter_orphaned_local_images(
         book_id, chapter_id, image_paths or []
     )
     conn = get_db()
     try:
+        if not overwrite and not reset_requested:
+            # §17 #31: leer el valor previo y fusionar por image_path.
+            # "La nueva gana" en mismo path (regeneración intencional).
+            row = conn.execute(
+                "SELECT images FROM chapters WHERE id = ? AND book_id = ?",
+                (chapter_id, book_id),
+            ).fetchone()
+            prev: list[str] = []
+            if row is not None and row["images"]:
+                try:
+                    raw_prev = json.loads(row["images"])
+                    if isinstance(raw_prev, list):
+                        prev = [str(p) for p in raw_prev if isinstance(p, str)]
+                except (json.JSONDecodeError, TypeError):
+                    prev = []  # valor corrupto: se asume lista vacía
+            merged: dict[str, str] = {p: p for p in prev}
+            for p in image_paths:
+                merged[p] = p  # la nueva sobrescribe en mismo path
+            image_paths = list(merged.values())
         images_json = json.dumps(image_paths, ensure_ascii=False)
         cur = conn.execute(
             "UPDATE chapters SET images = ?, updated_at = datetime('now') "

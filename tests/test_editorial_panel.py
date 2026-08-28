@@ -145,6 +145,87 @@ def test_persist_chapter_images_keeps_all_when_no_local_paths(client, monkeypatc
         ).fetchone()
     assert json.loads(row["images"]) == paths
 
+# ============================================
+# persist_chapter_images — fix §17 #31 (merge por image_path)
+# ============================================
+
+def test_persist_chapter_images_merges_with_existing(client, monkeypatch):
+    """§17 #31: persistir 1 imagen NUEVA sobre un capítulo con 2 previas válidas
+    conserva las 3 (ninguna perdida) — merge, no overwrite."""
+    from frontend import editorial
+
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tempfile.mkdtemp()))
+
+    assert _create_book(client).status_code == 201
+    chapter_id = _make_chapter(1, 1, "Texto.")
+    prev = ["data/images/comfyui/a.png", "data/images/web/b.png"]
+    editorial.persist_chapter_images(1, chapter_id, prev)
+
+    new_path = "data/images/comfyui/c.png"
+    result = editorial.persist_chapter_images(1, chapter_id, [new_path])
+    assert result["updated"] is True
+    assert result["images_count"] == 3
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ? AND book_id = ?",
+            (chapter_id, 1),
+        ).fetchone()
+    persisted = json.loads(row["images"])
+    assert len(persisted) == 3
+    assert prev[0] in persisted and prev[1] in persisted and new_path in persisted
+
+
+def test_persist_chapter_images_same_path_overwrites(client, monkeypatch):
+    """§17 #31: persistir una imagen con el MISMO path es una regeneración
+    intencional — la nueva gana (no hay duplicados en chapters.images)."""
+    from frontend import editorial
+
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tempfile.mkdtemp()))
+
+    assert _create_book(client).status_code == 201
+    chapter_id = _make_chapter(1, 1, "Texto.")
+    same_path = "data/images/comfyui/a.png"
+    editorial.persist_chapter_images(1, chapter_id, [same_path])
+
+    result = editorial.persist_chapter_images(1, chapter_id, [same_path])
+    assert result["images_count"] == 1
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ? AND book_id = ?",
+            (chapter_id, 1),
+        ).fetchone()
+    persisted = json.loads(row["images"])
+    assert persisted == [same_path]  # 1 sola ocurrencia, no 2
+
+
+def test_persist_chapter_images_empty_new_list_preserves_previous(client, monkeypatch):
+    """§17 #31: lista nueva vacía NO borra las imágenes previas válidas
+    (edge case: capítulo sin imágenes en esta ejecución)."""
+    from frontend import editorial
+
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tempfile.mkdtemp()))
+
+    assert _create_book(client).status_code == 201
+    chapter_id = _make_chapter(1, 1, "Texto.")
+    prev = ["data/images/comfyui/a.png", "data/images/web/b.png"]
+    editorial.persist_chapter_images(1, chapter_id, prev)
+
+    result = editorial.persist_chapter_images(1, chapter_id, [])
+    assert result["images_count"] == 2  # conservadas, no borradas
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ? AND book_id = ?",
+            (chapter_id, 1),
+        ).fetchone()
+    assert json.loads(row["images"]) == prev
+
+
+# ============================================
+# Crear / cargar libro
+# ============================================
 
 # ============================================
 # Crear / cargar libro
