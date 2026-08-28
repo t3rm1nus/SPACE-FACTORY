@@ -354,6 +354,176 @@ def retry_job(store: BookJobStore, job_id: str) -> Optional[dict]:
     return job
 
 # ---------------------------------------------------------------------------
+# §17 #36 Fase 3: reset desde fase de origen (retry inteligente)
+# ---------------------------------------------------------------------------
+# Cascada de dependencias: al resetear una fase de origen, TODA fase posterior
+# que consuma su salida debe re-ejecutarse (si no, el retry vuelve a fallar
+# por el mismo motivo: quality_gate vería datos stale).
+PHASE_RESET_CASCADE = {
+    "planner": ["research", "outline", "writer", "fact_check", "editor",
+                "image_plan", "image_gen", "quality_gate", "docx"],
+    "research": ["outline", "writer", "fact_check", "editor",
+                 "image_plan", "image_gen", "quality_gate", "docx"],
+    "writer": ["fact_check", "editor", "image_plan", "image_gen",
+               "quality_gate", "docx"],
+    "image_gen": ["quality_gate", "docx"],
+    "docx": [],
+}
+# Fases GLOBALES (no per-chapter): si from_phase o cualquier fase de su
+# cascada es global, chapter_number no es válido (la salida de una fase
+# global alimenta a TODOS los capítulos; no se puede acotar a uno).
+GLOBAL_PHASES = {"planner", "research", "outline", "quality_gate", "docx"}
+
+# Alias de entrada: origin_phase tal como lo anota quality_control (§17 #36
+# Fase 1) -> id real de fase del pipeline.
+_ORIGIN_PHASE_ALIASES = {"book_planner": "planner"}
+
+
+def _reset_phase_dict(ph: dict, subs_all: bool = False) -> None:
+    """Resetea una fase a PENDING (mismo criterio que retry_job: L.328-349).
+
+    ``subs_all=False`` conserva los subs PASS (solo resetea no-PASS);
+    ``subs_all=True`` resetea TODOS los subs (reset completo de fase).
+    """
+    ph["status"] = PHASE_PENDING
+    ph["attempts"] = 0
+    ph["started_at"] = None
+    ph["completed_at"] = None
+    ph["duration"] = None
+    ph["error"] = None
+    ph["metrics"] = {}
+    subs = ph.get("subs")
+    if subs and isinstance(subs.get("chapters"), dict):
+        for csub in subs["chapters"].values():
+            if subs_all or csub.get("status") != PHASE_PASS:
+                csub["status"] = PHASE_PENDING
+                csub["attempts"] = 0
+                csub["error"] = None
+        subs["done"] = sum(
+            1 for s in subs["chapters"].values() if s.get("status") == PHASE_PASS
+        )
+def reset_from_phase(
+    job: dict,
+    from_phase: str,
+    chapter_number: Optional[int] = None,
+) -> dict:
+    """§17 #36 Fase 3: resetea un job desde una fase de origen y su cascada.
+
+    A diferencia de ``retry_job`` (reset plano de fases no-PASS), retrocede
+    sobre fases ya PASS cuando la causa real del FAIL de quality_gate reside
+    en una fase anterior (p.ej. image_gen con imágenes insuficientes, §17 #30).
+
+    Reglas:
+    - ``from_phase`` se normaliza por alias ("book_planner" -> "planner").
+    - Reset = {from_phase} ∪ PHASE_RESET_CASCADE[from_phase], tolerando fases
+      ausentes en el job (skip silencioso, p.ej. image_plan con ratio=0).
+    - Bilingüe: si la cascada incluye "writer", también se resetea "writer_en"
+      cuando existe como fase del job (misma salida de texto, otro idioma).
+    - ``chapter_number`` acota el reset a UN capítulo en las fases per-chapter
+      del set. Solo es válido si NINGUNA fase del set es global (la salida de
+      una fase global alimenta a todos los capítulos); en caso contrario,
+      ValueError. El status de la FASE también baja a PENDING (si no,
+      run_job no la re-ejecutaría al estar PASS).
+    - Las fases ANTERIORES a from_phase quedan intactas.
+    - NO persiste en store (patrón de retry_job/cancel_job: el caller decide
+      el save).
+    """
+    from_phase = _ORIGIN_PHASE_ALIASES.get(from_phase, from_phase)
+    if from_phase not in PHASE_RESET_CASCADE:
+        raise ValueError(
+            f"Fase de origen desconocida: '{from_phase}'. "
+            f"Válidas: {sorted(PHASE_RESET_CASCADE)}"
+        )
+    if job["status"] in (JOB_PENDING, JOB_RUNNING):
+        raise ValueError(
+            f"El job '{job['job_id']}' está en estado {job['status']} (ya activo)"
+        )
+
+    phase_ids = {from_phase, *PHASE_RESET_CASCADE[from_phase]}
+    # Bilingüe: writer cubre su variante EN si existe en el job.
+    if "writer" in phase_ids:
+        phase_ids.add("writer_en")
+
+    if chapter_number is not None and from_phase in GLOBAL_PHASES:
+        raise ValueError(
+            f"La fase de origen '{from_phase}' es global: no se puede acotar "
+            "el reset a un capítulo. Usa chapter_number=None (reset de libro "
+            "completo)."
+        )
+
+    phases_by_id = {p["id"]: p for p in job["phases"]}
+
+    # Resolución chapter_number -> chapter_id (los subs se indexan por el id
+    # real de BD, p.ej. "538"). Si la BD no está disponible o no contiene el
+    # número, fallback: el propio number como id (subs numéricos / tests).
+    chapter_id: Optional[str] = None
+    if chapter_number is not None:
+        chapter_id = str(chapter_number)
+        try:
+            from frontend.editorial import get_chapters
+
+            for ch in get_chapters(job["book_id"]) or []:
+                if int(ch.get("number", -1)) == int(chapter_number):
+                    chapter_id = str(ch.get("id"))
+                    break
+        except Exception:
+            pass
+
+    affected: list[str] = []
+    subs_matched = False  # ¿algún sub per-chapter matcheó chapter_number?
+    for pid in phase_ids:
+        ph = phases_by_id.get(pid)
+        if ph is None:
+            continue  # fase ausente en este job (p.ej. image_plan ratio=0)
+        if chapter_number is not None and (
+            pid not in PER_CHAPTER_PHASES
+            or not isinstance(ph.get("subs"), dict)
+        ):
+            # Fase global (o sin subs): se resetea COMPLETA aunque el reset
+            # esté acotado a un capítulo (quality_gate/docx deben re-evaluar
+            # el libro entero; no se puede acotar).
+            _reset_phase_dict(ph, subs_all=False)
+        elif chapter_number is not None:
+            subs = ph.get("subs") or {}
+            chapters = subs.get("chapters") if isinstance(subs, dict) else None
+            if not (isinstance(chapters, dict) and chapter_id in chapters):
+                continue  # fase per-chapter sin ese sub: nada que resetear
+            chapters[chapter_id]["status"] = PHASE_PENDING
+            chapters[chapter_id]["attempts"] = 0
+            chapters[chapter_id]["error"] = None
+            subs["done"] = sum(
+                1 for s in chapters.values() if s.get("status") == PHASE_PASS
+            )
+            subs_matched = True
+            # El status de la FASE también baja a PENDING (matiz del diseño:
+            # run_job solo re-ejecuta fases != PASS aunque haya subs pendientes;
+            # _reset_phase_dict con subs_all=False no toca los subs PASS).
+            _reset_phase_dict(ph, subs_all=False)
+        else:
+            _reset_phase_dict(ph, subs_all=False)
+        affected.append(pid)
+
+    if chapter_number is not None and not subs_matched:
+        raise ValueError(
+            f"El capítulo {chapter_number} no existe en los subs de ninguna "
+            "fase per-chapter afectada."
+        )
+
+    job["status"] = JOB_PENDING
+    job["error"] = None
+    job["updated_at"] = _now()
+    log(
+        logger,
+        logging.INFO,
+        "Reset desde fase de origen (§17 #36 Fase 3)",
+        job_id=job["job_id"],
+        book_id=job.get("book_id"),
+        from_phase=from_phase,
+        chapter_number=chapter_number,
+        affected=affected,
+    )
+    return job
+# ---------------------------------------------------------------------------
 # Recovery tras reinicio (política determinista: RUNNING/RETRY -> PENDING)
 # ---------------------------------------------------------------------------
 def recover(store: BookJobStore) -> list[dict]:
