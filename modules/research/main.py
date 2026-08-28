@@ -385,6 +385,10 @@ def _search_searxng(query: str, limit: int = 5, timeout: int = 7) -> list[dict[s
         if not title or not url:
             continue
         content = str(item.get("content") or "").strip()
+        # §17 #33 — descartar snippets de SERP (fecha/hace N días/"…") cortos:
+        # SearXNG entrega el snippet del buscador, no contenido real. skip-and-continue.
+        if _is_serp_snippet(content) and len(content) < _SERP_LENGTH_THRESHOLD:
+            continue
         out.append({
             "title": title,
             "url": url,
@@ -393,6 +397,63 @@ def _search_searxng(query: str, limit: int = 5, timeout: int = 7) -> list[dict[s
             "source_type": "web_searxng",
         })
     return out
+
+
+# §17 #27 — Denylist de redes sociales: SearXNG devuelve posts de TikTok/Instagram
+# con metadata de engagement (fecha+likes+comentarios) como resultados; el writer los
+# copiaba verbatim y el fact_checker bloqueaba el capítulo (patrón fabricación
+# estructural). Se descartan ANTES de curación/ranking, sin ocupar slot ni lanzar error.
+_SOCIAL_MEDIA_DENYLIST = {
+    "tiktok.com",
+    "instagram.com",
+    "facebook.com",
+    "twitter.com",
+    "x.com",
+}
+
+
+def _is_social_media(url: Optional[str]) -> bool:
+    """True si el dominio de ``url`` contiene algún dominio de ``_SOCIAL_MEDIA_DENYLIST``.
+
+    Tolerante a URL vacía/None (devuelve False, no levanta excepción). Elimina
+    el ``www.`` inicial y compara en minúsculas por CONTENIDO para cubrir
+    subdominios (``es.tiktok.com`` dispara ``tiktok.com``).
+    """
+    if not url:
+        return False
+    try:
+        netloc = urllib.parse.urlparse(str(url)).netloc.lower()
+    except Exception:  # noqa: BLE001 - defensa en depth
+        return False
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
+    return any(blocked in netloc for blocked in _SOCIAL_MEDIA_DENYLIST)
+
+
+# §17 #33 — Filtro de snippets de SERP: SearXNG devuelve el `content` como SNIPPET
+# del buscador (fecha de indexación "6 sept 2024", "hace N días" y "…" de
+# truncamiento del SERP), NO contenido real de la página. El writer los copiaba
+# verbatim y el fact_checker los bloqueaba (patrón fabricación estructural).
+# Se descartan en `_search_searxng` ANTES de curación/ranking, sin ocupar slot ni
+# lanzar error — mismo patrón de skip-and-continue que el denylist §17 #27.
+# Motivado por book_69/task_1486: 6 de 9 fuentes eran snippets de SERP (153-166
+# chars), frente a 3 de Wikipedia limpias (224-254 chars).
+_SERP_LENGTH_THRESHOLD = 250
+_SERP_DATE_RE = re.compile(r"\d{1,2}\s+\w{3,4}\.?\s+\d{4}")
+_SERP_AGO_RE = re.compile(r"\bhace\s+\d+\s+(día|días|hora|horas)\b")
+
+
+def _is_serp_snippet(content: Optional[str]) -> bool:
+    """True si ``content`` parece un snippet de buscador (SERP), no contenido real.
+
+    Detecta: fecha corta estilo "6 sept 2024", "hace N días/horas", o que el
+    texto termine en "..." / "…" tras strip(). Tolerante a None/vacío (False)."""
+    if not content:
+        return False
+    c = str(content).strip()
+    if _SERP_DATE_RE.search(c) or _SERP_AGO_RE.search(c):
+        return True
+    return c.endswith("...") or c.endswith("…")
 
 
 def _multi_source_search(query: str, max_sources: int, timeout: int, language: str = "es") -> list[dict[str, Any]]:
@@ -444,8 +505,13 @@ def _multi_source_search(query: str, max_sources: int, timeout: int, language: s
             logger.warning("Backend %s lanzó excepción durante búsqueda multi-fuente: %s", label, e)
             results = []
         for cand in results[:per_backend_limit]:
-            if cand.get("url"):
-                collected.append(cand)
+            if not cand.get("url"):
+                continue
+            # §17 #27: descarte silencioso de redes sociales ANTES de dedupe/curación
+            # (no ocupa slot, no lanza error, no toca el resto de la lógica).
+            if _is_social_media(cand.get("url")):
+                continue
+            collected.append(cand)
 
     # Dedupe determinista global (URL normalizada + título), en el orden de llegada
     # (primera ocurrencia gana). Cada backend aporta hasta su propio per_backend_limit
