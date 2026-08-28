@@ -15,6 +15,25 @@ import os
 import pytest
 
 from core.database import init_db
+
+
+def _dump_book67_job() -> dict:
+    """PASO 3 (§17 #28): inspección del job real de book_67 para plan de reset."""
+    path = os.path.join("data", "autopilot", "jobs", "book_67.json")
+    with open(path, encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def test_book67_job_reset_plan_inspection() -> None:
+    """Solo lectura: confirma claves de fases a poner PENDING para reset book_67."""
+    job = _dump_book67_job()
+    assert job["book_id"] == 67
+    phase_ids = [p["id"] for p in job["phases"]]
+    for required in ("image_plan", "image_gen", "quality_gate"):
+        assert required in phase_ids
+    targets = {p["id"]: p["status"] for p in job["phases"]
+               if p["id"] in ("image_plan", "image_gen", "quality_gate")}
+    assert set(targets) == {"image_plan", "image_gen", "quality_gate"}
 from frontend.editorial import (
     _build_book_dict,
     build_payload,
@@ -110,3 +129,140 @@ def test_persist_roundtrip_title_en_and_outline_en() -> None:
     bk = _get_book(bid)
     assert bk["title_en"] == "Round Trip Book"
     assert bk["description_en"] == "An English description"
+
+
+def test_writer_en_payload_no_es_objective_fallback() -> None:
+    """§17 #23: el objective del payload writer EN nunca es el texto ES.
+
+    - Con description_en=NULL → objective=None (NO chapter.objective en español).
+    - Con description_en presente → se usa description_en.
+    - Libro ES: sin cambio (sigue usando chapter.objective).
+    """
+    b = create_book({"title": "Libro bilingüe", "target_chapters": 1, "language": "es,en"})
+    bid = b["book_id"]
+    cid = _get_chapters(bid)[0]["id"]
+
+    # description_en NULL → None, nunca el objective ES del capítulo
+    payload = build_payload(bid, "writer", {"idea": "x"}, chapter_id=cid, language="en")
+    assert payload["chapter_outline"]["objective"] is None
+
+    # description_en presente → se usa
+    update_book_description_en(bid, "An English book description")
+    payload2 = build_payload(bid, "writer", {"idea": "x"}, chapter_id=cid, language="en")
+    assert payload2["chapter_outline"]["objective"] == "An English book description"
+
+    # Regresión ES: libro monolingüe sigue usando el objective PROPIO del capítulo
+    # (cualquiera que sea su valor; create_book lo deja NULL y eso se conserva).
+    b_es = create_book({
+        "title": "Libro español", "target_chapters": 1, "language": "es",
+    })
+    cid_es = _get_chapters(b_es["book_id"])[0]["id"]
+    payload_es = build_payload(
+        b_es["book_id"], "writer", {"idea": "x"}, chapter_id=cid_es, language="es"
+    )
+    assert (
+        payload_es["chapter_outline"]["objective"]
+        == _get_chapters(b_es["book_id"])[0]["objective"]
+    )
+
+
+def test_writer_en_payload_no_es_sources_fallback_when_lang_empty() -> None:
+    """§17 #23: sin desglose por idioma para 'en', el payload writer EN recibe
+    research/sources VACÍOS — NUNCA el contenido ES compartido. Libro ES: sin cambio.
+    """
+    b = create_book({"title": "Libro bilingüe", "target_chapters": 1, "language": "es,en"})
+    bid = b["book_id"]
+    cid = _get_chapters(bid)[0]["id"]
+
+    es_sources = [{"url": "https://es.example.com/articulo", "title": "Fuente ES"}]
+    data_es_only = {
+        "idea": "x",
+        # Desglose por idioma SIN entrada para 'en' + dato compartido ES:
+        # el fallback cruzado antiguo entregaría esto al writer EN.
+        "sources_by_lang": {"es": es_sources},
+        "research_by_lang": {"es": "- Hecho en español sobre el café."},
+        "sources": es_sources,
+        "research": "- Hecho en español sobre el café.",
+    }
+    payload = build_payload(bid, "writer", data_es_only, chapter_id=cid, language="en")
+    assert payload["sources"] == []
+    assert not payload["research"]
+
+    # Con desglose EN presente sí llega el contenido EN
+    data_with_en = {
+        "idea": "x",
+        "sources_by_lang": {
+            "es": es_sources,
+            "en": [{"url": "https://en.example.com/article", "title": "EN source"}],
+        },
+        "research_by_lang": {"es": "- Hecho ES.", "en": "- English fact about coffee."},
+    }
+    payload_en_ok = build_payload(bid, "writer", data_with_en, chapter_id=cid, language="en")
+    assert [s["url"] for s in payload_en_ok["sources"]] == ["https://en.example.com/article"]
+    assert payload_en_ok["research"] == "- English fact about coffee."
+
+    # Regresión ES: libro monolingüe conserva el fallback histórico a sources/research
+    b_es = create_book({"title": "Libro español", "target_chapters": 1, "language": "es"})
+    cid_es = _get_chapters(b_es["book_id"])[0]["id"]
+    payload_es = build_payload(b_es["book_id"], "writer", data_es_only, chapter_id=cid_es, language="es")
+    assert [s["url"] for s in payload_es["sources"]] == ["https://es.example.com/articulo"]
+    assert payload_es["research"] == "- Hecho en español sobre el café."
+
+
+def test_image_plan_gen_payload_uses_title_en_when_available() -> None:
+    """§17 #24: en libros EN, chapter_title del payload de image_plan e
+    image_gen usa chapters.title_en cuando existe; fallback al título ES
+    (chapters.title) si title_en es NULL/vacío. Regresión ES intacta."""
+    b = create_book({"title": "Libro bilingüe", "target_chapters": 1, "language": "es,en"})
+    bid = b["book_id"]
+    cid = _get_chapters(bid)[0]["id"]
+
+    # title_en NULL → fallback al título ES (comportamiento histórico)
+    p_plan = build_payload(bid, "image_plan", {"idea": "x"}, chapter_id=cid, language="en")
+    assert p_plan["chapter_title"].startswith("Capítulo")
+
+    update_chapter_title_en(bid, 1, "Chapter Title EN")
+
+    for phase in ("image_plan", "image_gen"):
+        p = build_payload(bid, phase, {"idea": "x"}, chapter_id=cid, language="en")
+        assert p["chapter_title"] == "Chapter Title EN"
+
+    # Regresión ES: libro monolingüe sigue usando chapters.title
+    b_es = create_book({"title": "Libro español", "target_chapters": 1, "language": "es"})
+    cid_es = _get_chapters(b_es["book_id"])[0]["id"]
+    p_es = build_payload(b_es["book_id"], "image_plan", {"idea": "x"}, chapter_id=cid_es, language="es")
+    assert p_es["chapter_title"].startswith("Capítulo")
+
+
+def test_image_payloads_no_english_anchor_without_native_en() -> None:
+    """§17 #28 bug fix 2026-08-26 (caso real book_67): libro bilingüe con
+    books.title_en=NULL, description_en=NULL y topic SOLO en español → el
+    payload de image_plan/image_gen NUNCA rellena topic_en con texto español
+    (queda vacío => fail-open del anclaje en image_search, ver §17 #28b)."""
+    b = create_book({
+        "title": "Todo sobre el café, descubrimientos, tipos, cafe en el mundo",
+        "target_chapters": 1,
+        "language": "es,en",
+        # title_en/description_en NO se pasan → quedan NULL en BD.
+    })
+    bid = b["book_id"]
+    cid = _get_chapters(bid)[0]["id"]
+
+    for phase in ("image_plan", "image_gen"):
+        # Ni job.data.topic_en ni nada nativo EN disponible.
+        p = build_payload(
+            bid, phase, {"idea": "x"}, chapter_id=cid, language="en"
+        )
+        assert not str(p.get("topic_en") or "").strip(), (
+            f"{phase}: topic_en contiene texto (fallback ES vivo?): {p.get('topic_en')!r}"
+        )
+        assert "café" not in str(p.get("topic_en") or "")
+        assert "mundo" not in str(p.get("topic_en") or "")
+
+    # Con topic_en REAL en job.data sí viaja (contrato positivo intacto).
+    p_ok = build_payload(
+        bid, "image_plan",
+        {"idea": "x", "topic_en": "Everything about coffee around the world"},
+        chapter_id=cid, language="en",
+    )
+    assert p_ok["topic_en"] == "Everything about coffee around the world"

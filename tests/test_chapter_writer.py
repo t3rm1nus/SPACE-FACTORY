@@ -288,7 +288,9 @@ def test_build_prompt_includes_inputs_en() -> None:
     assert "Verified topic data." in prompt
     assert "formal" in prompt
     assert "English" in prompt
-    assert "Sources used" in prompt
+    # Comportamiento actual (fix §17 #13/#19): el prompt NO instruye generar la
+    # sección de fuentes; el sistema la añade automáticamente.
+    assert "Do not include any sources, references, or bibliography section" in prompt
 
 
 def test_build_prompt_en_editorial_rules() -> None:
@@ -300,7 +302,9 @@ def test_build_prompt_en_editorial_rules() -> None:
     assert "Do not invent information, statistics, quotes, sources, or people" in prompt
     assert "Adapt idioms and culturally specific expressions into natural English equivalents when needed" in prompt
     assert "Keep the tone consistent with the book metadata and style guide" in prompt
-    assert "Include a '## Sources used' section at the end, listing only valid provided URLs" in prompt
+    # El prompt YA NO instruye generar '## Sources used' (el sistema la añade).
+    assert "Include a '## Sources used' section at the end, listing only valid provided URLs" not in prompt
+    assert "Do not include any sources, references, or bibliography section" in prompt
 
 
 def test_build_prompt_no_longer_instructs_to_add_sources_section() -> None:
@@ -325,14 +329,6 @@ def test_build_prompt_no_longer_instructs_to_add_sources_section() -> None:
     # La regla de no inventar información/citas/fuentes se mantiene intacta.
     assert "No inventes información, estadísticas, citas ni fuentes" in es
     assert "Do not invent information, statistics, quotes, sources, or people" in en
-
-
-
-    assert result["word_count"] == 1500
-    assert "Introduction" in result["chapter_md"]
-    assert "Conclusion" in result["chapter_md"]
-    assert "https://example.com/1" in result["chapter_md"]
-    assert result["sources_used"] == ["https://example.com/1"]
 
 
 def test_fallback_chapter_no_sources_en() -> None:
@@ -1145,11 +1141,15 @@ def test_prompt_conclusion_no_new_concepts() -> None:
 
 
 def test_prompt_no_content_after_sources() -> None:
-    """No debe haber contenido editorial después de las fuentes."""
+    """El prompt debe delimitar el final editorial del capítulo: ninguna sección
+    después de la Conclusión (comportamiento actual tras fix §17 #19: la sección
+    de fuentes ya no se pide al LLM, la añade el sistema)."""
     es = _build_prompt(_payload(), language="es")
     en = _build_prompt(_payload(), language="en")
-    assert "después de `Fuentes utilizadas`" in es
-    assert "after `Sources used`" in en
+    assert "No añadas ninguna sección después de `Conclusión`" in es
+    assert "ninguna sección editorial `##` después de `Conclusión`" in es
+    assert "Do not add any section after `Conclusion`" in en
+    assert "no editorial `##` after `Conclusion`" in en
 
 
 def test_prompt_no_repetition_for_length() -> None:

@@ -74,6 +74,79 @@ def _chapter_id(book_id, number):
 
 
 # ============================================
+# persist_chapter_images — fix §17 #26
+# ============================================
+
+def test_persist_chapter_images_discards_orphaned_local_without_metadata(client, monkeypatch, tmp_path):
+    """§17 #26: una ruta 'local' sin *.metadata.json en el directorio real del
+    capítulo es huérfana (metadata sobrescrita por re-generación) y NO se
+    persiste. Una ruta 'local' CON metadata que la respalde SÍ se persiste.
+    Las rutas comfyui/web pasan sin cambio (regresión)."""
+    from frontend import editorial
+
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path))
+
+    assert _create_book(client).status_code == 201
+    book_id = 1
+    chapter_id = _make_chapter(book_id, 1, "Texto de prueba del capítulo.")
+
+    # Metadata legítima que respalda UNA de las rutas locales (caso general:
+    # un placeholder con metadata presente no debe descartarse).
+    images_dir = tmp_path / "books" / "1" / "chapters" / "1" / "images"
+    images_dir.mkdir(parents=True)
+    local_supported = "data/images/local/1111111111_abcdef123456.png"
+    (images_dir / "img_01_hero.metadata.json").write_text(
+        json.dumps({"image_id": "img_01_hero", "provider": "local",
+                    "image_path": local_supported, "status": "ok"}),
+        encoding="utf-8",
+    )
+
+    orphan_local = "data/images/local\\934705850_a938610a44c0.png"
+    comfyui_path = "data/images/comfyui\\4153029846_space_lair_4153029846_00001_.png"
+
+    result = editorial.persist_chapter_images(
+        book_id, chapter_id,
+        [orphan_local, local_supported, comfyui_path],
+    )
+
+    assert result["updated"] is True
+    assert result["discarded_orphaned_local"] == 1
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ? AND book_id = ?",
+            (chapter_id, book_id),
+        ).fetchone()
+    persisted = json.loads(row["images"])
+    assert orphan_local not in persisted          # huérfana descartada
+    assert local_supported in persisted           # local legítimo conservado
+    assert comfyui_path in persisted              # comfyui sin cambio
+
+
+def test_persist_chapter_images_keeps_all_when_no_local_paths(client, monkeypatch):
+    """Regresión: sin rutas 'local', el comportamiento es idéntico al anterior."""
+    from frontend import editorial
+
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tempfile.mkdtemp()))
+
+    assert _create_book(client).status_code == 201
+    chapter_id = _make_chapter(1, 1, "Texto.")
+    paths = [
+        "data/images/comfyui/a.png",
+        "data/images/web/b.png",
+    ]
+    result = editorial.persist_chapter_images(1, chapter_id, paths)
+    assert result["discarded_orphaned_local"] == 0
+
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT images FROM chapters WHERE id = ? AND book_id = ?",
+            (chapter_id, 1),
+        ).fetchone()
+    assert json.loads(row["images"]) == paths
+
+
+# ============================================
 # Crear / cargar libro
 # ============================================
 
