@@ -439,11 +439,43 @@ def _check_images(book: Book) -> list[QualityControlItem]:
             has_images = True
         if has_images and len(ch.images) != expected:
             wrong_count.append("cap {}: {}".format(ch.number, len(ch.images)))
+    # §17 #30: con image_search_ratio=1.0 (100% web, elección explícita del
+    # usuario) la cuota de compensación IA es 0 por diseño (§16); un 403/timeout
+    # puntual de descarga web deja el capítulo con 1 imagen menos y no es
+    # corregible por el pipeline. Tolerancia de déficit <=1 por capítulo SOLO
+    # con ratio==1.0 (mayor déficit o exceso siguen fallando; ratio distinto
+    # de 1.0: comparación exacta como siempre).
+    _ratio = getattr(book, "image_search_ratio", None)
+    try:
+        _ratio = float(_ratio) if _ratio is not None else None
+    except (TypeError, ValueError):
+        _ratio = None
+    _tolerated = []
+    if wrong_count and _ratio == 1.0:
+        _strict = []
+        for entry in wrong_count:
+            _n = int(entry.rsplit(":", 1)[1])
+            if 0 <= expected - _n <= 1:  # déficit de como máximo 1
+                _tolerated.append(entry)
+            else:
+                _strict.append(entry)
+        wrong_count = _strict
     if wrong_count:
         checks.append(
             QualityControlItem(
                 status="FAIL",
                 message="Imágenes por capítulo != {}: {}".format(expected, wrong_count),
+                origin_phase="image_gen",
+            )
+        )
+    elif _tolerated:
+        # Déficit <=1 tolerado por ratio=1.0: WARNING trazable, nunca PASS silencioso.
+        checks.append(
+            QualityControlItem(
+                status="WARNING",
+                message="Imágenes por capítulo: {} (tolerado, ratio=1.0 100% web): {}".format(
+                    expected, _tolerated
+                ),
                 origin_phase="image_gen",
             )
         )

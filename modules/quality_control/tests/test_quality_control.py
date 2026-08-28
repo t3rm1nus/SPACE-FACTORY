@@ -250,3 +250,63 @@ def test_image_metadata_in_image_id_metadata_json_is_recognized(tmp_path: Path):
     assert not any(c.status == "WARNING" and "metadata" in c.message for c in checks)
     assert any(c.message == "Metadata presente en imágenes" for c in checks)
 
+def _make_images_book(tmp_path: Path, image_count: int, per_chapter: int, ratio) -> Book:
+    """Book mínimo para _check_images: image_count esperado, N imágenes reales por cap."""
+    img_path = tmp_path / "hero.png"
+    PILImage.new("RGB", (64, 64), color="red").save(img_path)
+    (tmp_path / "metadata.json").write_text('{"camera": "test"}', encoding="utf-8")
+    data = {
+        "title": "Libro de prueba",
+        "description": "Descripción del libro.",
+        "image_count": image_count,
+        "chapters": [
+            {
+                "chapter_id": i,
+                "book_id": 1,
+                "number": i,
+                "edited_es": "Contenido del capítulo {}.".format(i),
+                "images": [str(img_path)] * per_chapter,
+            }
+            for i in range(1, 4)
+        ],
+    }
+    if ratio is not None:
+        data["image_search_ratio"] = ratio
+    return Book.model_validate(data)
+
+
+def test_check_images_ratio_1_tolerates_deficit_of_one(tmp_path: Path):
+    """§17 #30: ratio=1.0 con déficit de 1 imagen/capítulo (4/5) -> NO falla;
+    queda como WARNING trazable (tolerado, 100% web), nunca PASS silencioso."""
+    from modules.quality_control.main import _check_images
+
+    book = _make_images_book(tmp_path, image_count=5, per_chapter=4, ratio=1.0)
+    checks = _check_images(book)
+    fails = [c for c in checks if c.status == "FAIL" and "Imágenes por capítulo" in c.message]
+    assert not fails, fails
+    warns = [c for c in checks if c.status == "WARNING" and "tolerado" in c.message]
+    assert len(warns) == 1 and "ratio=1.0 100% web" in warns[0].message
+    assert warns[0].origin_phase == "image_gen"
+
+
+def test_check_images_ratio_1_still_fails_deficit_of_two(tmp_path: Path):
+    """§17 #30 (regresión de seguridad): ratio=1.0 con déficit de 2 imágenes/capítulo
+    (3/5) -> SIGUE fallando igual que antes; la tolerancia no relaja de más."""
+    from modules.quality_control.main import _check_images
+
+    book = _make_images_book(tmp_path, image_count=5, per_chapter=3, ratio=1.0)
+    checks = _check_images(book)
+    fails = [c for c in checks if c.status == "FAIL" and "Imágenes por capítulo" in c.message]
+    assert len(fails) == 1 and fails[0].origin_phase == "image_gen"
+
+
+def test_check_images_ratio_not_1_keeps_exact_comparison(tmp_path: Path):
+    """§17 #30 (aislamiento): ratio=0.5 con déficit de 1 imagen (4/5) -> SIGUE
+    fallando como siempre; la tolerancia no se cuela fuera de ratio=1.0."""
+    from modules.quality_control.main import _check_images
+
+    book = _make_images_book(tmp_path, image_count=5, per_chapter=4, ratio=0.5)
+    checks = _check_images(book)
+    fails = [c for c in checks if c.status == "FAIL" and "Imágenes por capítulo" in c.message]
+    assert len(fails) == 1 and fails[0].origin_phase == "image_gen"
+    assert not any(c.status == "WARNING" and "tolerado" in c.message for c in checks)
