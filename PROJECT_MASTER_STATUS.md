@@ -603,8 +603,8 @@ quality_gate, docx` → **10 fases** (espejo exacto del backend desde FASE 8F.3)
 
 ### LAST KNOWN FULL SUITE
 ```text
-786 passed, 0 failed, 0 errors, 1 skipped   (tests/ + modules/, incl. E2E runner) — 2026-08-28 (315.30s)
-checkpoint post-commits §17 #35(F1-F3)/#36(F1-F5)/#37, sin regresión
+786 passed, 0 failed, 0 errors, 1 skipped   (tests/ + modules/, incl. E2E runner) — 2026-08-28 (318.71s)
+checkpoint post-commits §17 #38 (a687c5a/5fe18c0), sin regresión
 ```
 Histórico: 601 passed (2026-08-16, checkpoint 8K.3). Incrementos desde 8K.1: +1 test (`test_real_query_los_dooms_stopwords_filtro` en `tests/test_research_sources.py`, FASE 8K.3).
 También referenciado: "503 tests verdes" excluyendo el E2E pesado (`test_runner_e2e_001.py`).
@@ -1024,7 +1024,7 @@ DOCUMENT BUILDER:        IMPLEMENTED + VALIDATED (book_{book_id}_{lang}.docx; co
 GENERACIÓN EN:           IMPLEMENTED + VALIDATED (E2E real 2026-08-24, ver §20 tarea 6). Research multi-idioma para libros bilingües (es,en): IMPLEMENTED + VALIDATED 2026-08-24 — una pasada de research POR idioma (es/en.wikipedia), fuentes separadas por idioma en job.data.sources_by_lang; writer EN recibe fuentes nativas EN (prompt LLM y backstop determinista sin hechos mezclados) — ver §16/§19 P3 CLOSED/§24
 LAYOUT:                  IMPLEMENTED + VALIDATED (5 presets + aliases + overrides)
 FRONT:                   IMPLEMENTED (10 fases; textos de interfaz traducidos, 8H.1; sin UI de proveedor de imagen IA)
-TESTS:                   Checkpoint suite completa 2026-08-28 (post-commits §17 #35(F1-F3)/#36(F1-F5)/#37): 786 passed, 0 failed, 0 errors, 1 skipped (315.30s, tests/ + modules/). Histórico: checkpoint 2026-08-27 (764 passed).
+TESTS:                   Checkpoint suite completa 2026-08-28 (post-commits §17 #38): 786 passed, 0 failed, 0 errors, 1 skipped (318.71s, tests/ + modules/). Sin regresión tras eliminar update_book_title() incondicional.. Histórico: checkpoint 2026-08-27 (764 passed).
 E2E:                     PASS (e2e_001_report.json status=completed; 8/8; DOCX PASS; QC PASS)
 DOCX:                    PASS (output/docx/book_1001_es.docx)
 PDF:                     OUT OF SCOPE / DEUDA (book_{language}.pdf sin book_id)
