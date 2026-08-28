@@ -72,6 +72,37 @@ def test_build_prompt_respects_explicit_num() -> None:
     assert "EXACTAMENTE 4" in prompt
 
 
+def test_build_prompt_en_uses_english_instructions() -> None:
+    """§17 #24: con language='en' el prompt usa el esqueleto EN (sin el texto
+    español del esqueleto ES) e incluye la regla reforzada de sin texto/marcas."""
+    payload = dict(_payload(), language="en")
+    prompt = _build_prompt(payload)
+    assert "editorial art director" in prompt
+    assert "RULES:" in prompt
+    assert "EXACTLY 3" in prompt
+    assert "ABSOLUTELY NO readable text, letters, words, logos or brand marks" in prompt
+    # Sin rastro del esqueleto ES
+    assert "director de arte editorial" not in prompt
+    assert "REGLAS" not in prompt
+    assert "EXACTAMENTE" not in prompt
+    # Los campos variables se insertan igual (sin traducir)
+    assert "Introducción" in prompt
+    assert "El río Amazonas desemboca en el Atlántico" in prompt
+
+
+def test_build_prompt_es_unchanged_default() -> None:
+    """Regresión: sin language o language='es' → esqueleto ES idéntico al actual."""
+    for payload in (_payload(), dict(_payload(), language="es")):
+        prompt = _build_prompt(payload)
+        assert "Eres un director de arte editorial" in prompt
+        assert "REGLAS ESTRICTAS" in prompt
+        assert "EXACTAMENTE 3" in prompt
+        assert "sin marcas de agua, sin texto en la imagen" in prompt
+        # Sin rastro del esqueleto EN
+        assert "art director" not in prompt
+        assert "EXACTLY" not in prompt
+
+
 def test_make_image_has_all_required_keys() -> None:
     img = _make_image("hero", 1, "Intro", "estilo X", "texto")
     assert set(img.keys()) == ALL_KEYS

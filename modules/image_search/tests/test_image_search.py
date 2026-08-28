@@ -95,6 +95,45 @@ def _payload(**overrides):
     return payload
 
 
+def test_search_query_includes_language_param_for_english_book(
+    tmp_path, monkeypatch
+):
+    """§17 #24: con language='en' la request a SearXNG incluye el param nativo
+    `language=en`; con 'es' o sin language, comportamiento histórico (sin filtro).
+    """
+    captured: list[dict] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            captured.append(dict(kwargs.get("params") or {}))
+            return _FakeResp(json_data={"query": "q", "results": _search_results(1)})
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    # EN: el param de idioma debe estar presente y ser "en"
+    image_search.search_chapter_images(_payload(language="en"))
+    assert captured[-1].get("language") == "en"
+    assert captured[-1]["q"]  # la query sigue presente
+
+    # ES: comportamiento histórico — SIN param de idioma
+    image_search.search_chapter_images(_payload(language="es"))
+    assert "language" not in captured[-1]
+
+    # Sin language: comportamiento histórico — SIN param de idioma
+    p = _payload()
+    p.pop("language")
+    image_search.search_chapter_images(p)
+    assert "language" not in captured[-1]
+
+    # Unit: _searxng_search sin language → sin param (default histórico)
+    captured.clear()
+    image_search_main._searxng_search("query de prueba")
+    assert "language" not in captured[-1]
+    image_search_main._searxng_search("query de prueba", language="en")
+    assert captured[-1].get("language") == "en"
+
+
 def test_ok_completo(tmp_path, monkeypatch):
     _mock_requests(monkeypatch, results=_search_results(3))
     out = image_search.search_chapter_images(_payload(num_images=3))
@@ -380,3 +419,213 @@ def test_topic_none_no_bloquea(tmp_path, monkeypatch):
     assert validated.failed == 0
     # Las 3 imágenes legítimas se descargaron sin ningún filtrado por tema.
     assert len(downloaded) == 3
+    assert len(downloaded) == 3
+
+
+# ---------------------------------------------------------------------------
+# §17 #28 — capabilities ES/EN nativas (_has_anchor_keyword_img + routing)
+# ---------------------------------------------------------------------------
+_TOPIC_ES_CAFE = "Todo sobre el café, descubrimientos, tipos, cafe en el mundo"
+_TOPIC_EN_CAFE = "Everything about coffee, discoveries, types of coffee in the world"
+
+_CAND_EN_COFFEE = {
+    "title": "What are the main types of coffee drinks around the world?",
+    "snippet": "https://unsplash.com/photos/a-cup-of-coffee-sitting-on-top-of-a-white-counter",
+    "content": "https://images.unsplash.com/photo-coffee-cup.jpg",
+}
+
+
+def test_anchor_img_en_anchors_book67_candidate():
+    """book_67 (§17 #28): el candidato inglés on-topic ANCLA con topic EN nativo."""
+    assert (
+        image_search_main._has_anchor_keyword_img(_TOPIC_EN_CAFE, _CAND_EN_COFFEE, "en")
+        is True
+    )
+
+
+def test_anchor_img_es_no_anchora_candidato_ingles():
+    """Cada idioma busca lo suyo: el mismo candidato inglés NO ancla con topic ES."""
+    assert (
+        image_search_main._has_anchor_keyword_img(_TOPIC_ES_CAFE, _CAND_EN_COFFEE, "es")
+        is False
+    )
+
+
+def test_anchor_img_es_anchora_candidato_espanol():
+    """Regresión variante ES: candidatos en español siguen anclando con topic ES."""
+    cand_es = {
+        "title": "Los principales tipos de café del mundo",
+        "snippet": "https://es.wikipedia.org/wiki/Cafe",
+        "content": "https://cdn.example.com/cafe-tipos-mundo.png",
+    }
+    assert (
+        image_search_main._has_anchor_keyword_img(_TOPIC_ES_CAFE, cand_es, "es") is True
+    )
+
+
+def test_anchor_img_comicvine_regression_both_capabilities():
+    """§17 #11 regresión con el helper propio: el candidato off-topic tipo
+    comicvine.gamespot.com ('historia polar' vs 'Portada de cómic de
+    superhéroes') queda descartado en AMBAS variantes; el on-topic pasa."""
+    off_topic = {
+        "title": "Portada de cómic de superhéroes",
+        "snippet": "https://comicvine.gamespot.com/comic-page",
+        "content": "https://comicvine.gamespot.com/img/cover.png",
+    }
+    on_topic = {
+        "title": "Historia polar: expediciones al Antártico",
+        "snippet": "https://example.com/historia-polar-expedicion",
+        "content": "https://cdn.example.com/exp.png",
+    }
+    # Off-topic: descartado en ES y EN.
+    assert image_search_main._has_anchor_keyword_img("historia polar", off_topic, "es") is False
+    assert (
+        image_search_main._has_anchor_keyword_img("polar history", off_topic, "en") is False
+    )
+    # On-topic ES con texto español ancla; EN exige candidato en inglés nativo.
+    assert image_search_main._has_anchor_keyword_img("historia polar", on_topic, "es") is True
+    on_topic_en = {
+        "title": "A visual history of polar expedition gear",
+        "snippet": "https://example.com/polar-history-expedition",
+        "content": "https://cdn.example.com/polar-expedition.png",
+    }
+    assert (
+        image_search_main._has_anchor_keyword_img(
+            "polar history expedition", on_topic_en, "en"
+        )
+        is True
+    )
+
+
+def test_execute_routes_es_en_capabilities(tmp_path, monkeypatch):
+    """Las nuevas capabilities fijan idioma nativo: query EN desde title_en y
+    param language=en en SearXNG para *_en; ES mantiene comportamiento histórico."""
+    captured: list[dict] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            captured.append(dict(kwargs.get("params") or {}))
+            return _FakeResp(json_data={"query": "q", "results": _search_results(2)})
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    payload_en = _payload(num_images=2, title_en="The Echo Cave")
+    out_en = image_search.execute(payload_en, capability="search_chapter_images_en")
+    assert captured[-1].get("language") == "en"
+    assert captured[-1]["q"] == "The Echo Cave"  # query nativa EN, no el título ES
+    assert out_en["language"].startswith("en")
+    # Shape validable; slots pueden venir como skip si el fichero ya existía
+    # (storage compartido entre corridas), así que NO se exige todo "ok".
+    ImageGenerateOutput(**validate_output("generate_image", out_en))
+    assert len(out_en["results"]) == 2
+
+    payload_es = _payload(num_images=2)
+    out_es = image_search.execute(payload_es, capability="search_chapter_images_es")
+    assert "language" not in captured[-1]  # ES: sin param de idioma (histórico)
+    assert captured[-1]["q"] == "La Caverna de los Ecos"
+    assert out_es["language"].startswith("es")
+
+    # Capability legacy intacta: idioma viene del payload.
+    image_search.search_chapter_images(_payload(num_images=1))
+
+
+def test_module_json_registers_new_capabilities():
+    import json
+    from pathlib import Path
+
+    cfg_path = Path(image_search_main.__file__).parent / "module.json"
+    caps = set(json.loads(cfg_path.read_text(encoding="utf-8"))["capabilities"])
+    assert {"search_chapter_images", "search_chapter_images_es", "search_chapter_images_en"} <= caps
+
+
+def test_pipeline_en_anchors_and_es_discards_english_candidates(tmp_path, monkeypatch):
+    """book_67 end-to-end (mock): con topic EN el candidato unsplash de café ancla;
+    la variante ES con topic español lo descarta sin descargar nada."""
+    results = [
+        {
+            "url": "https://unsplash.com/photos/a-cup-of-coffee-sitting-on-top-of-a-white-counter",
+            "title": "What are the main types of coffee drinks around the world?",
+            "img_src": "https://images.unsplash.com/photo-coffee-cup.png",
+            "engine": "google images",
+        },
+        {
+            "url": "https://www.pexels.com/photo/anonymous-barista-pouring-water-into-filter/",
+            "title": "Anonymous barista pouring water into a paper filter",
+            "img_src": "https://images.pexels.com/photos/barista-filter.png",
+            "engine": "bing images",
+        },
+    ]
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    # Variante EN: título/tema en inglés → el candidato de tipos de café ancla.
+    payload_en = _payload(
+        num_images=2,
+        language="en",
+        title_en="Coffee types around the world",
+        topic_en=_TOPIC_EN_CAFE,
+    )
+    out_en = image_search.execute(payload_en, capability="search_chapter_images_en")
+    ok_urls_en = {r["source_url"] for r in out_en["results"] if r["status"] == "ok"}
+    assert ok_urls_en == {"https://images.unsplash.com/photo-coffee-cup.png"}
+
+    # Variante ES: mismo resultado SearXNG, topic en español → nada se descarga.
+    payload_es = _payload(num_images=2, topic=_TOPIC_ES_CAFE)
+    out_es = image_search.execute(payload_es, capability="search_chapter_images_es")
+    assert not [r for r in out_es["results"] if r["status"] == "ok"]
+    # La única descarga sigue siendo la legítima de la fase EN; ES no añadió ninguna.
+    assert downloaded == ["https://images.unsplash.com/photo-coffee-cup.png"]
+
+
+def test_failopen_en_when_topic_en_empty_even_with_spanish_title_en(tmp_path, monkeypatch):
+    """§17 #28 fix 2026-08-26 (segundo bug book_67): variante EN con
+    topic_en="" y title_en con texto ESPAÑOL (fallback §17 #21) → el ancla EN
+    usa SOLO topic_en, queda vacía y el filtro entra en FAIL-OPEN: el candidato
+    inglés on-topic NO se descarta y se descarga con normalidad."""
+    results = [
+        {
+            "url": "https://unsplash.com/photos/a-cup-of-coffee-sitting-on-top-of-a-white-counter",
+            "title": "What are the main types of coffee drinks around the world?",
+            "img_src": "https://images.unsplash.com/photo-coffee-cup.png",
+            "engine": "google images",
+        },
+        {
+            "url": "https://www.pexels.com/photo/anonymous-barista-pouring-water-into-filter/",
+            "title": "Anonymous barista pouring water into a paper filter",
+            "img_src": "https://images.pexels.com/photos/barista-filter.png",
+            "engine": "bing images",
+        },
+    ]
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    payload_en = _payload(
+        num_images=2,
+        language="en",
+        topic_en="",  # sin nativo EN real (book_67: title_en/description_en NULL)
+        # title_en con fallback ES de §17 #21 — NUNCA debe usarse como ancla EN:
+        title_en="Todo sobre el café... - Parte 1",
+    )
+    out_en = image_search.execute(payload_en, capability="search_chapter_images_en")
+    ok_urls_en = {r["source_url"] for r in out_en["results"] if r["status"] == "ok"}
+    # Fail-open real: ambos candidatos pasan y se descargan.
+    assert ok_urls_en == {
+        "https://images.unsplash.com/photo-coffee-cup.png",
+        "https://images.pexels.com/photos/barista-filter.png",
+    }
+    assert len(downloaded) == 2

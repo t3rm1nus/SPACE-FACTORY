@@ -5,7 +5,9 @@
   "type": "agent",
   "capabilities": [
     "generate_image",
-    "generate_chapter_images"
+    "generate_chapter_images",
+    "generate_chapter_images_es",
+    "generate_chapter_images_en"
   ],
   "requires_human_approval": false,
   "config": {

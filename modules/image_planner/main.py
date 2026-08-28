@@ -226,8 +226,8 @@ def _build_fallback_plan(validated: dict) -> dict[str, Any]:
     }
 
 
-def _build_prompt(validated: dict) -> str:
-    """Construye el prompt del plan de imágenes."""
+def _build_prompt_es(validated: dict) -> str:
+    """Construye el prompt del plan de imágenes (variante ES)."""
     num = _resolve_num_images(validated)
     title = validated.get("chapter_title") or "el capítulo"
     style = validated.get("visual_style") or "Fotografía editorial, paleta coherente, detalle realista"
@@ -266,6 +266,61 @@ def _build_prompt(validated: dict) -> str:
         "- visual_style: la guía de estilo visual para este capítulo.\n"
         "- identity_notes: pautas para mantener consistencia visual entre capítulos."
     )
+
+
+def _build_prompt_en(validated: dict) -> str:
+    """Builds the image plan prompt (EN variant).
+
+    §17 #24: same role/structure as the ES skeleton; the no-watermark/no-text
+    rule is translated AND reinforced for English-language books.
+    """
+    num = _resolve_num_images(validated)
+    title = validated.get("chapter_title") or "the chapter"
+    style = validated.get("visual_style") or "Editorial photography, coherent palette, realistic detail"
+    chapter_text = validated.get("chapter_text", "")
+    return (
+        "You are an editorial art director. Plan the images for a chapter.\n\n"
+        f"Chapter: {title}\n"
+        f"Visual style guide: {style}\n"
+        f"Exact number of images: {num}\n\n"
+        f"Chapter text:\n{chapter_text}\n\n"
+        "RULES:\n"
+        f"- Generate EXACTLY {num} images.\n"
+        "- Each image must have a DIFFERENT purpose (opening, explanation, illustration...).\n"
+        "- Do NOT generate three nearly identical images.\n"
+        "- They must complement the text, not replace information that must appear in writing.\n"
+        "- Avoid redundant visual material.\n"
+        "- Prompts must be compatible with local generators (no watermarks, NO text in the image).\n"
+        "- ABSOLUTELY NO readable text, letters, words, logos or brand marks anywhere in the image.\n"
+        "- The SUBJECT of each image must be a concrete VISUAL SCENE (objects, setting, "
+        "characters, action) related to the chapter topic.\n"
+        "- Do NOT use the chapter title literally as the subject of the image.\n"
+        "- Do NOT depict the image as a page, cover, magazine, article, editorial layout, "
+        "text diagram or any content implying legible text.\n"
+        "- Keep a consistent visual identity across images and chapters.\n\n"
+        "STRICT RULES:\n"
+        "- Do NOT change verifiable facts.\n"
+        "- Do NOT remove necessary references.\n"
+        "- Do NOT invent information, data, quotes or sources.\n"
+        "- Do NOT modify proper names.\n"
+        "- Do NOT alter the meaning.\n"
+        "- Keep the plan's length and structure.\n\n"
+        "Each image requires these keys: image_id, purpose, description, composition, subject, "
+        "environment, lighting, visual_style, aspect_ratio, prompt, negative_prompt, caption, placement.\n"
+        "- aspect_ratio must be one of: 16:9, 3:2, 4:3, 1:1, 2:3, 9:16.\n\n"
+        "Return ONLY valid JSON:\n"
+        '{"images":[{...13 keys per image...}],"visual_style":"...","identity_notes":["..."]}\n'
+        "- visual_style: the visual style guide for this chapter.\n"
+        "- identity_notes: guidelines to keep visual consistency across chapters."
+    )
+
+
+def _build_prompt(validated: dict) -> str:
+    """Wrapper: elige la variante ES o EN según el campo ``language`` del payload
+    (default "es" si ausente, mismo criterio que el resto del proyecto)."""
+    if str((validated or {}).get("language") or "es").lower().startswith("en"):
+        return _build_prompt_en(validated)
+    return _build_prompt_es(validated)
 
 
 _IMAGE_KEYS = (

@@ -184,3 +184,44 @@ def test_budget_guard_forces_local_fallback_for_remaining_images(tmp_path, monke
     assert out["results"][1]["fallback_reason"] == "time_budget_exhausted"
     assert out["results"][2]["fallback"] is True
     assert out["results"][2]["fallback_reason"] == "time_budget_exhausted"
+
+
+# ---------------------------------------------------------------------------
+# §17 #28 — capabilities ES/EN nativas (registro + shape + idioma)
+# ---------------------------------------------------------------------------
+def _module_capabilities():
+    import json
+    from pathlib import Path
+
+    cfg_path = Path(image_generator.__file__).parent / "module.json"
+    return set(json.loads(cfg_path.read_text(encoding="utf-8"))["capabilities"])
+
+
+def test_generate_chapter_images_es_en_capabilities_registered():
+    """§17 #28: ambas capabilities ES/EN nativas están registradas en module.json."""
+    caps = _module_capabilities()
+    assert {"generate_image", "generate_chapter_images", "generate_chapter_images_es",
+            "generate_chapter_images_en"} <= caps
+
+
+def test_generate_chapter_images_es_en_shape_and_language(tmp_path):
+    """Ambas capabilities devuelven el mismo shape validable y etiquetan la
+    salida/metadata con SU idioma; legacy generate_chapter_images sin cambios."""
+    for cap, lang, chapter in (
+        ("generate_chapter_images_es", "es", 10),
+        ("generate_chapter_images_en", "en", 11),
+    ):
+        out = image_generator.execute(
+            _payload(chapter_number=chapter), capability=cap
+        )
+        validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+        assert validated.generated >= 1
+        assert validated.results[0].status == "ok"
+        assert os.path.isfile(validated.results[0].image_path)
+        assert out.get("language") == lang
+
+    # Legacy intacto.
+    out_legacy = image_generator.execute(_payload(), capability="generate_chapter_images")
+    ImageGenerateOutput(**validate_output("generate_image", out_legacy))
+    assert out_legacy.get("language") == "es"

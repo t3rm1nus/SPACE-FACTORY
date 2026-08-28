@@ -317,13 +317,40 @@ def generate_chapter_images(payload: dict[str, Any]) -> dict[str, Any]:
     return generate_image(data)
 
 
+# §17 #28 — capabilities ES/EN nativas (mismo patrón que chapter_writer
+# write_chapter_es/_en e image_planner _es/_en): cada variante fija el idioma
+# del payload (y por tanto el plan/metadatos de SU idioma) y delega en
+# generate_chapter_images. Sin cambio de proveedor ni de shape.
+_CAPABILITY_LANGUAGES = {
+    "generate_chapter_images_es": "es",
+    "generate_chapter_images_en": "en",
+}
+
+
+def generate_chapter_images_lang(
+    payload: dict[str, Any], language: str
+) -> dict[str, Any]:
+    """Variante nativa por idioma: normaliza ``language`` y delega.
+
+    El image_plan ya viene separado por idioma desde image_planner (_es/_en);
+    aquí solo se garantiza que la salida/metadata queden etiquetadas con el
+    idioma de la capability invocada."""
+    data = dict(payload)
+    data["language"] = language
+    return generate_chapter_images(data)
+
+
 def execute(payload: dict, capability: str = "generate_image") -> dict:
     """Wrapper de ejecución: genera imágenes de un capítulo.
 
-    Capabilities soportadas: generate_image, generate_chapter_images.
+    Capabilities soportadas: generate_image, generate_chapter_images,
+    generate_chapter_images_es, generate_chapter_images_en (§17 #28).
     """
     if capability == "generate_chapter_images":
         return generate_chapter_images(payload)
+    lang = _CAPABILITY_LANGUAGES.get(capability)
+    if lang is not None:
+        return generate_chapter_images_lang(payload, lang)
     return generate_image(payload)
 
 

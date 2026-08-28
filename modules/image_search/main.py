@@ -1,6 +1,7 @@
 """Módulo image_search: busca imágenes de un capítulo en la web (SearXNG, sin LLM).
 
-Capability: search_chapter_images
+Capabilities: search_chapter_images (legacy), search_chapter_images_es,
+search_chapter_images_en
 
 Sin dependencia de un modelo LLM: construye una query determinista a partir del
 título del capítulo (fallback: primeras palabras del texto), consulta SearXNG
@@ -138,12 +139,21 @@ def _search_query(chapter_title: Optional[str], chapter_text: Optional[str]) -> 
 # ---------------------------------------------------------------------------
 # Llamadas HTTP a SearXNG (resilientes)
 # ---------------------------------------------------------------------------
-def _searxng_search(query: str) -> list[dict]:
-    """Consulta SearXNG y devuelve la lista de resultados ([] si falla, sin excepción)."""
+def _searxng_search(query: str, language: Optional[str] = None) -> list[dict]:
+    """Consulta SearXNG y devuelve la lista de resultados ([] si falla, sin excepción).
+
+    ``language`` (opcional): código de idioma SearXNG ("en", "es", ...). Si es
+    None se comporta como históricamente (sin filtro de idioma en la request).
+    """
     try:
+        params: dict[str, str] = {"q": query, "categories": "images", "format": "json"}
+        if language:
+            # §17 #24: acota resultados por idioma (SearXNG soporta el param
+            # nativo `language`; default histórico = sin filtro).
+            params["language"] = language
         resp = requests.get(
             SEARXNG_URL.rstrip("/") + "/search",
-            params={"q": query, "categories": "images", "format": "json"},
+            params=params,
             timeout=SEARCH_TIMEOUT,
             headers={"User-Agent": _USER_AGENT},
         )
@@ -276,23 +286,121 @@ def _error_meta(image_id: str, query: str, images_dir: str, reason: str, source_
         source_url=source_url,
     )
 
+# ---------------------------------------------------------------------------
+# Filtro de anclaje temático por idioma nativo (§17 #28)
+# ---------------------------------------------------------------------------
+# Problema (book_67): el filtro §17 #11 reutilizaba _has_anchor_keyword() de
+# research, pensado para TEXTO RICO en un solo idioma y con un único topic
+# español compartido. Los candidatos de imágenes web exponen casi todo su
+# texto como slugs/nombres de fichero EN ("a-cup-of-coffee-sitting..."), así
+# que un topic en español no matcheaba NI UNA keyword y se descartaban en masa
+# candidatos claramente on-topic. Fix: capabilities ES/EN nativas; cada
+# variante ancla contra keywords en SU idioma, sin reutilizar research.
+_STOPWORDS_ES_FALLBACK = {
+    "el", "la", "los", "las", "de", "del", "en", "un", "una", "unos", "unas",
+    "y", "o", "que", "con", "para", "por", "se", "es", "su", "sus", "al", "lo",
+    "the", "a", "an", "and", "or", "but", "if", "then", "else", "for", "nor",
+    "on", "at", "by", "of", "to", "from", "in", "out", "over", "under",
+}
+
+# Stopwords mínimas EN para la variante _en (solo palabras funcionales).
+_ANCHOR_STOPWORDS_EN = {
+    "the", "a", "an", "and", "or", "but", "of", "to", "in", "on", "at", "by",
+    "for", "from", "with", "about", "into", "over", "under", "up", "down",
+    "out", "off", "is", "are", "was", "were", "be", "been", "its", "it",
+    "that", "this", "these", "those", "all",
+}
+
+
+def _anchor_stopwords(language: str) -> set:
+    """Stopwords por idioma: ES reutiliza research._STOPWORDS_ES (mismo criterio
+    que §17 #11); EN usa la lista mínima local _ANCHOR_STOPWORDS_EN."""
+    if str(language or "").lower().startswith("en"):
+        return _ANCHOR_STOPWORDS_EN
+    try:
+        from modules.research.main import _STOPWORDS_ES  # reuso, sin duplicar
+
+        return _STOPWORDS_ES
+    except Exception:  # noqa: BLE001 - defensa: research ausente
+        return _STOPWORDS_ES_FALLBACK
+
+
+def _has_anchor_keyword_img(topic: Optional[str], cand: dict, language: str = "es") -> bool:
+    """True si el candidato de imagen se ancla al tema ``topic`` usando las
+    keywords del ``language`` indicado.
+
+    Mismo umbral que research (_has_anchor_keyword): 1 keyword si el tema tiene
+    una sola palabra útil, >=2 hits para temas multi-palabra. Haystack:
+    title + snippet + content del candidato normalizado por image_search
+    (título de página / URL fuente / URL de imagen)."""
+    if not topic:
+        return True
+    stop = _anchor_stopwords(language)
+    topic_keywords = [
+        w for w in re.findall(r"\w+", str(topic).lower())
+        if len(w) >= 2 and w not in stop
+    ]
+    if not topic_keywords:
+        return True
+    haystack_words = set(re.findall(
+        r"\w+",
+        str(cand.get("title") or "").lower() + " " +
+        str(cand.get("snippet") or "").lower() + " " +
+        str(cand.get("content") or "").lower(),
+    ))
+    hits = sum(1 for w in topic_keywords if w in haystack_words)
+    if len(topic_keywords) == 1:
+        return hits >= 1
+    return hits >= 2
+
+
+def _search_query_en(data: dict) -> str:
+    """Query determinista en inglés nativo para la variante *_en.
+
+    Prioridad: title_en > chapter_title_en > chapter_text_en (primeras
+    palabras) > cadena genérica EN. NUNCA cae al título/texto en español:
+    era exactamente la causa del mismatch de idioma de book_67."""
+    for field in ("title_en", "chapter_title_en"):
+        value = str(data.get(field) or "").strip()
+        if value:
+            return value[:200]
+    text = str(data.get("chapter_text_en") or "").strip()
+    words = [w for w in re.split(r"\s+", text) if w.strip()]
+    if words:
+        return " ".join(words[:12])[:200]
+    return "book illustration"
+
+
+_CAPABILITY_LANGUAGES = {
+    "search_chapter_images_es": "es",
+    "search_chapter_images_en": "en",
+}
+
+
+
 
 
 # ---------------------------------------------------------------------------
 # API principal
 # ---------------------------------------------------------------------------
-def search_chapter_images(payload: dict) -> dict:
+def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict:
     """Busca hasta ``num_images`` imágenes web para un capítulo y las persiste.
 
-    Payload: book_id, chapter_number, chapter_title, chapter_text, num_images, language.
+    Payload: book_id, chapter_number, chapter_title, chapter_text, num_images,
+    language (+ title_en/chapter_text_en/topic_en para la variante *_en).
+
+    El parámetro ``language`` (routing desde capability *_es/*_en) tiene
+    prioridad sobre payload.language.
 
     Devuelve el MISMO shape que ``generate_image`` (image_generator), para ser
     plug-compatible sin adaptadores.
     """
     data = dict(payload or {})
+    lang_norm = str(language or data.get("language") or "es").lower()
+    lang_is_en = lang_norm.startswith("en")
     book_id = int(data.get("book_id", 0))
     chapter_number = int(data.get("chapter_number", 0))
-    language = str(data.get("language") or "es")[:10]
+    language = str(lang_norm)[:10]
     chapter_title = data.get("chapter_title")
     chapter_text = data.get("chapter_text") or ""
     topic = data.get("topic")
@@ -302,9 +410,17 @@ def search_chapter_images(payload: dict) -> dict:
     num_images = max(0, min(num_images, MAX_IMAGES))
 
     images_dir = _images_dir(book_id, chapter_number)
-    query = _search_query(chapter_title, chapter_text)
+    # Query nativa por idioma (§17 #28): ES usa el comportamiento histórico;
+    # EN usa campos nativos EN (title_en etc.) si existen.
+    if lang_is_en:
+        query = _search_query_en(data)
+    else:
+        query = _search_query(chapter_title, chapter_text)
 
-    raw_results = _searxng_search(query)
+    # §17 #24: para libros EN se acota SearXNG por idioma; cualquier otro
+    # idioma/ausente mantiene el comportamiento histórico (sin filtro).
+    searxng_language = "en" if language.lower().startswith("en") else None
+    raw_results = _searxng_search(query, language=searxng_language)
 
     results: list[dict] = []
     requested = num_images
@@ -322,29 +438,37 @@ def search_chapter_images(payload: dict) -> dict:
         if not img_src:
             continue
 
-        # §17 #11 — filtro de relevancia temática: si se pasa ``topic`` del libro
-        # (mismo criterio que research, reutilizando _has_anchor_keyword SIN
-        # modificar research), el resultado se descarta ANTES de descargar si no
-        # se ancla al tema. topic None/vacío => no bloquea nada (compatibilidad
-        # total con libros ya generados sin topic).
-        if topic:
-            try:
-                from modules.research.main import _has_anchor_keyword as _anchor_topic
-            except Exception:  # noqa: BLE001 - defensa: sin research no se filtra
-                _anchor_topic = None
-            if _anchor_topic is not None:
-                page_fetch_url = item.get("url") or item.get("parsed_url") or ""
-                _cand = {
-                    "title": item.get("title") or "",
-                    "snippet": page_fetch_url,
-                    "content": img_src,
-                }
-                if not _anchor_topic(str(topic), _cand):
-                    logger.warning(
-                        "image_search: resultado descartado por no anclarse al tema (%s): %s",
-                        topic, page_fetch_url or img_src,
-                    )
-                    continue
+        # §17 #28 — filtro de relevancia temática por idioma nativo: cada
+        # variante capability (_es/_en) ancla contra keywords en SU idioma,
+        # sin reutilizar _has_anchor_keyword de research (texto rico
+        # monolingüe; causaba descartes masivos de candidatos on-topic EN con
+        # topic ES, caso book_67). Mismo umbral que research.
+        # Variante EN: el ancla es SOLO topic_en — NUNCA title_en, porque este
+        # puede llevar el fallback ES de §17 #21 (chapters.title_en NULL →
+        # chapters.title) y un título español como anchor EN no matchea nunca
+        # candidatos EN (segundo bug book_67). topic_en="" => fail-open (no
+        # filtra), ver §17 #28(b).
+        anchor_topic: Optional[str] = None
+        anchor_lang = "es"
+        if lang_is_en:
+            anchor_topic = str(data.get("topic_en") or "").strip() or None
+            anchor_lang = "en"
+        else:
+            # Variante ES: comportamiento histórico intacto (topic del libro).
+            anchor_topic = topic
+        if anchor_topic:
+            page_fetch_url = item.get("url") or item.get("parsed_url") or ""
+            _cand = {
+                "title": item.get("title") or "",
+                "snippet": page_fetch_url,
+                "content": img_src,
+            }
+            if not _has_anchor_keyword_img(str(anchor_topic), _cand, anchor_lang):
+                logger.warning(
+                    "image_search: resultado descartado por no anclarse al tema (%s [%s]): %s",
+                    anchor_topic, anchor_lang, page_fetch_url or img_src,
+                )
+                continue
 
         # §17 #5 — denylist de dominios: revisa AMBAS URLs (img_src + página fuente)
         # antes de descargar. SearXNG expone la URL de la página fuente en el
@@ -475,7 +599,14 @@ def search_chapter_images(payload: dict) -> dict:
 
 
 def execute(payload: dict, capability: str = "search_chapter_images") -> dict:
-    """Wrapper de ejecución acorde a la convención del proyecto."""
+    """Wrapper de ejecución acorde a la convención del proyecto.
+
+    Capabilities soportadas: search_chapter_images (legacy, idioma del payload),
+    search_chapter_images_es y search_chapter_images_en (§17 #28, idioma nativo).
+    """
+    lang = _CAPABILITY_LANGUAGES.get(capability)
+    if lang is not None:
+        return search_chapter_images(payload, language=lang)
     if capability == "search_chapter_images":
         return search_chapter_images(payload)
     raise ValueError(f"Capability no soportada por image_search: {capability}")

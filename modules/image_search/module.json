@@ -4,7 +4,9 @@
   "description": "Busca imágenes de un capítulo en la web (SearXNG, sin LLM), descarga los resultados y persiste archivos y metadatos con trazabilidad de fuente, devolviendo el mismo shape de salida que image_generator para ser plug-compatible.",
   "type": "agent",
   "capabilities": [
-    "search_chapter_images"
+    "search_chapter_images",
+    "search_chapter_images_es",
+    "search_chapter_images_en"
   ],
   "requires_human_approval": false,
   "config": {

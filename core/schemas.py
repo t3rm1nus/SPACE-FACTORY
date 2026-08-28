@@ -351,6 +351,9 @@ class ImagePlanPayload(TaskPayload):
     visual_style: Optional[str] = Field(default=None, max_length=300)
     num_images: Optional[int] = Field(default=None, ge=0, le=20)
     language: str = Field(default="es", min_length=2, max_length=10)
+    # §17 #28: tema EN nativo para el anclaje posterior de image_search (opcional,
+    # solo presente en libros bilingües con idioma activo EN; plug-compatible).
+    topic_en: Optional[str] = Field(default=None, max_length=2000)
 
 
 class ImagePlanOutput(BaseModel):
@@ -384,7 +387,8 @@ class ImageMetadata(BaseModel):
 
 
 class ImageGeneratePayload(TaskPayload):
-    """Payload para image_generator (capability: generate_image, generate_chapter_images)."""
+    """Payload para image_generator (capability: generate_image,
+    generate_chapter_images, generate_chapter_images_es/_en — §17 #28)."""
 
     image_plan: Optional[dict] = Field(default=None,
         description="Plan de imágenes; si es None/empty, se genera uno simple")
@@ -402,7 +406,8 @@ class ImageGeneratePayload(TaskPayload):
 
 
 class ImageSearchPayload(TaskPayload):
-    """Payload para search_chapter_images (capability: search_chapter_images)."""
+    """Payload para search_chapter_images (capability: search_chapter_images,
+    search_chapter_images_es, search_chapter_images_en — §17 #28)."""
 
     book_id: int = Field(..., ge=1)
     chapter_number: int = Field(..., ge=1)
@@ -411,6 +416,9 @@ class ImageSearchPayload(TaskPayload):
     chapter_text: Optional[str] = Field(default=None)
     num_images: Optional[int] = Field(default=None, ge=0, le=20)
     topic: Optional[str] = Field(default=None, max_length=2000)
+    # §17 #28: anclaje temático en idioma nativo EN (candidatos/keywords EN).
+    topic_en: Optional[str] = Field(default=None, max_length=2000)
+    title_en: Optional[str] = Field(default=None, max_length=500)
 
 
 class ImageGenerateOutput(BaseModel):
@@ -512,7 +520,12 @@ PAYLOAD_SCHEMAS = {
     "create_chapter_image_plan": ImagePlanPayload,
     "generate_image": ImageGeneratePayload,
     "generate_chapter_images": ImageGeneratePayload,
+    # §17 #28: variantes ES/EN nativas, plug-compatible (mismas clases).
+    "generate_chapter_images_es": ImageGeneratePayload,
+    "generate_chapter_images_en": ImageGeneratePayload,
     "search_chapter_images": ImageSearchPayload,
+    "search_chapter_images_es": ImageSearchPayload,
+    "search_chapter_images_en": ImageSearchPayload,
     "build_book_docx": BookDocxPayload,
     "build_book_pdf": BookPdfPayload,
     "final_quality_control": QualityControlPayload,
@@ -533,7 +546,12 @@ OUTPUT_SCHEMAS = {
     "create_chapter_image_plan": ImagePlanOutput,
     "generate_image": ImageGenerateOutput,
     "generate_chapter_images": ImageGenerateOutput,
+    # §17 #28: mismas salidas que las capabilities base (plug-compatible).
+    "generate_chapter_images_es": ImageGenerateOutput,
+    "generate_chapter_images_en": ImageGenerateOutput,
     "search_chapter_images": ImageGenerateOutput,
+    "search_chapter_images_es": ImageGenerateOutput,
+    "search_chapter_images_en": ImageGenerateOutput,
     "build_book_docx": BookDocxOutput,
     "build_book_pdf": BookPdfOutput,
     "final_quality_control": QualityControlOutput,
