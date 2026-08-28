@@ -912,6 +912,40 @@ def create_app() -> Flask:
             return jsonify({"error": str(e)}), 400
         return jsonify(_serialize_job(retried)), 200
 
+    @app.route("/api/books/<int:book_id>/autopilot/reset", methods=["POST"])
+    def api_autopilot_reset(book_id: int):
+        """POST -> reset del job desde una fase de origen (§17 #36 Fase 4).
+
+        Delega en core.autopilot.reset_from_phase (la lógica vive en el motor).
+        Body JSON opcional: {"from_phase": "image_gen", "chapter_number": 2}
+        - from_phase: fase de origen del reset (acepta alias de origin_phase
+          de QC, p.ej. "book_planner" -> "planner"). Por defecto "planner".
+        - chapter_number (opcional): acota el reset a un capítulo en las fases
+          per-chapter; su ausencia = reset completo de fase/libro.
+
+        reset_from_phase NO persiste -> se guarda aquí vía store.save().
+        404 si no hay job; 400 con el motivo real ante ValueError; 200 con el
+        job actualizado (mismo shape que retry).
+        """
+        store = get_autopilot_store()
+        job = store.load_by_book(book_id)
+        if job is None:
+            return jsonify({"error": f"No existe job autopilot para el libro {book_id}"}), 404
+        body = request.get_json(silent=True) or {}
+        from_phase = str(body.get("from_phase") or "planner")
+        chapter_number = body.get("chapter_number")
+        if chapter_number is not None:
+            try:
+                chapter_number = int(chapter_number)
+            except (TypeError, ValueError):
+                return jsonify({"error": f"chapter_number inválido: {chapter_number!r}"}), 400
+        try:
+            reset_job = autopilot.reset_from_phase(job, from_phase, chapter_number)
+            store.save(reset_job)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        return jsonify(_serialize_job(reset_job)), 200
+
     @app.route("/api/books/<int:book_id>/docx")
     def api_book_docx(book_id: int):
         """GET -> sirve el DOCX REAL generado por Document Builder.
