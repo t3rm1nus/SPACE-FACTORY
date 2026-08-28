@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import Any, Optional
 
 from core.database import get_db, init_db
@@ -78,6 +79,43 @@ def get_chapters(book_id: int) -> list[dict]:
     Reutiliza la consulta existente; helper público para el Autopilot.
     """
     return _get_chapters(book_id)
+def set_chapter_quality_status(
+    book_id: int, chapter_number: int, language: Optional[str], quality_status: str
+) -> dict:
+    """Persiste el estado de calidad de un capítulo (§17 #35 Fase 2.3b).
+
+    Escrito por el Autopilot al completar la fase fact_check de un capítulo:
+    - "PASS_WITH_WARNING": el gate no bloquea (solo accuracy_partial degradado)
+      y el Document Builder (F3) debe insertar el aviso visible.
+    - "PASS": verificación sin advertencias.
+
+    ``language`` se acepta por compatibilidad con la firma del orquestador
+    (fact_check es fase multidioma), pero la tabla ``chapters`` NO tiene
+    columna ``language``: ``quality_status`` es un único campo por capítulo,
+    así que el UPDATE localiza por (book_id, number) y el último idioma
+    verificado es el que queda reflejado.
+    """
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "UPDATE chapters SET quality_status = :qs, updated_at = :ts "
+            "WHERE book_id = :book_id AND number = :number",
+            {
+                "qs": quality_status,
+                "ts": datetime.now().isoformat(),
+                "book_id": book_id,
+                "number": chapter_number,
+            },
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            return {"updated": False, "reason": "chapter_not_found",
+                    "book_id": book_id, "number": chapter_number}
+        return {"updated": True, "quality_status": quality_status,
+                "book_id": book_id, "number": chapter_number}
+    finally:
+        conn.close()
+
 
 
 # Campos de texto persistibles por fase per-capítulo (resultado real de writer/editor).
@@ -286,12 +324,91 @@ def update_book_description_en(book_id: int, description_en: str) -> dict:
     finally:
         conn.close()
 
+def _chapter_images_metadata_dir(book_id: int, chapter_id: int) -> tuple[Optional[str], Optional[int]]:
+    """Resuelve el directorio real de imágenes del capítulo y su número.
+
+    Devuelve (images_dir, chapter_number) o (None, None) si el capítulo no
+    existe. Mismo layout que modules/image_generator._images_dir (respeta
+    IMAGE_STORAGE_ROOT para aislamiento en tests).
+    """
+    import os
+
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT number FROM chapters WHERE id = ? AND book_id = ?",
+            (chapter_id, book_id),
+        ).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return None, None
+    root = os.getenv("IMAGE_STORAGE_ROOT") or os.path.join("data", "images")
+    images_dir = os.path.join(
+        root, "books", str(book_id), "chapters", str(row["number"]), "images"
+    )
+    return images_dir, row["number"]
+
+
+def _filter_orphaned_local_images(book_id: int, chapter_id: int, image_paths: list[str]) -> tuple[list[str], int]:
+    """Filtra rutas placeholder 'local' huérfanas (§17 #26).
+
+    Una ruta bajo ``data/images/local/`` solo se considera legítima si existe
+    un ``*.metadata.json`` en el directorio real del libro/capítulo cuyo
+    ``image_path`` la referencie. Si no, es huérfana de una re-ejecución
+    posterior del mismo capítulo (los metadata por image_id fueron
+    sobrescritos) y NO debe persistirse. Las rutas comfyui/web no se tocan.
+    """
+    import glob
+    import json as _json
+    import os
+
+    if not image_paths:
+        return [], 0
+    normalized = [p.replace("\\\\", "/").replace("\\", "/") for p in image_paths]
+    local_idx = [
+        i for i, p in enumerate(normalized)
+        if "/local/" in f"/{p.lstrip('/')}"
+    ]
+    if not local_idx:
+        return list(image_paths), 0
+
+    supported: set[str] = set()
+    images_dir, _ = _chapter_images_metadata_dir(book_id, chapter_id)
+    if images_dir and os.path.isdir(images_dir):
+        for md_path in glob.glob(os.path.join(images_dir, "*.metadata.json")):
+            try:
+                with open(md_path, "r", encoding="utf-8") as fh:
+                    md = _json.load(fh)
+            except Exception:
+                continue
+            mp = md.get("image_path")
+            if isinstance(mp, str):
+                supported.add(mp.replace("\\\\", "/").replace("\\", "/"))
+
+    out: list[str] = []
+    discarded = 0
+    for i, original in enumerate(image_paths):
+        if i in local_idx and normalized[i] not in supported:
+            discarded += 1
+            continue
+        out.append(original)
+    return out, discarded
+
+
 def persist_chapter_images(book_id: int, chapter_id: int, image_paths: list[str]) -> dict:
     """Persiste las rutas de imágenes generadas a chapters.images.
 
     Serializa la lista como JSON. Usado por autopilot tras image_gen PASS.
+    Fix §17 #26: antes de persistir, descarta rutas placeholder 'local'
+    huérfanas (sin *.metadata.json que las respalde en el directorio real del
+    capítulo) — residuos de una pasada anterior cuya metadata fue sobrescrita
+    por una re-generación. comfyui/web sin cambio de comportamiento.
     """
     import json
+    image_paths, discarded_local = _filter_orphaned_local_images(
+        book_id, chapter_id, image_paths or []
+    )
     conn = get_db()
     try:
         images_json = json.dumps(image_paths, ensure_ascii=False)
@@ -306,6 +423,7 @@ def persist_chapter_images(book_id: int, chapter_id: int, image_paths: list[str]
             "book_id": book_id,
             "chapter_id": chapter_id,
             "images_count": len(image_paths),
+            "discarded_orphaned_local": discarded_local,
         }
     finally:
         conn.close()
@@ -690,11 +808,30 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
             "chapter_outline": {
                 "title": chapter_title,
                 "number": chapter.get("number"),
-                "objective": chapter.get("objective"),
+                # §17 #23: para la pasada EN NO se filtra el objective/description
+                # en español; se usa description_en si existe, si no None (el
+                # backstop determinista EN degrada a párrafo genérico inglés).
+                "objective": (
+                    ((book.get("description_en") or "").strip() or None)
+                    if _is_english_language(language)
+                    else chapter.get("objective")
+                ),
                 "sections": outline_sections,
             },
-                                    "research": research_by_lang.get(lang_key) or data.get("research"),
-            "sources": lang_sources or data.get("sources") or [],  # propagación REAL de Research (job data)
+            "research": (
+                # §17 #23: en EN se ELIMINA el fallback cruzado al research ES
+                # compartido — sin desglose por idioma se pasa vacío.
+                research_by_lang.get(lang_key)
+                if _is_english_language(language)
+                else (research_by_lang.get(lang_key) or data.get("research"))
+            ),
+            # §17 #23: en EN se ELIMINA el fallback cruzado a las fuentes ES
+            # compartidas — sin desglose por idioma se pasa lista vacía.
+            "sources": (
+                lang_sources
+                if _is_english_language(language)
+                else (lang_sources or data.get("sources") or [])
+            ),  # propagación REAL de Research (job data), sin mezcla de idiomas en EN
             "previous_chapter_summaries": [],
             "target_word_count": int(data.get("target_words") or 3000),
             "research_required": True,
@@ -727,23 +864,45 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
         if chapter is None:
             raise ValueError("Se requiere un capítulo para image_plan")
         text = (chapter.get(edited_field) or chapter.get(draft_field) or "").strip()
+        # §17 #24: mismo criterio que writer_en (§17 #21) — en libros EN el
+        # título EN es la query del buscador; fallback al título ES si NULL.
+        chapter_title = chapter.get("title")
+        if _is_english_language(language) and _is_bilingual(book):
+            chapter_title = (chapter.get("title_en") or "").strip() or chapter.get("title")
         payload = {
             "chapter_text": text or "Capítulo sin texto todavía.",
-            "chapter_title": chapter.get("title"),
+            "chapter_title": chapter_title,
             "visual_style": data.get("style"),
             "genre": book.get("genre"),
             "num_images": int(data.get("num_images") if data.get("num_images") is not None else 3),
             "language": language,
         }
+        if _is_english_language(language) and _is_bilingual(book):
+            # §17 #28: tema/título EN nativos para el anclaje de image_search
+            # (job.data.topic_en > books.title_en). BUG corregido 2026-08-26:
+            # NUNCA se rellena con topic/título en ESPAÑOL — un topic ES como
+            # anchor con keywords EN no matchea nunca y descartaba en masa
+            # candidatos on-topic (book_67). Sin nativo EN => topic_en="" y
+            # image_search queda en fail-open (no filtra), ver §17 #28(b).
+            payload["topic_en"] = (
+                str(data.get("topic_en") or "").strip()
+                or str(book.get("title_en") or "").strip()
+            )[:2000]
+            payload["title_en"] = chapter_title
     elif phase_id == "image_gen":
         if chapter is None:
             raise ValueError("Se requiere un capítulo para generate image")
         text = (chapter.get(edited_field) or chapter.get(draft_field) or "").strip()
+        # §17 #24: mismo criterio que writer_en (§17 #21) — título EN para
+        # libros EN; fallback al título ES si title_en es NULL/vacío.
+        chapter_title = chapter.get("title")
+        if _is_english_language(language) and _is_bilingual(book):
+            chapter_title = (chapter.get("title_en") or "").strip() or chapter.get("title")
         payload = {
             "book_id": book_id,
             "chapter_number": int(chapter.get("number") or 1),
             "chapter_text": text or "Capítulo sin texto todavía.",
-            "chapter_title": chapter.get("title"),
+            "chapter_title": chapter_title,
             "num_images": int(data.get("num_images") if data.get("num_images") is not None else 3),
             "language": language,
             "provider": data.get("provider"),
@@ -753,6 +912,16 @@ def build_payload(book_id: int, phase_id: str, data: dict, chapter_id: Optional[
             "skip_existing": True,
             "max_attempts": 3,
         }
+        if _is_english_language(language) and _is_bilingual(book):
+            # §17 #28: mismo topic_en/title_en que image_plan (contrato único).
+            # Sin fallback a ES (fix 2026-08-26, book_67): texto español como
+            # anchor EN no matchea nunca candidatos EN y provocaba descartes
+            # masivos. Sin nativo EN => "" y fail-open en image_search.
+            payload["topic_en"] = (
+                str(data.get("topic_en") or "").strip()
+                or str(book.get("title_en") or "").strip()
+            )[:2000]
+            payload["title_en"] = chapter_title
     elif phase_id == "docx":
         payload = {
             "book": _build_book_dict(book, chapters, language=language),

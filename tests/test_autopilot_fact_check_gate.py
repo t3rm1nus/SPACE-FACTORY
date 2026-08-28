@@ -136,3 +136,64 @@ def test_fact_check_status_fail_gate_fail_fails_phase(store):
     assert fc_phase["status"] == autopilot.PHASE_FAIL
     # El error debe reflejar el gate=FAIL real (trazabilidad de st + qg).
     assert "quality_gate=FAIL" in (fc_phase.get("error") or "")
+
+
+# ---------------------------------------------------------------------------
+# §17 #35 F2 — gate DIFERENCIADO por error_type + persistencia quality_status
+# ---------------------------------------------------------------------------
+def test_fact_check_fabrication_structural_blocks_phase(store):
+    """REGRESIÓN §17 #35 F2: quality_gate=FAIL con error_type=fabrication_structural
+    SÍ bloquea la fase (fabricación factual nunca pasa)."""
+    book_id = _make_book_with_draft()
+    result = _fc_result("FAIL", "FAIL")
+    result["issues"] = [{
+        "claim": "Eichmann estuvo a cargo de campos en Palestina entre 1942 y 1948.",
+        "severity": "ERROR",
+        "error_type": "fabrication_structural",
+    }]
+    executor = _executor_for(lambda payload: result)
+    final, collected = _run(store, book_id, executor)
+
+    fc_phase = next(p for p in final["phases"] if p["id"] == "fact_check")
+    assert fc_phase["status"] == autopilot.PHASE_FAIL
+    assert "fabrication_structural" in (fc_phase.get("error") or "")
+
+
+def test_fact_check_accuracy_partial_does_not_block_and_marks_warning(store):
+    """§17 #35 F2: quality_gate=FAIL solo por accuracy_partial (ERROR subjetivo
+    degradado) NO bloquea la fase; el capítulo continúa y el subestado/BD quedan
+    marcados PASS_WITH_WARNING."""
+    book_id = _make_book_with_draft()
+    result = _fc_result("FAIL", "FAIL")
+    result["issues"] = [{
+        "claim": "El café Liberica es el más consumido del mundo.",
+        "severity": "ERROR",
+        "error_type": "accuracy_partial",
+    }]
+    executor = _executor_for(lambda payload: result)
+    final, collected = _run(store, book_id, executor)
+
+    fc_phase = next(p for p in final["phases"] if p["id"] == "fact_check")
+    assert fc_phase["status"] == autopilot.PHASE_PASS
+    assert fc_phase["error"] is None
+    assert "job_failed" not in _ev_types(collected)
+    # Persistencia en BD (2.3b): quality_status = PASS_WITH_WARNING
+    from frontend.editorial import _get_chapters
+    ch = _get_chapters(book_id)[0]
+    assert ch["quality_status"] == "PASS_WITH_WARNING"
+
+
+def test_set_chapter_quality_status_persists_and_reports_missing(store):
+    """§17 #35 F2.3b: set_chapter_quality_status escribe la columna real y
+    reporta de forma honesta si el capítulo no existe."""
+    from frontend.editorial import _get_chapters, set_chapter_quality_status
+    book_id = _make_book_with_draft()
+    number = _get_chapters(book_id)[0]["number"]
+
+    out = set_chapter_quality_status(book_id, number, "es", "PASS_WITH_WARNING")
+    assert out["updated"] is True
+    assert _get_chapters(book_id)[0]["quality_status"] == "PASS_WITH_WARNING"
+
+    out2 = set_chapter_quality_status(book_id, 9999, "es", "PASS")
+    assert out2["updated"] is False
+    assert out2["reason"] == "chapter_not_found"

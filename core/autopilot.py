@@ -89,6 +89,18 @@ def _resolve_writer_capability(book: Optional[dict]) -> str:
     return "write_chapter_es"
 
 
+def _resolve_image_capabilities(book: Optional[dict]) -> tuple[str, str, str]:
+    """Resuelve las capabilities de imagen según el idioma del libro (§17 #28).
+
+    Mismo criterio que ``_resolve_writer_capability`` (books.languages contiene
+    "en" → variantes nativas EN; cualquier otro caso → históricas, regresión
+    cero). Devuelve ``(search_cap, generate_cap, language)``.
+    """
+    if _resolve_writer_capability(book) == "write_chapter_en":
+        return ("search_chapter_images_en", "generate_chapter_images_en", "en")
+    return ("search_chapter_images", "generate_chapter_images", "es")
+
+
 def _resolve_book_languages(book: Optional[dict]) -> list[str]:
     """Alias compatible de ``frontend.editorial._resolve_book_languages``.
 
@@ -480,6 +492,10 @@ class PhaseResult:
     task_id: Optional[int] = None
     progress: Optional[dict] = None
     docx_path: Optional[str] = None
+    # §17 #35 F2: estado de calidad persistible para fases de verificación
+    # (fact_check). "PASS_WITH_WARNING" = el gate no bloquea pero hay claims
+    # accuracy_partial degradadas que el Document Builder debe marcar.
+    quality_status: Optional[str] = None
 
 
 # Tipo del ejecutor: recibe la fase y el job, devuelve un PhaseResult.
@@ -901,6 +917,17 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                     _book = None
                 capability = _resolve_writer_capability(_book)
             language = language or ("en" if capability == "write_chapter_en" else "es")
+        elif phase["id"] == "image_gen":
+            # §17 #28: resolución dinámica por idioma del libro — mismas
+            # capabilities nativas ES/EN que el Paso 1 (patrón §20 tarea 6).
+            if language is None:
+                from frontend import editorial as _editorial
+
+                try:
+                    _book = _editorial._get_book(job["book_id"])
+                except Exception:
+                    _book = None
+                _, capability, language = _resolve_image_capabilities(_book)
         payload = build_phase_payload(phase, job["book_id"], job.get("data"), chapter_id, language=language)
         task_id = _tq.enqueue_task(capability, payload, max_attempts=1)
         module = _pick_module(modules, cap_map, capability)
@@ -938,6 +965,7 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             # Quality Gate y el Fact Check son autoridad y deben traducirse
             # a ok=True/False.
             gate_fail = None
+            quality_status = None  # §17 #35 F2: solo fact_check lo informatiza
             if phase["id"] == "quality_gate":
                 ov = str(result.get("overall_status", ""))
                 if ov.upper() == "FAIL":
@@ -951,7 +979,25 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                 # revés). autopilot solo aborta la fase si el GATE falla, manteniendo
                 # st en el mensaje solo por trazabilidad.
                 if qg == "FAIL":
-                    gate_fail = f"fact_check#status={st} quality_gate={qg}"
+                    # §17 #35 F2: gate DIFERENCIADO por error_type (F1). Solo se
+                    # atenúa a PASS_WITH_WARNING cuando hay EVIDENCIA explícita de
+                    # que el FAIL es accuracy_partial (ERROR subjetivo degradado por
+                    # la pasada de consistencia) y no hay fabricación estructural.
+                    # Sin issues (o con error_type desconocido) se bloquea: fail-safe.
+                    issues = [i for i in (result.get("issues") or []) if isinstance(i, dict)]
+                    types = {str(i.get("error_type", "")) for i in issues}
+                    if "fabrication_structural" in types or not types:
+                        gate_fail = f"fact_check#status={st} quality_gate={qg} error_type={','.join(sorted(types)) or 'unknown'}"
+                    else:
+                        quality_status = "PASS_WITH_WARNING"
+                        log(
+                            logger,
+                            logging.INFO,
+                            "fact_check FAIL por accuracy_partial: no bloquea el pipeline",
+                            status=st,
+                            quality_gate=qg,
+                            quality_status=quality_status,
+                        )
             elif phase["id"] == "research":
                 # La fase research debe traducir su gate REAL a ok=True/False igual
                 # que quality_gate/fact_check: FAIL por status, quality_gate o por
@@ -981,6 +1027,7 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                 module=module_id,
                 task_id=task_id,
                 docx_path=docx_path,
+                quality_status=quality_status,
             )
         return PhaseResult(
             ok=False,
@@ -1018,8 +1065,26 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         # a image_search para el filtro de relevancia temática (§17 #11).
         topic = (job.get("data") or {}).get("topic") or (book or {}).get("title")
 
+        # §17 #28: capabilities nativas por idioma del libro (mismo criterio que
+        # _resolve_writer_capability / §20 tarea 6). En EN el filtro de anclaje
+        # nativo de image_search necesita topic_en/title_en en el payload.
+        search_cap, gen_cap, img_lang = _resolve_image_capabilities(book)
+        # §17 #28 fix 2026-08-26 (book_67): SIN fallback al topic/título en
+        # español — keywords ES contra slugs/títulos EN nunca matchean y
+        # descartaban candidatos on-topic en masa. Sin nativo EN => "" y
+        # el filtro de anclaje queda en fail-open (no filtra).
+        topic_en = (
+            (job.get("data") or {}).get("topic_en")
+            or (book or {}).get("title_en")
+            or ""
+        )
+
         # Misma fuente de num_images que build_payload/generate_chapter_images.
-        base = build_phase_payload(phase, job["book_id"], job.get("data"), chapter_id)
+        # §17 #28: con img_lang="en", build_payload resuelve chapter_title a
+        # chapters.title_en (necesario para payload title_en del anclaje nativo).
+        base = build_phase_payload(
+            phase, job["book_id"], job.get("data"), chapter_id, language=img_lang
+        )
         _num = base.get("num_images")
         num_images = int(_num) if _num is not None else 3
         num_images = max(0, min(num_images, 20))
@@ -1032,22 +1097,26 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
 
         tasks: list[tuple[str, dict]] = []
         if n_search > 0:
-            tasks.append((
-                "search_chapter_images",
-                {
-                    "book_id": base.get("book_id"),
-                    "chapter_number": base.get("chapter_number"),
-                    "chapter_title": base.get("chapter_title"),
-                    "chapter_text": base.get("chapter_text", ""),
-                    "num_images": n_search,
-                    "language": base.get("language", "es"),
-                    "topic": topic,
-                },
-            ))
+            search_payload = {
+                "book_id": base.get("book_id"),
+                "chapter_number": base.get("chapter_number"),
+                "chapter_title": base.get("chapter_title"),
+                "chapter_text": base.get("chapter_text", ""),
+                "num_images": n_search,
+                "language": img_lang,
+                "topic": topic,
+            }
+            if img_lang == "en":
+                # §17 #28: keywords EN para el anclaje nativo (el capítulo/
+                # título ya llega resuelto a EN desde build_payload).
+                search_payload["topic_en"] = str(topic_en or "")[:2000]
+                search_payload["title_en"] = str(base.get("chapter_title") or "")[:500]
+            tasks.append((search_cap, search_payload))
         if n_generate > 0:
             gen_payload = dict(base)
             gen_payload["num_images"] = n_generate
-            tasks.append(("generate_chapter_images", gen_payload))
+            gen_payload["language"] = img_lang
+            tasks.append((gen_cap, gen_payload))
 
         merged: dict[str, Any] = {"results": []}
         task_ids: list[int] = []
@@ -1119,15 +1188,35 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             # El shortfall se calcula sobre la lista YA deduplicada.
             ok_count = sum(1 for r in merged["results"] if r.get("status") == "ok")
             shortfall = num_images - ok_count
-            if shortfall > 0:
+            # ---- Cuota máxima de imágenes IA para la compensación (fix ratio):
+            # la rama anterior compensaba TODO el shortfall con generación,
+            # ignorando image_search_ratio (un libro ratio=1.0 podía acabar con
+            # imágenes IA por cada búsqueda fallida). Se acota a la misma cuota
+            # IA que el split inicial: round(num_images * (1 - ratio)), contando
+            # las IA ya generadas en el split (n_generate). Con ratio=0.0 esta
+            # rama no se alcanza (passthrough a _run_single más arriba).
+            max_ia_quota = max(0, round(num_images * (1.0 - ratio)))
+            ia_quota_left = max_ia_quota - n_generate
+            comp_count = min(shortfall, max(0, ia_quota_left))
+            if 0 < shortfall and comp_count < shortfall:
+                logger.warning(
+                    "[fix ratio] image_gen_split: shortfall=%d no cubierto "
+                    "completo por cuota IA agotada (ratio=%.2f, cuota IA=%d, "
+                    "IA ya generadas=%d): el capítulo queda con %d de %d "
+                    "imágenes solicitadas",
+                    shortfall, ratio, max_ia_quota, n_generate,
+                    ok_count + comp_count, num_images,
+                )
+            if comp_count > 0:
                 comp_payload = dict(base)
-                comp_payload["num_images"] = shortfall
+                comp_payload["num_images"] = comp_count
+                comp_payload["language"] = img_lang
                 # Fuerza generación de material GENUINAMENTE nuevo: si se hereda
                 # skip_existing=True del payload base (regresión libro 36), la
                 # tarea de compensación reciclaría metadata ya existente y volver
                 # a añadir la MISMA ruta al merge.
                 comp_payload["skip_existing"] = False
-                _run_img_task("generate_chapter_images", comp_payload)
+                _run_img_task(gen_cap, comp_payload)
                 # ---- Dedup 2: vuelve a normalizar tras la compensación (si se
                 # disparó), por safety: la tarea de compensación podría haber
                 # devuelto una ruta ya presente en el merge.
@@ -1300,6 +1389,21 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                         lang_sub["status"] = "PASS"
                         lang_sub["metrics"] = res.metrics
                     _persist_chapter(phase, chapter, res.metrics, language=ulang)
+                    # §17 #35 F2.3b: persistir quality_status en BD SOLO para
+                    # fact_check cuando la unidad informatiza un estado (p.ej.
+                    # PASS_WITH_WARNING). Nunca bloquea el flujo si falla.
+                    if phase["id"] == "fact_check" and res.quality_status:
+                        try:
+                            editorial.set_chapter_quality_status(
+                                chapter["book_id"],
+                                chapter["number"],
+                                ulang,
+                                res.quality_status,
+                            )
+                        except Exception as e_qs:
+                            log(logger, logging.WARNING,
+                                f"No se pudo persistir quality_status del capítulo "
+                                f"{chapter['id']}: {e_qs}")
                     agg_words += int(res.metrics.get("words", 0) or 0)
                     agg_module = res.module
                     last_metrics = res.metrics
