@@ -815,3 +815,63 @@ def test_split_sources_tail_discards_english():
     assert "en.wikipedia.org" not in joined
     assert "Párrafo uno." in joined
     assert tail  # la cola se captura pero se descarta aguas abajo
+
+# ---- Hardening de doc.save() (deuda §19 / §17 #16) ----
+
+def test_docx_save_failure_propagates_as_error(tmp_path):
+    """Si doc.save lanza excepción (disco lleno, permisos, interrupción),
+    build_book_docx debe PROPAGAR el fallo, nunca devolver PASS silencioso."""
+    payload = _book_payload(tmp_path, with_images=False)
+    with patch("modules.document_builder.main.Document") as MockDocument:
+        MockDocument.return_value.save.side_effect = OSError(28, "No space left on device")
+        with pytest.raises(RuntimeError, match="No se pudo guardar el DOCX"):
+            build_book_docx(payload)
+        MockDocument.return_value.save.assert_called_once()
+
+
+def test_docx_save_success_path_unchanged(tmp_path):
+    """Regresión: en el camino feliz (save real, sin mocks de fallo) el resultado
+    sigue siendo PASS como antes — fichero existente y con tamaño > 0."""
+    payload = _book_payload(tmp_path, with_images=False)
+    out = build_book_docx(payload)
+    assert os.path.exists(out["docx_path"])
+    assert os.path.getsize(out["docx_path"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# §17 #35 F3 — marcador visible para capítulos PASS_WITH_WARNING
+# ---------------------------------------------------------------------------
+def _doc_paragraph_texts(docx_path: str) -> list[str]:
+    from docx import Document
+
+    return [p.text for p in Document(docx_path).paragraphs]
+
+
+_MARKER = (
+    "⚠️ Contenido no verificado completamente: alguna afirmación de este "
+    "capítulo no pudo confirmarse con las fuentes disponibles."
+)
+
+
+def test_pass_with_warning_chapter_shows_marker(tmp_path: Path):
+    """§17 #35 F3: un capítulo con quality_status=PASS_WITH_WARNING lleva el
+    aviso visible en el DOCX."""
+    payload = _book_payload(tmp_path, with_images=False)
+    payload["book"]["chapters"][0]["quality_status"] = "PASS_WITH_WARNING"
+    out = build_book_docx(payload)
+
+    assert os.path.isfile(out["docx_path"])
+    texts = _doc_paragraph_texts(out["docx_path"])
+    assert _MARKER in texts
+
+
+def test_normal_chapter_no_marker(tmp_path: Path):
+    """§17 #35 F3: un capítulo sin quality_status (o PASS) NO lleva el aviso."""
+    payload = _book_payload(tmp_path, with_images=False)
+    payload["book"]["chapters"][0]["quality_status"] = "PASS"
+    payload["book"]["chapters"][1]["quality_status"] = None
+    out = build_book_docx(payload)
+
+    texts = _doc_paragraph_texts(out["docx_path"])
+    assert _MARKER not in texts
+

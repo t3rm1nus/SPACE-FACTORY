@@ -747,6 +747,16 @@ def _add_chapter(doc: Document, chapter: Chapter, language: str) -> None:
                 # Nunca romper el DOCX por una URL malformada: texto plano.
                 src_para.add_run(url)
 
+    # §17 #35 F3: aviso visible para capítulos cuyo fact_check terminó en
+    # PASS_WITH_WARNING (claims accuracy_partial degradadas). Se inserta tras
+    # la sección de fuentes y antes del material restante.
+    if str(getattr(chapter, "quality_status", "") or "") == "PASS_WITH_WARNING":
+        doc.add_paragraph(
+            "⚠️ Contenido no verificado completamente: alguna afirmación de "
+            "este capítulo no pudo confirmarse con las fuentes disponibles.",
+            style="Quote",
+        )
+
     # Imágenes que quedaron sin intercalar (capítulo muy corto / huecos insuficientes):
     # se conserva el comportamiento actual, todas al final.
     for img_path in images:
@@ -837,7 +847,21 @@ def build_book_docx(payload: dict[str, Any]) -> dict[str, Any]:
     # Aplicar preset/overrides de maquetación sobre los estilos ya creados (FASE 6)
     _apply_layout_config(doc, getattr(book, "layout_config", None))
 
-    doc.save(docx_path)
+    # Hardening de doc.save() (deuda §19 / §17 #16): si el guardado falla a medias
+    # (disco lleno, permiso denegado, proceso interrumpido) NO se reporta éxito con
+    # un DOCX corrupto o inexistente — se propaga un error claro que el scheduler
+    # traduce a fallo de fase (mismo contrato que validate_payload al lanzar ValueError).
+    try:
+        doc.save(docx_path)
+    except Exception as exc:  # noqa: BLE001 - cualquier fallo de I/O invalida el DOCX
+        raise RuntimeError(
+            f"No se pudo guardar el DOCX en '{docx_path}': {exc}"
+        ) from exc
+    if not os.path.exists(docx_path) or os.path.getsize(docx_path) <= 0:
+        raise RuntimeError(
+            f"El guardado del DOCX no produjo un fichero válido en '{docx_path}' "
+            "(no existe o tamaño 0)."
+        )
 
     return BookDocxOutput(
         docx_path=docx_path,
