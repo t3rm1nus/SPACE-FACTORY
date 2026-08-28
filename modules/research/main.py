@@ -750,6 +750,35 @@ def _curate_with_llm(
     return curated[:max_sources], "llm"
 
 
+def _shorten_query_for_search(query: str) -> Optional[str]:
+    """Deriva un query corto buscable a partir de una frase larga (idea/título).
+
+    Recuperación robusta en ``research_web`` cuando el query crudo da 0 candidatos
+    (evidencia book_71: la idea completa = frase larga -> 0 en Wikipedia/Wikidata,
+    pero "historia de los videojuegos" -> 8 resultados). Corta en el primer
+    """
+    if not query or not str(query).strip():
+        return None
+    q = str(query).strip()
+    # Cortar en el primer separador de cláusula más temprano.
+    for sep in (", ", " hasta ", " desde ", " y luego ", ","):
+        idx = q.lower().find(sep)
+        if idx > 0:
+            q = q[:idx].strip()
+            break
+    tokens = [
+        w
+        for w in re.findall(r"\w+", q)
+        if len(w) >= 2 and w.lower() not in _STOPWORDS_ES
+    ]
+    if not tokens:
+        return None
+    short = " ".join(tokens[:6])
+    if not short.strip() or short.lower().strip() == str(query).replace(",", "").lower().strip():
+        return None
+    return short
+
+
 def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: str = "es",
                  topic: Optional[str] = None) -> dict[str, Any]:
     lang = _norm_language(language)
@@ -767,6 +796,21 @@ def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: 
             "quality_gate": "FAIL",
         }
 
+    # Recuperación por query derivado: si el crudo (idea/título completo del libro)
+    # da 0 candidatos en Wikipedia/Wikidata, se reintenta UNA vez con un query corto
+    # derivado del mismo texto (evidencia book_71). topic NO cambia.
+    query_effective = query
+    if not candidates:
+        short_q = _shorten_query_for_search(query)
+        if short_q:
+            try:
+                candidates = _multi_source_search(
+                    short_q, max_sources, timeout, language=lang
+                )
+            except Exception:
+                candidates = []
+            if candidates:
+                query_effective = short_q
     if not candidates:
         return {
             "query": query,
@@ -783,13 +827,13 @@ def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: 
     # en cuyo caso entra directo el ranking determinista.
     try:
         if RESEARCH_USE_LLM == "1":
-            curated, execution_mode = _curate_with_llm(query, candidates, language, max_sources)
+            curated, execution_mode = _curate_with_llm(query_effective, candidates, language, max_sources)
         else:
-            curated = _deterministic_curate(query, candidates, max_sources)
+            curated = _deterministic_curate(query_effective, candidates, max_sources)
             execution_mode = "deterministic"
     except Exception as e:
         log(logger, logging.WARNING, f"Falla la curación; se usa ranking determinista: {e}")
-        curated = _deterministic_curate(query, candidates, max_sources)
+        curated = _deterministic_curate(query_effective, candidates, max_sources)
         execution_mode = "deterministic"
 
     # --- Filtro de relevancia (PASO 4): criterio compuesto. Se descartan las
@@ -801,7 +845,7 @@ def research_web(query: str, max_sources: int = 8, timeout: int = 20, language: 
     _pre = len(curated)
     curated = [
         c for c in curated
-        if _keyword_overlap(query, c) >= RELEVANCE_MIN_OVERLAP
+        if _keyword_overlap(query_effective, c) >= RELEVANCE_MIN_OVERLAP
         and _has_anchor_keyword(topic, c)
     ]
     if _pre - len(curated):

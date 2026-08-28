@@ -497,3 +497,47 @@ def test_is_social_media_helper():
     assert not research._is_social_media("https://es.wikipedia.org/wiki/GTA")
     assert not research._is_social_media(None)
     assert not research._is_social_media("")
+
+
+def test_shorten_query_derives_short_from_book71_phrase():
+    """Recuperación de query corto (§17 #33/book_71): una frase larga (idea/título
+    completo del libro) se reduce a las primeras palabras significativas tras el
+    primer separador de cláusula. Reutiliza _STOPWORDS_ES."""
+    long_q = (
+        "Historia de los videojuegos, desde el pong, hasta las máquinas arcade, "
+        "las videoconsolas y los ordenadores hasta la llegada de gta6"
+    )
+    short = research._shorten_query_for_search(long_q)
+    assert short is not None
+    assert "videojuegos" in short.lower()
+    assert len(short.split()) <= 6
+
+
+def test_research_web_recovers_from_long_query_using_derived_short(monkeypatch):
+    """book_71 reproducible con mocks: el query crudo (frase larga) da 0 candidatos
+    en _multi_source_search; el query corto derivado sí aporta candidatos y research
+    se recupera en vez de fallar con 'No se obtuvieron fuentes reales.'"""
+    monkeypatch.setattr(research, "RESEARCH_USE_LLM", "0")  # ranking determinista
+
+    long_q = (
+        "gato doméstico, desde su origen hasta la domesticación y su relación "
+        "con el ser humano a lo largo de la historia"
+    )
+
+    def _fake_multi(q, n, timeout, language="es"):
+        if len(str(q).split()) >= 4:
+            return []  # query crudo largo -> 0 candidatos (caso book_71)
+        return list(_CANDIDATES)  # query derivado corto -> candidatos
+
+    monkeypatch.setattr(research, "_multi_source_search", _fake_multi)
+
+    # Sanidad: el query derivado es "gato doméstico" (corto) y SÍ matchea _CANDIDATES.
+    short = research._shorten_query_for_search(long_q)
+    assert short == "gato doméstico"
+
+    out = research.research_web(long_q, max_sources=5, timeout=20)
+    assert out["status"] == "PASS"
+    assert out["source_count"] >= 1
+    assert out["sources"]
+    # El resultado reporta el query original (el task conserva su book_id), no el derivado.
+    assert out["query"] == long_q
