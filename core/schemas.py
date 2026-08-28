@@ -477,6 +477,9 @@ class QualityControlItem(BaseModel):
 
     status: str = Field(..., pattern="^(PASS|WARNING|FAIL)$")
     message: str = Field(..., min_length=1, max_length=1000)
+    # §17 #36 Fase 1: fase del pipeline responsable de corregir un FAIL
+    # (metadato opcional, retrocompatible; None en PASS/WARNING informativos).
+    origin_phase: Optional[str] = Field(default=None, max_length=40)
 
 
 class QualityControlPayload(TaskPayload):

@@ -91,6 +91,7 @@ def _check_book(book: Book) -> list[QualityControlItem]:
         QualityControlItem(
             status="PASS" if book.book_id or book.title else "FAIL",
             message="Libro existe" if book.book_id or book.title else "Libro sin identificador ni título",
+            origin_phase="book_planner",
         )
     )
 
@@ -117,6 +118,7 @@ def _check_book(book: Book) -> list[QualityControlItem]:
         QualityControlItem(
             status="PASS" if has_required_metadata else "FAIL",
             message="Metadatos completos" if has_required_metadata else "Metadatos incompletos",
+            origin_phase="book_planner",
         )
     )
     if has_required_metadata and optional_missing:
@@ -138,6 +140,7 @@ def _check_book(book: Book) -> list[QualityControlItem]:
         QualityControlItem(
             status="PASS" if len(book.chapters) > 0 else "FAIL",
             message="Capítulos presentes" if len(book.chapters) > 0 else "Sin capítulos",
+            origin_phase="book_planner",
         )
     )
 
@@ -158,6 +161,7 @@ def _check_chapters(
             QualityControlItem(
                 status="FAIL",
                 message="Capítulos insuficientes: {} < mínimo {}".format(count, min_chapters),
+                origin_phase="book_planner",
             )
         )
     elif count < target_chapters:
@@ -180,6 +184,7 @@ def _check_chapters(
             QualityControlItem(
                 status="FAIL",
                 message="Capítulos exceden el máximo configurado: {} > máximo {}".format(count, max_chapters),
+                origin_phase="book_planner",
             )
         )
     else:
@@ -196,6 +201,7 @@ def _check_chapters(
             QualityControlItem(
                 status="FAIL",
                 message="Números de capítulo duplicados detectados",
+                origin_phase="book_planner",
             )
         )
     else:
@@ -211,6 +217,7 @@ def _check_chapters(
         QualityControlItem(
             status="PASS" if all_numbered else "FAIL",
             message="Todos los capítulos están numerados" if all_numbered else "Capítulos sin numerar",
+            origin_phase="book_planner",
         )
     )
 
@@ -232,6 +239,7 @@ def _check_chapters(
             QualityControlItem(
                 status="FAIL",
                 message="Capítulos vacíos: {}".format(empty_chapters),
+                origin_phase="writer",
             )
         )
     else:
@@ -284,6 +292,7 @@ def _check_languages(book: Book) -> list[QualityControlItem]:
                 QualityControlItem(
                     status="FAIL",
                     message="Español incompleto en capítulos: {}".format(missing_es),
+                    origin_phase="writer",
                 )
             )
         else:
@@ -305,6 +314,7 @@ def _check_languages(book: Book) -> list[QualityControlItem]:
                 QualityControlItem(
                     status="FAIL",
                     message="Inglés incompleto en capítulos: {}".format(missing_en),
+                    origin_phase="writer",
                 )
             )
         else:
@@ -365,6 +375,7 @@ def _check_sources(book: Book) -> list[QualityControlItem]:
             QualityControlItem(
                 status="FAIL",
                 message="Fuentes faltantes en capítulos: {}".format(missing_sources),
+                origin_phase="research",
             )
         )
     else:
@@ -382,6 +393,7 @@ def _check_sources(book: Book) -> list[QualityControlItem]:
             QualityControlItem(
                 status="FAIL",
                 message="URLs inválidas detectadas: {}".format(invalid_urls[:5]),
+                origin_phase="research",
             )
         )
     else:
@@ -398,6 +410,7 @@ def _check_sources(book: Book) -> list[QualityControlItem]:
             QualityControlItem(
                 status="FAIL",
                 message="Fuentes inventadas detectadas: {}".format(invented[:5]),
+                origin_phase="research",
             )
         )
     else:
@@ -431,6 +444,7 @@ def _check_images(book: Book) -> list[QualityControlItem]:
             QualityControlItem(
                 status="FAIL",
                 message="Imágenes por capítulo != {}: {}".format(expected, wrong_count),
+                origin_phase="image_gen",
             )
         )
     elif has_images:
@@ -470,6 +484,7 @@ def _check_images(book: Book) -> list[QualityControlItem]:
             QualityControlItem(
                 status="FAIL",
                 message="Imágenes faltantes: {}".format(missing[:5]),
+                origin_phase="image_gen",
             )
         )
     else:
@@ -485,6 +500,7 @@ def _check_images(book: Book) -> list[QualityControlItem]:
             QualityControlItem(
                 status="FAIL",
                 message="Imágenes ilegibles: {}".format(unreadable[:5]),
+                origin_phase="image_gen",
             )
         )
     else:
@@ -528,6 +544,7 @@ def _check_documents(
                 QualityControlItem(
                     status="FAIL",
                     message="DOCX no encontrado: {}".format(docx_path),
+                    origin_phase="docx",
                 )
             )
         else:
@@ -539,6 +556,7 @@ def _check_documents(
                         QualityControlItem(
                             status="FAIL",
                             message="DOCX vacío",
+                            origin_phase="docx",
                         )
                     )
                 else:
@@ -578,6 +596,7 @@ def _check_documents(
                     QualityControlItem(
                         status="FAIL",
                         message="DOCX inválido: {}".format(exc),
+                        origin_phase="docx",
                     )
                 )
     else:
@@ -594,6 +613,7 @@ def _check_documents(
                 QualityControlItem(
                     status="FAIL",
                     message="PDF no encontrado: {}".format(pdf_path),
+                    origin_phase="docx",
                 )
             )
         else:
@@ -605,6 +625,7 @@ def _check_documents(
                         QualityControlItem(
                             status="FAIL",
                             message="PDF sin páginas",
+                            origin_phase="docx",
                         )
                     )
                 else:
@@ -634,6 +655,7 @@ def _check_documents(
                     QualityControlItem(
                         status="FAIL",
                         message="PDF inválido: {}".format(exc),
+                        origin_phase="docx",
                     )
                 )
     else:

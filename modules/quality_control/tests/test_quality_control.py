@@ -77,6 +77,42 @@ def test_check_images_uses_book_image_count_not_literal(tmp_path: Path):
     assert not any(c.status == "FAIL" and "Imágenes por capítulo" in c.message for c in checks)
 
 
+def test_check_images_fail_carries_origin_phase_image_gen(tmp_path: Path):
+    """§17 #36 Fase 1: el check FAIL de déficit/desigualdad de imágenes expone
+    el campo estructurado origin_phase="image_gen" (fase responsable)."""
+    from modules.quality_control.main import _check_images
+
+    img_path = tmp_path / "hero.png"
+    PILImage.new("RGB", (64, 64), color="red").save(img_path)
+
+    book = Book.model_validate({
+        "title": "Libro de prueba",
+        "description": "Descripción del libro.",
+        "image_count": 3,
+        "chapters": [
+            {
+                "chapter_id": 1,
+                "book_id": 1,
+                "number": 1,
+                "edited_es": "Texto cap 1.",
+                "images": [str(img_path)] * 3,
+            },
+            {
+                "chapter_id": 2,
+                "book_id": 1,
+                "number": 2,
+                "edited_es": "Texto cap 2.",
+                "images": [str(img_path)],  # cap 2 con menos -> desigualdad -> FAIL
+            },
+        ],
+    })
+    checks = _check_images(book)
+    fails = [c for c in checks if c.status == "FAIL"]
+    assert fails, "se espera un FAIL por desigualdad de imágenes entre capítulos"
+    assert all(c.origin_phase == "image_gen" for c in fails)
+
+
+
 
 
 def test_health_check():
