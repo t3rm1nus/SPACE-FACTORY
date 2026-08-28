@@ -134,3 +134,13 @@ def test_f_minimal_payload_without_author_genre():
     # Y aún así el QC no bloquea el PASS de "Metadatos completos"
     qc = final_quality_control({"book": d, "language": "es"})
     assert _metadata_item(qc)["status"] == "PASS"
+
+
+# G) §17 #38: title e idea DISTINTOS → cada campo persiste su valor propio.
+# (El bug real estaba aguas abajo — core/autopilot.py pisaba books.title con la
+# idea del planner fallback — pero este test fija el contrato de create_book.)
+def test_g_title_and_idea_distinct_are_persisted_separately():
+    b = create_book({"title": "X", "idea": "Y"})
+    row = _get_book(b["book_id"])
+    assert row["title"] == "X"
+    assert row["description"] == "Y"

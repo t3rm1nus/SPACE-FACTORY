@@ -810,8 +810,19 @@ def run_job(
                                 _ed.update_book_description(
                                     job["book_id"], planner_desc
                                 )
-                            # Propagar el título del libro si el planner generó uno mejor
-                            if planner_title:
+                            # Propagar el título del planner SOLO si es una mejora real.
+                            # §17 #38 (bug título/idea): el fallback determinista del
+                            # planner (_fallback_plan) devuelve como "title" la idea
+                            # cruda del libro (title == description == validated.idea);
+                            # persistirlo incondicionalmente pisaba el título REAL que
+                            # el usuario introdujo en el formulario. Un título generado
+                            # por LLM es distinto de la descripción, así que se compara
+                            # con planner_desc y solo se persiste si difiere.
+                            if (
+                                planner_title
+                                and planner_title.strip()
+                                and planner_title.strip() != planner_desc.strip()
+                            ):
                                 _ed.update_book_title(
                                     job["book_id"], planner_title
                                 )

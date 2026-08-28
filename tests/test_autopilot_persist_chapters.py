@@ -111,6 +111,77 @@ def _editor_stub_executor(store):
     return autopilot.default_executor_factory(modules, cap_map, store=store)
 
 
+
+# ---------------------------------------------------------------------------
+# §17 #38 — guard: el planner fallback (title == description == idea) NO pisa
+# el título REAL del usuario; un título de planner distinto de la descripción
+# sí se propaga.
+# ---------------------------------------------------------------------------
+def _planner_stub_executor(store, planner_title, planner_desc):
+    modules = {
+        "book_planner": {
+            "manifest": {"id": "book_planner", "config": {"timeout_seconds": 30}},
+            "execute": lambda payload: {
+                "title": planner_title,
+                "description": planner_desc,
+                "chapters": [{"number": 1, "title": "Cap 1"}],
+                "execution_mode": "deterministic",
+            },
+        }
+    }
+    cap_map = {"create_book_plan": ["book_planner"]}
+    return autopilot.default_executor_factory(modules, cap_map, store=store)
+
+
+def _book_title(book_id):
+    with get_db() as conn:
+        return conn.execute(
+            "SELECT title FROM books WHERE id = ?", (book_id,)
+        ).fetchone()["title"]
+
+
+def test_planner_fallback_title_equals_idea_does_not_overwrite_real_title(store):
+    """§17 #38: fallback del planner (title==description==idea) no pisa el título real."""
+    d = dict(_META)
+    d["title"] = "TITULO REAL DEL USUARIO"
+    book_id = create_book(d)["book_id"]
+
+    job = _job_ready_at_phase(store, book_id, "planner")
+    autopilot.run_job(
+        job,
+        store,
+        _planner_stub_executor(
+            store,
+            "Historia de los videojuegos, desde el pong, hasta las maquinas arcade",
+            "Historia de los videojuegos, desde el pong, hasta las maquinas arcade",
+        ),
+        max_attempts=1,
+        sleep_fn=_NOSLEEP,
+    )
+    assert _book_title(book_id) == "TITULO REAL DEL USUARIO"
+
+
+def test_planner_generated_title_distinct_from_description_is_propagated(store):
+    """Título de planner LEGITIMO (distinto de la descripción) sí se propaga."""
+    d = dict(_META)
+    d["title"] = "TITULO PROVISIONAL"
+    book_id = create_book(d)["book_id"]
+
+    job = _job_ready_at_phase(store, book_id, "planner")
+    autopilot.run_job(
+        job,
+        store,
+        _planner_stub_executor(
+            store,
+            "Historia de los videojuegos",
+            "Historia de los videojuegos, desde el pong, hasta las maquinas arcade",
+        ),
+        max_attempts=1,
+        sleep_fn=_NOSLEEP,
+    )
+    assert _book_title(book_id) == "Historia de los videojuegos"
+
+
 def test_editor_populates_edited_es_in_db(store):
     """Tras la fase editor, chapters.edited_es queda con el texto REAL devuelto."""
     book_id = _make_book(1)
