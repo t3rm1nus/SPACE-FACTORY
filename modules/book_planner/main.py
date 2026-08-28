@@ -22,6 +22,14 @@ DEFAULT_MODEL = os.environ.get("OLLAMA_MODEL", "qwen-agent:latest")
 DEFAULT_ROUTER_MODEL = os.environ.get("ROUTER_MODEL", "qwen-agent:latest")
 DEFAULT_IMAGE_REQUIREMENTS = 3
 
+# §17 #22: presupuesto de salida dinámico para la llamada LLM del plan.
+# max_tokens=2000 fijo truncaba el JSON con ~20 capítulos (~90-130
+# tokens/capítulo observados) y el parseo caía al fallback determinista.
+PLANNER_BASE_TOKENS = 400        # campos del libro + margen fijo
+PLANNER_TOKENS_PER_CHAPTER = 150  # margen holgado sobre el ~90-130 observado
+MAX_PLANNER_TOKENS = 6000        # techo razonable, evita presupuestos absurdos
+MIN_PLANNER_TOKENS = 2000        # preserva el valor actual como piso
+
 
 def _coerce_image_requirements(value: Any) -> int:
     """Normaliza el campo image_requirements a un int válido antes de la validación.
@@ -611,6 +619,19 @@ def _deterministic_outline_en(sections: list[dict]) -> Optional[list[dict]]:
     return out
 
 
+def _planner_max_tokens(target_chapters: int) -> int:
+    """Presupuesto de salida dinámico para la llamada LLM del plan (§17 #22).
+
+    El JSON del plan consume ~90-130 tokens por capítulo; con max_tokens fijo
+    en 2000, pedidos de ~20 capítulos truncaban la respuesta a mitad del array
+    y el parseo caía al fallback. Escala linealmente con techo y piso.
+    """
+    return min(
+        MAX_PLANNER_TOKENS,
+        max(MIN_PLANNER_TOKENS, PLANNER_BASE_TOKENS + PLANNER_TOKENS_PER_CHAPTER * target_chapters),
+    )
+
+
 def execute(payload: dict) -> dict:
     """Genera un plan editorial estructurado a partir de una idea de libro.
 
@@ -621,6 +642,7 @@ def execute(payload: dict) -> dict:
     model_validated = BookPlanPayload(**validated)
     provider = None
     raw = None
+    raw_text: Optional[str] = None
     input_tokens = 0
     output_tokens = 0
     provider_name = "none"
@@ -633,10 +655,13 @@ def execute(payload: dict) -> dict:
             prompt,
             system="Devuelve solo JSON válido, sin texto adicional.",
             model=DEFAULT_ROUTER_MODEL,
-            max_tokens=2000,
+            # §17 #22: presupuesto dinámico — 2000 fijo truncaba el JSON con
+            # ~20 capítulos (~90-130 tokens/capítulo) y caía al fallback.
+            max_tokens=_planner_max_tokens(int(model_validated.target_chapters or 0)),
             temperature=0.4,
         )
         raw = result.raw_response
+        raw_text = result.text
         provider_name = result.provider
         model_name = result.model
         input_tokens = result.input_tokens
@@ -651,6 +676,13 @@ def execute(payload: dict) -> dict:
             logging.WARNING,
             f"Fallo al generar plan con LLM ({provider_name}): {e}. Usando fallback.",
         )
+        if raw_text:
+            # §17 #22: conserva el texto crudo (truncado) para diagnosticar
+            # truncamientos sin reproducir offline. DEBUG: no ensucia producción.
+            logger.debug(
+                "[§17 #22] Respuesta cruda del planner LLM (primeros 2000 chars): %r",
+                raw_text[:2000],
+            )
         plan_data = _fallback_plan(model_validated)
         used_fallback = True
 

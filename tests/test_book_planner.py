@@ -842,3 +842,110 @@ def test_p_fallback_plan_populates_outline_en_deterministically(monkeypatch) -> 
         assert oe is not None
         assert [s["heading"] for s in oe] == ["Introduction", "Development", "Conclusion"]
         assert c["title_en"] is None
+
+
+def test_max_tokens_scales_with_target_chapters() -> None:
+    """§17 #22: el presupuesto de salida escala con target_chapters.
+
+    Fórmula: min(MAX_PLANNER_TOKENS, max(MIN_PLANNER_TOKENS,
+    PLANNER_BASE_TOKENS + PLANNER_TOKENS_PER_CHAPTER * target_chapters)).
+    - tc=1  → piso MIN_PLANNER_TOKENS=2000 (comportamiento actual preservado).
+    - tc=5  → 400+5*150=1150 < 2000 → sigue en el piso 2000.
+    - tc=20 → 400+20*150=3400 (>2000, <6000) → presupuesto notablemente mayor.
+    - tc=60 → 9400 > techo → capado a MAX_PLANNER_TOKENS=6000.
+    Además verifica que execute pasa ese valor al provider.
+    """
+    import modules.book_planner.main as main
+
+    assert main._planner_max_tokens(1) == main.MIN_PLANNER_TOKENS == 2000
+    assert main._planner_max_tokens(5) == 2000
+    assert main._planner_max_tokens(20) == 3400
+    assert main._planner_max_tokens(20) > main._planner_max_tokens(5)
+    assert main._planner_max_tokens(60) == main.MAX_PLANNER_TOKENS == 6000
+
+    captured: dict = {}
+
+    class FakeResult:
+        text = json.dumps({
+            "title": "T", "subtitle": "S", "description": "D",
+            "target_audience": "adultos",
+            "chapters": [{
+                "number": 1, "title": "C1", "objective": "O",
+                "key_questions": ["Q"], "estimated_words": 3000,
+                "research_requirements": [], "image_requirements": 3,
+                "sections": [{"heading": "Introducción", "objective": "o"}],
+            }],
+        })
+        provider = "ollama"
+        model = "llama3.1"
+        input_tokens = 10
+        output_tokens = 20
+        cost = 0.0
+        raw_response = {}
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def generate(self, prompt, **kwargs):
+            captured["max_tokens"] = kwargs.get("max_tokens")
+            return FakeResult()
+
+    monkeypatch: pytest.MonkeyPatch = pytest.MonkeyPatch()
+    try:
+        monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+        payload = _payload()
+        payload["target_chapters"] = 20
+        execute(payload)
+        assert captured["max_tokens"] == 3400
+    finally:
+        monkeypatch.undo()
+
+
+def test_planner_logs_raw_on_json_parse_failure(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """§17 #22: si el JSON del LLM viene truncado/inválido, el texto crudo se
+    registra (DEBUG, truncado a 2000 chars) antes de caer al fallback, que
+    debe seguir funcionando igual."""
+    import logging
+
+    import modules.book_planner.main as main
+
+    truncated = (
+        '{"title":"T","subtitle":"S","description":"D","target_audience":"adultos",'
+        '"chapters":[{"number":1,"title":"Capítulo 1","objective":"Objetivo",'
+        '"key_questions":["Q"],"estimated_words":3000,"research_requirements":[],'
+        '"image_requirements":3,"sections":[{"heading":"Introducción","objective"'
+    )  # cortado a mitad del array (simula budget agotado)
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def generate(self, *args: Any, **kwargs: Any):
+            class R:
+                text = truncated
+                provider = "ollama"
+                model = "llama3.1"
+                input_tokens = 10
+                output_tokens = 2000
+                cost = 0.0
+                raw_response = {}
+
+            return R()
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    with caplog.at_level(logging.DEBUG, logger="modules.book_planner.main"):
+        out = execute(_payload())
+
+    # El fallback sigue funcionando
+    assert out["title"] == "Novela corta de ciencia ficción"
+    assert len(out["chapters"]) == 25
+    # El texto crudo quedó registrado en DEBUG (o parte de él)
+    debug_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
+    raw_logs = [m for m in debug_msgs if "Respuesta cruda del planner LLM" in m]
+    assert raw_logs, f"no se loggeó el raw en DEBUG: {debug_msgs}"
+    assert 'chapters"' in raw_logs[0]
