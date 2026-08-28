@@ -210,7 +210,7 @@ class LLMProvider:
         """Devuelve kwargs de construcción leídos de las variables de entorno."""
         return {}
 
-    # --- interfaz pública ---
+        # --- interfaz pública ---
     def generate(
         self,
         prompt: str,
@@ -219,6 +219,7 @@ class LLMProvider:
         model: Optional[str] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
+        seed: Optional[int] = None,
         **kwargs: Any,
     ) -> LLMResult:
         """Genera una respuesta completa con reintentos.
@@ -226,6 +227,10 @@ class LLMProvider:
         Los reintentos se aplican solo a errores transitorios (timeout y
         problemas de conexión/red). Un modelo inexistente o una respuesta
         inválida se propagan de inmediato.
+
+        Si ``seed`` se provee, se reenvía al backend para reproducibilidad
+        determinista (p. ej. ``options.seed`` de Ollama); si es ``None``, el
+        comportamiento no cambia (default actual).
         """
         resolved = model or self.model
         if not resolved:
@@ -233,6 +238,13 @@ class LLMProvider:
                 f"El proveedor '{self.name}' no tiene modelo configurado. "
                 "Define LLM_MODEL o la variable específica del proveedor."
             )
+
+        # §17 #32: seed opcional → reproducibilidad (determinismo fact_checker).
+        # Se inyecta como kwarg
+        # genérico; cada provider reenvía (Ollama) o ignora (Anthropic) sin
+        # cambiar el comportamiento cuando es None.
+        if seed is not None:
+            kwargs["seed"] = seed
 
         last_error: Optional[LLMError] = None
         for attempt in range(self.max_retries + 1):

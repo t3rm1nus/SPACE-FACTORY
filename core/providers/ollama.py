@@ -93,6 +93,9 @@ class OllamaProvider(LLMProvider):
             options["num_predict"] = int(max_tokens)
         if temperature is not None:
             options["temperature"] = float(temperature)
+        seed = kwargs.pop("seed", None)
+        if seed is not None:
+            options["seed"] = int(seed)
         if options:
             payload["options"] = options
         context = kwargs.pop("context", None)
