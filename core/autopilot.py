@@ -500,7 +500,15 @@ def reset_from_phase(
             # _reset_phase_dict con subs_all=False no toca los subs PASS).
             _reset_phase_dict(ph, subs_all=False)
         else:
-            _reset_phase_dict(ph, subs_all=False)
+            # §17 #36 Fase 3: image_gen puede estar PASS con déficit
+            # (§17 #30 tolerancia de déficit ≤1 → capítulo PASS con
+            # menos imágenes de las solicitadas). Resetear TODOS los subs
+            # para forzar regeneración; el resto mantiene subs_all=False
+            # (PASS = completo y correcto en writer/editor/fact_check).
+            _reset_phase_dict(
+                ph,
+                subs_all=(pid == from_phase and from_phase == "image_gen"),
+            )
         affected.append(pid)
 
     if chapter_number is not None and not subs_matched:
@@ -1354,46 +1362,22 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             # repetida en el merge no cuente como 2 imágenes reales.
             merged["results"] = _dedupe_by_path(merged["results"] or [])
 
-            # ---- Compensación de déficit (una sola ronda, SIN bucle ni recursión).
-            # Si search/generate no alcanzaron el total pedido (p.ej. una imagen
-            # web inválida/SVG se descartó y quedó status != "ok"), se genera
-            # localmente exactamente el shortfall. NO se reintenta tras compensar.
-            # El shortfall se calcula sobre la lista YA deduplicada.
+            # ---- §17 #30 (rediseño): SIN compensación con IA. image_search
+            # ahora pagina (pageno de SearXNG) hasta completar el cupo o
+            # agotar su presupuesto (IMAGE_SEARCH_TOTAL_TIME_BUDGET /
+            # IMAGE_SEARCH_MAX_PAGES). Si aún así queda shortfall (no hay más
+            # imágenes válidas en la web para el tema), el capítulo se queda
+            # con las imágenes que consiguió. Se conserva solo el WARNING de
+            # diagnóstico; NO se encola ninguna generación extra.
             ok_count = sum(1 for r in merged["results"] if r.get("status") == "ok")
             shortfall = num_images - ok_count
-            # ---- Cuota máxima de imágenes IA para la compensación (fix ratio):
-            # la rama anterior compensaba TODO el shortfall con generación,
-            # ignorando image_search_ratio (un libro ratio=1.0 podía acabar con
-            # imágenes IA por cada búsqueda fallida). Se acota a la misma cuota
-            # IA que el split inicial: round(num_images * (1 - ratio)), contando
-            # las IA ya generadas en el split (n_generate). Con ratio=0.0 esta
-            # rama no se alcanza (passthrough a _run_single más arriba).
-            max_ia_quota = max(0, round(num_images * (1.0 - ratio)))
-            ia_quota_left = max_ia_quota - n_generate
-            comp_count = min(shortfall, max(0, ia_quota_left))
-            if 0 < shortfall and comp_count < shortfall:
+            if shortfall > 0:
                 logger.warning(
-                    "[fix ratio] image_gen_split: shortfall=%d no cubierto "
-                    "completo por cuota IA agotada (ratio=%.2f, cuota IA=%d, "
-                    "IA ya generadas=%d): el capítulo queda con %d de %d "
-                    "imágenes solicitadas",
-                    shortfall, ratio, max_ia_quota, n_generate,
-                    ok_count + comp_count, num_images,
+                    "[fix ratio] image_gen_split: shortfall=%d tras búsqueda "
+                    "paginada (ratio=%.2f): el capítulo queda con %d de %d "
+                    "imágenes solicitadas, SIN compensación con IA (§17 #30)",
+                    shortfall, ratio, ok_count, num_images,
                 )
-            if comp_count > 0:
-                comp_payload = dict(base)
-                comp_payload["num_images"] = comp_count
-                comp_payload["language"] = img_lang
-                # Fuerza generación de material GENUINAMENTE nuevo: si se hereda
-                # skip_existing=True del payload base (regresión libro 36), la
-                # tarea de compensación reciclaría metadata ya existente y volver
-                # a añadir la MISMA ruta al merge.
-                comp_payload["skip_existing"] = False
-                _run_img_task(gen_cap, comp_payload)
-                # ---- Dedup 2: vuelve a normalizar tras la compensación (si se
-                # disparó), por safety: la tarea de compensación podría haber
-                # devuelto una ruta ya presente en el merge.
-                merged["results"] = _dedupe_by_path(merged["results"] or [])
         except _TaskFailed as ex:
             return PhaseResult(
                 ok=False,
@@ -1475,8 +1459,18 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                     if r.get("status") == "ok" and r.get("image_path"):
                         image_paths.append(r["image_path"])
                 if image_paths:
+                    # §17 #30/#31 (fix acumulación): image_gen se re-ejecuta desde
+                    # cero en cada reset (fase regenera sus subs). El merge de
+                    # persist_chapter_images (§17 #31) está pensado para MÚLTIPLES
+                    # llamadas DENTRO de una misma ejecución (compensación IA),
+                    # pero tras §17 #30 esa compensación ya no existe: hay UNA
+                    # única llamada por capítulo por ejecución. Sin overwrite, cada
+                    # reset ACUMULABA imágenes de ejecuciones previas en
+                    # chapters.images (book_72: 127-140/capítulo). Al ser la
+                    # primera y única llamada de la ejecución, overwrite=True
+                    # deja chapters.images EXACTAMENTE con las de esta pasada.
                     editorial.persist_chapter_images(
-                        chapter["book_id"], cid, image_paths
+                        chapter["book_id"], cid, image_paths, overwrite=True
                     )
             # fact_check: no produce texto; las métricas de claims van en el subestado.
         except Exception as e:  # no bloquear el flujo por persistencia colateral

@@ -183,3 +183,51 @@ def test_reset_from_phase_unknown_phase():
     job = _make_job()
     with pytest.raises(ValueError, match="desconocida"):
         autopilot.reset_from_phase(job, "no_existe")
+
+
+def test_reset_from_phase_image_gen_full_book_resets_pass_subs_with_deficit():
+    """§17 #30 / Fix B: image_gen puede estar PASS con déficit tolerado
+    (capítulo PASS con menos imágenes de las solicitadas). Al resetear desde
+    image_gen (chapter_number=None), TODOS los subs PASS deben volver a
+    PENDING para forzar la regeneración — NO conservarlos como en writer.
+    """
+    job = _make_job()
+    # image_gen está PASS con subs PASS (simulan déficit tolerado §17 #30).
+    ig = _phases_by_id(job)["image_gen"]
+    assert ig["status"] == "PASS"
+    assert all(
+        s["status"] == "PASS" for s in ig["subs"]["chapters"].values()
+    )
+
+    out = autopilot.reset_from_phase(job, "image_gen", chapter_number=None)
+    by_id = _phases_by_id(out)
+    ig = by_id["image_gen"]
+    assert ig["status"] == "PENDING"
+    assert ig["attempts"] == 0
+    # Todos los subs vuelven a PENDING (forzar regeneración de imágenes).
+    assert all(
+        s["status"] == "PENDING" for s in ig["subs"]["chapters"].values()
+    )
+    assert ig["subs"]["done"] == 0
+    # Cascada reseteada.
+    assert by_id["quality_gate"]["status"] == "PENDING"
+    assert by_id["docx"]["status"] == "PENDING"
+    # Fases ANTERIORES a image_gen intactas.
+    for pid in ("planner", "research", "outline", "writer", "fact_check",
+                "editor", "image_plan"):
+        assert by_id[pid]["status"] == "PASS", pid
+
+
+def test_reset_from_phase_writer_full_book_keeps_pass_subs():
+    """Fix B NO debe afectar a writer: PASS = completo y correcto, los subs
+    PASS se conservan (comportamiento retry_job intacto para texto)."""
+    job = _make_job()
+    out = autopilot.reset_from_phase(job, "writer", chapter_number=None)
+    by_id = _phases_by_id(out)
+    assert by_id["writer"]["status"] == "PENDING"
+    # Subs PASS conservados (no regenerar texto válido ya escrito).
+    assert by_id["writer"]["subs"]["done"] == 3
+    assert all(
+        s["status"] == "PASS"
+        for s in by_id["writer"]["subs"]["chapters"].values()
+    )

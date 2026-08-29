@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,6 +44,14 @@ SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://localhost:8081")
 SEARCH_TIMEOUT = float(os.environ.get("IMAGE_SEARCH_TIMEOUT", "15"))
 DOWNLOAD_TIMEOUT = float(os.environ.get("IMAGE_DOWNLOAD_TIMEOUT", "10"))
 MAX_IMAGES = 20
+# §17 #30 — presupuesto total (s) de la fase de búsqueda + techo de páginas de
+# SearXNG. Mismo patrón env-overridable que WRITER_TOTAL_TIME_BUDGET /
+# RESEARCH_TOTAL_TIME_BUDGET. El budget deja ~40% de holgura bajo el
+# timeout_seconds=170 del scheduler (modules/image_search/module.json).
+IMAGE_SEARCH_TOTAL_TIME_BUDGET = float(
+    os.environ.get("IMAGE_SEARCH_TOTAL_TIME_BUDGET", "90")
+)
+IMAGE_SEARCH_MAX_PAGES = int(os.environ.get("IMAGE_SEARCH_MAX_PAGES", "6"))
 
 _USER_AGENT = "SpaceLair/1.0 (image_search agent)"
 
@@ -57,7 +66,11 @@ _ASPECT_TOKENS = [
     (9 / 16, "9:16"),
 ]
 
-_VALID_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"}
+# §17 #30 — formatos NO-raster que PIL no puede abrir como imagen normal (SVG
+# vectorial). Descartarlos ANTES de descargar ahorra DOWNLOAD_TIMEOUT de HTTP
+# en candidatos que luego se tirarían por contenido inválido. Ampliable si
+# aparecen más formatos problemáticos (p.ej. .ico/.tif no soportados).
+_NON_RASTER_EXTENSIONS = {".svg"}
 
 # Lista mínima conocida de dominios a bloquear (riesgo reputacional/legal: portadas
 # de editoriales reales, repositorios académicos/docentes y material con copyright).
@@ -77,9 +90,20 @@ _DOMAIN_DENYLIST = {
     "laleo.com",
 }
 
+# Denylist separada de dominios que sirven LIBRERÍAS DE ICONOS/assets de dev
+# (SVG vectorial de librerías como devicons, lucide-static, etc.). Nunca dan
+# contenido editorial raster válido, pero ocupan slots de intento y agotan el
+# margen del ratio (evidencia real: book_72, cdn.jsdelivr.net repetido).
+_ICON_LIBRARY_DENYLIST = {
+    "cdn.jsdelivr.net",
+}
+
 
 def _is_denylisted(url: Optional[str]) -> bool:
-    """True si el dominio de ``url`` contiene algún dominio de ``_DOMAIN_DENYLIST``.
+    """True si el dominio de ``url`` contiene algún dominio bloqueado.
+
+    Compara contra ``_DOMAIN_DENYLIST`` (marca/editoriales/copyright) y
+    ``_ICON_LIBRARY_DENYLIST`` (CDNs de librerías de iconos, p.ej. jsDelivr).
 
     Tolerante a URL vacía/None (devuelve False, no levanta excepción). Elimina
     el ``www.`` inicial y compara en minúsculas para cubrir subdominios
@@ -93,7 +117,10 @@ def _is_denylisted(url: Optional[str]) -> bool:
         return False
     if netloc.startswith("www."):
         netloc = netloc[4:]
-    return any(blocked in netloc for blocked in _DOMAIN_DENYLIST)
+    return any(
+        blocked in netloc
+        for blocked in _DOMAIN_DENYLIST | _ICON_LIBRARY_DENYLIST
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -139,14 +166,23 @@ def _search_query(chapter_title: Optional[str], chapter_text: Optional[str]) -> 
 # ---------------------------------------------------------------------------
 # Llamadas HTTP a SearXNG (resilientes)
 # ---------------------------------------------------------------------------
-def _searxng_search(query: str, language: Optional[str] = None) -> list[dict]:
+def _searxng_search(
+    query: str, language: Optional[str] = None, pageno: int = 1
+) -> list[dict]:
     """Consulta SearXNG y devuelve la lista de resultados ([] si falla, sin excepción).
 
     ``language`` (opcional): código de idioma SearXNG ("en", "es", ...). Si es
     None se comporta como históricamente (sin filtro de idioma en la request).
+    ``pageno`` (§17 #30): número de página de resultados (SearXNG soporta el
+    param nativo `pageno`; default 1 = comportamiento histórico).
     """
     try:
-        params: dict[str, str] = {"q": query, "categories": "images", "format": "json"}
+        params: dict[str, str] = {
+            "q": query,
+            "categories": "images",
+            "format": "json",
+            "pageno": str(pageno),
+        }
         if language:
             # §17 #24: acota resultados por idioma (SearXNG soporta el param
             # nativo `language`; default histórico = sin filtro).
@@ -187,14 +223,33 @@ def _normalize_engine(engine: Any) -> str:
 
 
 def _image_extension(url: str) -> str:
-    """Extensión derivada de la URL (fallback .png), sin inventar por contenido."""
+    """Extensión REAL de la URL (vía ``_url_extension``) o ".png" solo si la
+    URL no tiene extensión (necesario para nombrar el archivo en disco).
+
+    §17 #30 fix logging: antes devolvía ".png" como default INCLUSO cuando la
+    URL sí tenía extensión (p.ej. .svg), haciendo que los logs de descarte
+    mintieran sobre la extensión real. Ahora la extensión real manda; el
+    fallback ".png" aplica únicamente a URLs sin extensión en la ruta.
+    """
+    return _url_extension(url) or ".png"
+
+
+def _url_extension(url: str) -> Optional[str]:
+    """Extensión (con punto, minúsculas) de la ruta de ``url``, o None si no tiene."""
     try:
-        ext = os.path.splitext(urllib.parse.urlparse(url).path)[1].lower()
-        if ext in _VALID_EXTENSIONS:
-            return ext
+        return os.path.splitext(urllib.parse.urlparse(url).path)[1].lower() or None
     except Exception:  # noqa: BLE001
-        pass
-    return ".png"
+        return None
+
+
+def _is_non_raster(url: str) -> bool:
+    """True si la extensión de ``url`` es un formato no-raster (p.ej. .svg).
+
+    §17 #30: permiten descartar el candidato SIN hacer la petición HTTP, porque
+    los bytes serían ilegibles por PIL como imagen normal. Evita gastar
+    DOWNLOAD_TIMEOUT en una descarga que se descartaría por contenido inválido.
+    """
+    return _url_extension(url) in _NON_RASTER_EXTENSIONS
 
 
 def _image_dimensions(data: Optional[bytes]) -> tuple[Optional[int], Optional[int]]:
@@ -420,7 +475,6 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
     # §17 #24: para libros EN se acota SearXNG por idioma; cualquier otro
     # idioma/ausente mantiene el comportamiento histórico (sin filtro).
     searxng_language = "en" if language.lower().startswith("en") else None
-    raw_results = _searxng_search(query, language=searxng_language)
 
     results: list[dict] = []
     requested = num_images
@@ -431,140 +485,259 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
     # más resultados o la descarga falla, ese slot queda en status=error sin
     # abortar el lote (patrón research/writer).
     slot = 0
-    for item in raw_results:
-        if slot >= requested:
+    # §17 #30 — PAGINACIÓN con presupuesto: se piden páginas sucesivas a
+    # SearXNG (param nativo `pageno`) hasta completar el cupo, agotar el
+    # presupuesto de tiempo, llegar al techo de páginas o quedarse sin
+    # resultados nuevos. NUNCA se rinde en el primer lote (antes se cortaba
+    # con shortfall y la compensación IA de autopilot tapaba el déficit).
+    _start = time.monotonic()
+    page = 1
+    seen_urls: set[str] = set()
+    # §17 #30 — bandera para cortar limpio si el presupuesto se agota a mitad
+    # de una página (después de procesar algunos candidatos de la misma). Se
+    # setea dentro del loop de candidatos y se lee tras el loop interior para
+    # romper también el loop de páginas y pasar directo al relleno final.
+    _budget_exhausted = False
+    while slot < requested:
+        if time.monotonic() - _start >= IMAGE_SEARCH_TOTAL_TIME_BUDGET:
+            logger.warning(
+                "image_search: presupuesto agotado (%.1fs >= %.1fs) tras %d "
+                "página(s): shortfall=%d no cubierto",
+                time.monotonic() - _start,
+                IMAGE_SEARCH_TOTAL_TIME_BUDGET,
+                page,
+                requested - slot,
+            )
             break
-        img_src = item.get("img_src") or item.get("thumbnail_src")
-        if not img_src:
-            continue
+        if page > IMAGE_SEARCH_MAX_PAGES:
+            logger.warning(
+                "image_search: techo de páginas alcanzado (%d): shortfall=%d "
+                "no cubierto",
+                IMAGE_SEARCH_MAX_PAGES,
+                requested - slot,
+            )
+            break
+        page_results = _searxng_search(
+            query, language=searxng_language, pageno=page
+        )
 
-        # §17 #28 — filtro de relevancia temática por idioma nativo: cada
-        # variante capability (_es/_en) ancla contra keywords en SU idioma,
-        # sin reutilizar _has_anchor_keyword de research (texto rico
-        # monolingüe; causaba descartes masivos de candidatos on-topic EN con
-        # topic ES, caso book_67). Mismo umbral que research.
-        # Variante EN: el ancla es SOLO topic_en — NUNCA title_en, porque este
-        # puede llevar el fallback ES de §17 #21 (chapters.title_en NULL →
-        # chapters.title) y un título español como anchor EN no matchea nunca
-        # candidatos EN (segundo bug book_67). topic_en="" => fail-open (no
-        # filtra), ver §17 #28(b).
-        anchor_topic: Optional[str] = None
-        anchor_lang = "es"
-        if lang_is_en:
-            anchor_topic = str(data.get("topic_en") or "").strip() or None
-            anchor_lang = "en"
-        else:
-            # Variante ES: comportamiento histórico intacto (topic del libro).
-            anchor_topic = topic
-        if anchor_topic:
-            page_fetch_url = item.get("url") or item.get("parsed_url") or ""
-            _cand = {
-                "title": item.get("title") or "",
-                "snippet": page_fetch_url,
-                "content": img_src,
-            }
-            if not _has_anchor_keyword_img(str(anchor_topic), _cand, anchor_lang):
+        # Dedupe entre páginas por la MISMA clave que ya usa el filtrado:
+        # img_src (clave de descarga) y url de la página fuente (clave de
+        # denylist). Un candidato ya visto en una página anterior no se
+        # re-procesa. Si la página no aporta NADA nuevo, no hay más resultados
+        # → fin de la paginación.
+        fresh: list[dict] = []
+        for item in page_results:
+            img_src = item.get("img_src") or item.get("thumbnail_src") or ""
+            page_url = item.get("url") or item.get("parsed_url") or ""
+            keys = {k for k in (img_src, page_url) if k}
+            if keys and keys <= seen_urls:
+                continue
+            seen_urls.update(keys)
+            fresh.append(item)
+        if not fresh:
+            logger.info(
+                "image_search: página %d sin candidatos nuevos (%d brutos, "
+                "%d ya vistos): fin de paginación con shortfall=%d",
+                page,
+                len(page_results),
+                len(page_results) - len(fresh),
+                requested - slot,
+            )
+            break
+
+        for item in fresh:
+            # §17 #30 — guard de CUPO dentro de la página: una página puede
+            # traer MUCHOS más candidatos que `requested` (p.ej. ~2400 de
+            # duckduckgo images en una sola request). Sin este guard, el `for`
+            # consume TODA la página aunque `slot` ya alcanzó el cupo
+            # (book_72: 2448 resultados para requested=5, 109 "ok" colándose
+            # entre fallos). Va ANTES del chequeo de presupuesto: el cupo es
+            # la condición de éxito normal, es más barata de comprobar y debe
+            # cortar inmediatamente al completarse, sin depender del tiempo.
+            if slot >= requested:
+                break
+
+            img_src = item.get("img_src") or item.get("thumbnail_src")
+            if not img_src:
+                continue
+
+            # §17 #28 — filtro de relevancia temática por idioma nativo: cada
+            # variante capability (_es/_en) ancla contra keywords en SU idioma,
+            # sin reutilizar _has_anchor_keyword de research (texto rico
+            # monolingüe; causaba descartes masivos de candidatos on-topic EN con
+            # topic ES, caso book_67). Mismo umbral que research.
+            # Variante EN: el ancla es SOLO topic_en — NUNCA title_en, porque este
+            # puede llevar el fallback ES de §17 #21 (chapters.title_en NULL →
+            # chapters.title) y un título español como anchor EN no matchea nunca
+            # candidatos EN (segundo bug book_67). topic_en="" => fail-open (no
+            # filtra), ver §17 #28(b).
+            anchor_topic: Optional[str] = None
+            anchor_lang = "es"
+            if lang_is_en:
+                anchor_topic = str(data.get("topic_en") or "").strip() or None
+                anchor_lang = "en"
+            else:
+                # Variante ES: comportamiento histórico intacto (topic del libro).
+                anchor_topic = topic
+            if anchor_topic:
+                page_fetch_url = item.get("url") or item.get("parsed_url") or ""
+                _cand = {
+                    "title": item.get("title") or "",
+                    "snippet": page_fetch_url,
+                    "content": img_src,
+                }
+                if not _has_anchor_keyword_img(str(anchor_topic), _cand, anchor_lang):
+                    logger.warning(
+                        "image_search: resultado descartado por no anclarse al tema (%s [%s]): %s",
+                        anchor_topic, anchor_lang, page_fetch_url or img_src,
+                    )
+                    continue
+
+            # §17 #5 — denylist de dominios: revisa AMBAS URLs (img_src + página fuente)
+            # antes de descargar. SearXNG expone la URL de la página fuente en el
+            # campo ``url`` del resultado (también presente como ``parsed_url`` en
+            # algunos proveedores/motores). Si CUALQUIERA de las dos es denylisted,
+            # se salta el resultado sin ocupar slot ni error-slot.
+            page_url = item.get("url") or item.get("parsed_url") or ""
+            blocked_domain = (
+                _is_denylisted(img_src) and "img_src"
+                or (_is_denylisted(page_url) and "page_url")
+                or None
+            )
+            if blocked_domain:
                 logger.warning(
-                    "image_search: resultado descartado por no anclarse al tema (%s [%s]): %s",
-                    anchor_topic, anchor_lang, page_fetch_url or img_src,
+                    "image_search: resultado bloqueado por denylist (vía %s): %s",
+                    blocked_domain,
+                    page_url or img_src,
                 )
                 continue
 
-        # §17 #5 — denylist de dominios: revisa AMBAS URLs (img_src + página fuente)
-        # antes de descargar. SearXNG expone la URL de la página fuente en el
-        # campo ``url`` del resultado (también presente como ``parsed_url`` en
-        # algunos proveedores/motores). Si CUALQUIERA de las dos es denylisted,
-        # se salta el resultado sin ocupar slot ni error-slot.
-        page_url = item.get("url") or item.get("parsed_url") or ""
-        blocked_domain = (
-            _is_denylisted(img_src) and "img_src"
-            or (_is_denylisted(page_url) and "page_url")
-            or None
-        )
-        if blocked_domain:
-            logger.warning(
-                "image_search: resultado bloqueado por denylist (vía %s): %s",
-                blocked_domain,
-                page_url or img_src,
+            image_id = f"img_{slot + 1:02d}_web"
+            engine = _normalize_engine(item.get("engine"))
+            ext = _image_extension(img_src)
+
+            # §17 #30 — chequeo de presupuesto DENTRO de la página, ANTES de
+            # cada descarga. Una página con muchos candidatos que fallan en la
+            # descarga (403/timeout/SVG, cada uno hasta DOWNLOAD_TIMEOUT) puede
+            # superar IMAGE_SEARCH_TOTAL_TIME_BUDGET sin que el chequeo
+            # entre-páginas (nada más entrar al while) tenga ocasión de cortar.
+            # Si se agota a mitad de página, cortamos limpio ambos bucles y el
+            # relleno final marca los slots faltantes con "no_results".
+            if time.monotonic() - _start >= IMAGE_SEARCH_TOTAL_TIME_BUDGET:
+                logger.warning(
+                    "image_search: presupuesto agotado (%.1fs >= %.1fs) a mitad "
+                    "de página %d: shortfall=%d no cubierto",
+                    time.monotonic() - _start,
+                    IMAGE_SEARCH_TOTAL_TIME_BUDGET,
+                    page,
+                    requested - slot,
+                )
+                _budget_exhausted = True
+                break
+
+            # §17 #30 — descarte por extensión ANTES de descargar: los formatos
+            # no-raster (p.ej. .svg de lucide-static/devicons del log de
+            # book_72) son ilegibles por PIL como imagen normal. Se descartan
+            # sin gastar DOWNLOAD_TIMEOUT en una HTTP que tiraría los bytes.
+            if _is_non_raster(img_src):
+                logger.warning(
+                    "image_search: descartado no-raster sin descargar (ext %s): %s",
+                    ext,
+                    img_src,
+                )
+                results.append(
+                    _error_meta(
+                        image_id, query, images_dir,
+                        "invalid image content: non-raster extension",
+                        source_url=img_src,
+                    )
+                )
+                failed += 1
+                slot += 1
+                continue
+
+            data_bytes = _download_image(img_src)
+
+            if data_bytes is None:
+                results.append(
+                    _error_meta(image_id, query, images_dir, "download_failed", source_url=img_src)
+                )
+                failed += 1
+                slot += 1
+                continue
+
+            # Validar que los bytes descargados sean una imagen decodificable (PIL)
+            # ANTES de escribir el archivo ni marcarlo status="ok". Previene persistir
+            # HTML de error o contenido truncado como .png válido (bug real book_id=31:
+            # 5 archivos ~4KB/430B con status="ok" que PIL no podía abrir).
+            try:
+                import io
+
+                from PIL import Image
+
+                with Image.open(io.BytesIO(data_bytes)) as _im:
+                    _im.verify()
+            except Exception as exc:  # noqa: BLE001 - contenido inválido: fallo de descarga
+                logger.warning("image_search: contenido de imagen inválido %s: %s", img_src, exc)
+                results.append(
+                    _error_meta(image_id, query, images_dir, f"invalid image content: {exc}", source_url=img_src)
+                )
+                failed += 1
+                slot += 1
+                continue
+
+            width, height = _image_dimensions(data_bytes)
+            w = int(width or 1024)
+            h = int(height or 576)
+            resolution = f"{w}x{h}" if width and height else (str(item.get("resolution") or "unknown"))
+
+            image_path = os.path.join(images_dir, f"{image_id}{ext}")
+            try:
+                with open(image_path, "wb") as f:
+                    f.write(data_bytes)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("image_search: no se pudo escribir %s: %s", image_path, exc)
+                results.append(_error_meta(image_id, query, images_dir, f"write_failed: {exc}", source_url=img_src))
+                failed += 1
+                slot += 1
+                continue
+
+            meta = _web_meta(
+                image_id=image_id,
+                query=query,
+                images_dir=images_dir,
+                engine=engine,
+                status="ok",
+                attempts=1,
+                error=None,
+                source_url=img_src,
+                width=w,
+                height=h,
+                resolution=resolution,
+                caption=item.get("title") or "",
+                extra={
+                    "book_id": book_id,
+                    "chapter_number": chapter_number,
+                    "language": language,
+                    "caption": item.get("title") or "",
+                    "placement": "Apoyo.",
+                    "purpose": f"Imagen web {slot + 1} de {requested}.",
+                },
             )
-            continue
-
-        image_id = f"img_{slot + 1:02d}_web"
-        engine = _normalize_engine(item.get("engine"))
-        ext = _image_extension(img_src)
-        data_bytes = _download_image(img_src)
-
-        if data_bytes is None:
-            results.append(
-                _error_meta(image_id, query, images_dir, "download_failed", source_url=img_src)
-            )
-            failed += 1
+            meta["image_path"] = image_path
+            _write_metadata(images_dir, meta)
+            results.append(meta)
+            generated += 1
             slot += 1
-            continue
 
-        # Validar que los bytes descargados sean una imagen decodificable (PIL)
-        # ANTES de escribir el archivo ni marcarlo status="ok". Previene persistir
-        # HTML de error o contenido truncado como .png válido (bug real book_id=31:
-        # 5 archivos ~4KB/430B con status="ok" que PIL no podía abrir).
-        try:
-            import io
-
-            from PIL import Image
-
-            with Image.open(io.BytesIO(data_bytes)) as _im:
-                _im.verify()
-        except Exception as exc:  # noqa: BLE001 - contenido inválido: fallo de descarga
-            logger.warning("image_search: contenido de imagen inválido %s: %s", img_src, exc)
-            results.append(
-                _error_meta(image_id, query, images_dir, f"invalid image content: {exc}", source_url=img_src)
-            )
-            failed += 1
-            slot += 1
-            continue
-
-        width, height = _image_dimensions(data_bytes)
-        w = int(width or 1024)
-        h = int(height or 576)
-        resolution = f"{w}x{h}" if width and height else (str(item.get("resolution") or "unknown"))
-
-        image_path = os.path.join(images_dir, f"{image_id}{ext}")
-        try:
-            with open(image_path, "wb") as f:
-                f.write(data_bytes)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("image_search: no se pudo escribir %s: %s", image_path, exc)
-            results.append(_error_meta(image_id, query, images_dir, f"write_failed: {exc}", source_url=img_src))
-            failed += 1
-            slot += 1
-            continue
-
-        meta = _web_meta(
-            image_id=image_id,
-            query=query,
-            images_dir=images_dir,
-            engine=engine,
-            status="ok",
-            attempts=1,
-            error=None,
-            source_url=img_src,
-            width=w,
-            height=h,
-            resolution=resolution,
-            caption=item.get("title") or "",
-            extra={
-                "book_id": book_id,
-                "chapter_number": chapter_number,
-                "language": language,
-                "caption": item.get("title") or "",
-                "placement": "Apoyo.",
-                "purpose": f"Imagen web {slot + 1} de {requested}.",
-            },
-        )
-        meta["image_path"] = image_path
-        _write_metadata(images_dir, meta)
-        results.append(meta)
-        generated += 1
-        slot += 1
+        # §17 #30: página procesada. Si el presupuesto se agotó a mitad de esta
+        # página (_budget_exhausted), cortamos la paginación aquí mismo; el
+        # relleno final marcará los slots faltantes con "no_results". Si el cupo
+        # ya está lleno, el while exterior rompe; si no, se pide la siguiente.
+        if _budget_exhausted:
+            break
+        page += 1
 
     # Llenar los slots pedidos que no pudieron completarse con metadatos de error,
     # de forma que requested == generated + failed (skipped == 0), igual que en

@@ -1061,6 +1061,7 @@ def _build_book_dict(book: dict, chapters: list[dict], language: Optional[str] =
         "languages": [book.get("languages") or "es"],
         "target_chapters": book.get("target_chapters"),
         "image_count": 3 if book.get("image_count") is None else int(book.get("image_count")),
+        "image_search_ratio": 0.0 if book.get("image_search_ratio") is None else float(book.get("image_search_ratio")),
         "layout_config": _parse_layout_config(book.get("layout_config")),
         "status": book.get("status"),
         "chapters": [

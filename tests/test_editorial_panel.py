@@ -513,3 +513,34 @@ def test_create_book_persists_image_search_ratio(client):
     book_id2 = resp2.get_json()["book_id"]
     row2 = _get_book(book_id2)
     assert row2["image_search_ratio"] == pytest.approx(0.0)
+
+
+def test_build_book_dict_propagates_image_search_ratio_to_docx_payload(client):
+    """Fix A: _build_book_dict debe propagar el image_search_ratio real del
+    libro al dict de book (que final_quality_control valida vía Book model,
+    activando la tolerancia §17 #30 con ratio==1.0). Dio antes 0.0 siempre
+    porque el campo se omitía y el Pydantic default era 0.0."""
+    from frontend.editorial import build_payload, _get_book, _get_chapters
+
+    # Libro con ratio=1.0 en BD (elección explícita 100% web).
+    resp = client.post("/api/books", data=json.dumps({
+        "title": "Libro ratio 1.0",
+        "target_chapters": 1,
+        "image_search_ratio": 1.0,
+        "image_count": 5,
+    }), content_type="application/json")
+    book_id = resp.get_json()["book_id"]
+
+    book = _get_book(book_id)
+    assert book["image_search_ratio"] == pytest.approx(1.0)
+
+    # La fase quality_gate se construye como la de "docx" (usa _build_book_dict).
+    payload = build_payload(book_id, "docx", {}, chapter_id=None, language="es")
+    book_dict = payload["book"]
+    assert book_dict["image_search_ratio"] == pytest.approx(1.0)
+    assert book_dict["image_count"] == 5
+
+    # Y con build_phase_payload (ruta real del autopilot) también propaga.
+    from core.book.book_schema import Book
+    parsed = Book.model_validate(book_dict)
+    assert parsed.image_search_ratio == pytest.approx(1.0)

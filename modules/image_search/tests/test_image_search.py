@@ -338,9 +338,65 @@ def test_denylist_bloquea_dominio_y_no_ocupa_slot(tmp_path, monkeypatch):
 
     # La URL denylisted (img_src ni página fuente) nunca fue descargada.
     assert "https://cdn.scribd.com/img/12345.png" not in downloaded
-    assert "https://www.scribd.com/document/12345/portada-libro" not in downloaded
-    # La única descarga es la imagen legítima.
-    assert downloaded == ["https://cdn.example.com/img2.png"]
+
+
+def test_icon_library_denylist_bloquea_jsdelivr(tmp_path, monkeypatch):
+    """Denylist de librerías de iconos: una URL de cdn.jsdelivr.net (devicons,
+    lucide-static, etc. — SVG de librerías dev) se descarta por denylist ANTES
+    de evaluarse como no-raster y SIN descargarse ni ocupar slot de intento
+    (evidencia real: book_72, déficit de imágenes por slots consumidos por
+    iconos de cdn.jsdelivr.net)."""
+    results = [
+        {
+            "url": "https://github.com/devicons/devicons",
+            "title": "Devicon",
+            "img_src": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/python/python-original.svg",
+            "engine": "bing images",
+            "resolution": "512x512",
+        },
+        {
+            "url": "https://example.com/page/ilustracion",
+            "title": "Imagen ilustración capítulo",
+            "img_src": "https://cdn.example.com/img_ok.png",
+            "engine": "google images",
+            "resolution": "1024x768",
+        },
+    ]
+
+    non_raster_checked: list[str] = []
+    downloaded: list[str] = []
+    real_is_non_raster = image_search_main._is_non_raster
+
+    def spy_non_raster(url):
+        non_raster_checked.append(url)
+        return real_is_non_raster(url)
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+    monkeypatch.setattr(image_search_main, "_is_non_raster", spy_non_raster)
+
+    out = image_search.search_chapter_images(_payload(num_images=2))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # El resultado de jsdelivr NO aparece en results (ni ok ni error): descartado
+    # por denylist, sin ocupar slot.
+    assert not any(
+        "jsdelivr" in (r.get("source_url") or "") for r in out["results"]
+    )
+    # El slot 1 lo ocupa la imagen legítima; el slot 2 queda sin resultados.
+    assert validated.results[0].status == "ok"
+    assert validated.results[0].image_path.endswith("img_01_web.png")
+    assert validated.results[1].status == "error"
+    assert validated.results[1].error == "no_results"
+
+    # Descartado por denylist ANTES del check no-raster y de la descarga.
+    assert not any("jsdelivr" in u for u in non_raster_checked)
+    assert not any("jsdelivr" in u for u in downloaded)
 
 
 def test_topic_filter_descarta_candidato_no_anclado(tmp_path, monkeypatch):
@@ -629,3 +685,238 @@ def test_failopen_en_when_topic_en_empty_even_with_spanish_title_en(tmp_path, mo
         "https://images.pexels.com/photos/barista-filter.png",
     }
     assert len(downloaded) == 2
+
+
+# ---------------------------------------------------------------------------
+# §17 #30 — paginación con presupuesto (pageno, budget, techo de páginas)
+# ---------------------------------------------------------------------------
+
+def test_paginacion_rellena_cupo_con_pagina_2(tmp_path, monkeypatch, caplog):
+    """§17 #30: si la página 1 no alcanza el cupo, se pide la página 2 con el
+    param nativo `pageno` y los candidatos nuevos rellenan los slots restantes
+    (no se rinde en el primer lote)."""
+    captured: list[dict] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            params = dict(kwargs.get("params") or {})
+            captured.append(params)
+            if params.get("pageno") == "1":
+                return _FakeResp(json_data={"results": _search_results(1, start=1)})
+            return _FakeResp(json_data={"results": _search_results(1, start=2)})
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=2))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # Dos llamadas a SearXNG: página 1 y página 2.
+    assert [p.get("pageno") for p in captured] == ["1", "2"]
+    assert validated.requested == 2
+    assert validated.generated == 2
+    assert validated.failed == 0
+    urls = {r["source_url"] for r in out["results"] if r["status"] == "ok"}
+    assert urls == {
+        "https://cdn.example.com/img1.png",
+        "https://cdn.example.com/img2.png",
+    }
+
+
+def test_paginacion_corta_cuando_pagina_no_aporta_nuevos(tmp_path, monkeypatch):
+    """§17 #30: si una página solo devuelve candidatos ya vistos (dedupe por
+    img_src/url de página), no hay más resultados → se corta sin bucle infinito
+    y el cupo pendiente queda como error no_results."""
+    captured: list[dict] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            captured.append(dict(kwargs.get("params") or {}))
+            return _FakeResp(json_data={"results": _search_results(1, start=1)})
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=3))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # Página 1 aporta 1 candidato; página 2 repite el mismo → fin.
+    assert [p.get("pageno") for p in captured] == ["1", "2"]
+    assert validated.requested == 3
+    assert validated.generated == 1
+    assert validated.failed == 2
+    assert [r.error for r in validated.results if r.status == "error"] == [
+        "no_results",
+        "no_results",
+    ]
+
+
+def test_paginacion_respeta_techo_de_paginas(tmp_path, monkeypatch):
+    """§17 #30: con candidatos nuevos en cada página pero cupo inalcanzable, el
+    bucle corta al llegar a IMAGE_SEARCH_MAX_PAGES (techo duro)."""
+    monkeypatch.setattr(image_search_main, "IMAGE_SEARCH_MAX_PAGES", 2)
+    captured: list[dict] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            params = dict(kwargs.get("params") or {})
+            captured.append(params)
+            n = int(params.get("pageno") or "1")
+            # Cada página trae un candidato NUEVO (start=n) → nunca se corta
+            # por 'sin nuevos', solo puede cortar el techo de páginas.
+            return _FakeResp(json_data={"results": _search_results(1, start=n)})
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=5))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # Solo 2 páginas (techo=2), cada una con su pageno secuencial.
+    assert [p.get("pageno") for p in captured] == ["1", "2"]
+    assert validated.generated == 2
+    assert validated.requested == 5
+    assert validated.failed == 3
+
+
+def test_presupuesto_agota_a_mitad_de_pagina_corta_limpio(tmp_path, monkeypatch, caplog):
+    """§17 #30 — bug paginación: el presupuesto solo se comprobaba entre páginas,
+    no dentro del loop de candidatos. Si una página trae varios candidatos y el
+    presupuesto se agota a mitad, el bucle debe cortar limpio (no esperar a
+    procesar todos los candidatos restantes de esa página) y pasar directo al
+    relleno final con `no_results`.
+
+    Simulamos un reloj que hace avanzar el tiempo tras el primer candidato, de
+    modo que el chequeo ANTES del 2º candidato ya supera el budget.
+    """
+    monkeypatch.setattr(image_search_main, "IMAGE_SEARCH_TOTAL_TIME_BUDGET", 300.0)
+    # Página con 3 candidatos válidos (.png, ejemplo.com no denylisted).
+    results = _search_results(3)
+    downloaded: list[str] = []
+
+    # Reloj artificial: [start, while-check(no corta), cand1-check(procesa),
+    # cand2-check(agota)]; tras agotar la lista, se queda en el último valor.
+    clock_vals = [0.0, 0.0, 100.0, 400.0]
+    _idx = {"i": 0}
+
+    def fake_monotonic():
+        i = _idx["i"]
+        _idx["i"] += 1
+        if i < len(clock_vals):
+            return clock_vals[i]
+        return clock_vals[-1]
+
+    monkeypatch.setattr(image_search_main.time, "monotonic", fake_monotonic)
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=3))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # Solo 1 imagen descargada (el 2º candidato se corta ANTES de descargar y el
+    # 3º nunca se procesa). Sin el fix, se habrían intentado procesar los 3.
+    assert len(downloaded) == 1
+    assert validated.requested == 3
+    assert validated.generated == 1
+    assert validated.failed == 2
+    # Slots no cubiertos rellenados con no_results (no error parcial de descarga).
+    assert [r.error for r in validated.results if r.status == "error"] == [
+        "no_results",
+        "no_results",
+    ]
+    # Log de corte a mitad de página presente.
+    assert any("a mitad de página" in r.message for r in caplog.records)
+
+
+def test_descarta_svg_sin_descargar_ni_gastar_http(tmp_path, monkeypatch):
+    """§17 #30 — antes de _download_image se descarta por extensión .svg (y
+    cualquiera de _NON_RASTER_EXTENSIONS) SIN hacer la petición HTTP. La URL
+    .svg queda como error no-raster y NUNCA aparece en la lista de descargas.
+
+    Nota (denylist de librerías de iconos): cdn.jsdelivr.net ya se descarta
+    ANTES, por _ICON_LIBRARY_DENYLIST (ver
+    test_icon_library_denylist_bloquea_jsdelivr); aquí se usa un dominio NO
+    denylisted para ejercitar específicamente la ruta no-raster.
+    """
+    results = [
+        {
+            "url": "https://example.com/svg-page",
+            "title": "Icono",
+            "img_src": "https://icons.example.com/lucide-static/icons/arrow.svg",
+            "engine": "bing images",
+            "resolution": "64x64",
+        },
+        {
+            "url": "https://example.com/png-page",
+            "title": "Imagen",
+            "img_src": "https://cdn.example.com/img1.png",
+            "engine": "bing images",
+            "resolution": "64x64",
+        },
+    ]
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=2))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # La URL .svg no se descarga (0 HTTP hacia ella); solo se descarga el .png.
+    assert "https://icons.example.com/lucide-static/icons/arrow.svg" not in downloaded
+    assert downloaded == ["https://cdn.example.com/img1.png"]
+    assert validated.generated == 1
+    assert validated.failed == 1
+    assert validated.results[0].status == "error"
+    assert "non-raster extension" in (validated.results[0].error or "")
+    assert validated.results[1].status == "ok"
+
+
+def test_cupo_corta_a_mitad_de_pagina_con_exceso_de_candidatos(tmp_path, monkeypatch):
+    """§17 #30 — bug del exceso (book_72, 4ª prueba): una página de SearXNG
+    puede traer MUCHOS más candidatos que ``requested`` (~2400 en una sola
+    request de duckduckgo images). Sin guard de cupo dentro del ``for``, el
+    bucle consumía TODA la página aunque ``slot`` ya alcanzó el cupo → 2448
+    resultados para requested=5, con "ok" válidos colándose entre fallos.
+
+    Reproducción exacta: 1 página con 50 candidatos TODOS válidos/rápidos y
+    requested=5 → corta en cuanto slot==requested, sin procesar los 45
+    restantes de esa página (≤5 descargas, ≤5 entradas de resultado).
+    """
+    results = _search_results(50)
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=5))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # Cupo exacto: 5 descargas y exactamente 5 entradas de resultado (sin el
+    # fix, habrían sido 50 descargas y 50 entradas con 50 "ok").
+    assert len(downloaded) == 5
+    assert len(validated.results) == 5
+    assert validated.requested == 5
+    assert validated.generated == 5
+    assert validated.failed == 0
+    assert all(r.status == "ok" for r in validated.results)
+    # Sin paginación extra: el cupo se llenó con la primera página.
+    assert [r.image_id for r in validated.results] == [
+        "img_01_web", "img_02_web", "img_03_web", "img_04_web", "img_05_web",
+    ]

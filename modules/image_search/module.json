@@ -11,7 +11,7 @@
   "requires_human_approval": false,
   "config": {
     "priority": 5,
-    "timeout_seconds": 120,
+    "timeout_seconds": 170,
     "engine": "searxng",
     "searxng_url": "http://localhost:8081",
     "search_timeout_seconds": 15,

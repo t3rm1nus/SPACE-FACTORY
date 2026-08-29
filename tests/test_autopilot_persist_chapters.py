@@ -32,7 +32,12 @@ import pytest
 
 from core import autopilot, task_queue
 from core.database import get_db, init_db
-from frontend.editorial import _get_chapters, create_book, persist_chapter_result
+from frontend.editorial import (
+    _get_chapters,
+    create_book,
+    persist_chapter_images,
+    persist_chapter_result,
+)
 from modules.image_generator import main as img_main
 
 _NOSLEEP = lambda _s: None  # noqa: E731  (evita esperas reales en tests)
@@ -381,15 +386,17 @@ def test_image_gen_ratio_positive_splits_into_two_tasks(store, tmp_path, monkeyp
     assert any("gen_" in os.path.basename(p) for p in stored)
 
 
-def test_image_gen_split_compensates_shortfall(store, tmp_path, monkeypatch):
-    """Fix 2026-08-22: si search_chapter_images pierde imágenes (status != 'ok',
-    p.ej. imagen web inválida/SVG descartada), _run_image_gen_split compensa el
-    déficit con una generación local extra (una sola ronda, sin bucle).
+def test_image_gen_split_does_not_compensate_shortfall_with_generation(
+    store, tmp_path, monkeypatch, caplog
+):
+    """§17 #30 (rediseño): si search_chapter_images pierde imágenes (status !=
+    'ok', p.ej. imagen web inválida/SVG descartada), _run_image_gen_split NO
+    compensa el déficit con generación IA: el capítulo se queda con las
+    imágenes que consiguió y la fase sigue ok (solo WARNING de diagnóstico).
 
     Setup: ratio=0.5, num_images=3 -> n_search=2 (devuelve 1 ok + 1 error) /
-    n_generate=1 (devuelve 1 ok) => ok_count=2 < 3 -> shortfall=1. Cuota IA =
-    round(3*(1-0.5))=2, IA ya generadas=1 -> queda cuota para 1 -> tercera
-    llamada a generate_chapter_images devuelve 1 ok => dedup final 2 únicas."""
+    n_generate=1 (devuelve 1 ok) => ok_count=2 < 3 -> shortfall=1 que se
+    acepta: solo 2 tasks encoladas (sin tercera de compensación)."""
     monkeypatch.setenv("IMAGE_PROVIDER", "local")
     monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path / "images_root"))
     monkeypatch.setenv("IMAGE_LOCAL_OUTPUT_DIR", str(tmp_path / "local_out"))
@@ -475,24 +482,21 @@ def test_image_gen_split_compensates_shortfall(store, tmp_path, monkeypatch):
 
     # El executor de image_gen es per-chapter: metrics se agrega como subs/per_chapter.
     assert exec_result.ok
-    # 3 tasks en total: search + generate + 1 de compensación (el déficit dispara
-    # una generación local extra).
+    # Solo 2 tasks: search + generate. §17 #30: el shortfall NO dispara una
+    # tercera tarea de compensación con generación IA.
     assert enqueued == [
         "search_chapter_images",
         "generate_chapter_images",
-        "generate_chapter_images",
     ], f"tasks encoladas: {enqueued}"
 
-    # 1) La tarea de compensación (la última generación) lleva skip_existing=False:
-    #    no recicla metadata ya existente.
-    comp_payload = enqueued_payloads[-1]
-    assert comp_payload["skip_existing"] is False, comp_payload
-    assert comp_payload["num_images"] == 1, comp_payload
+    # §17 #30: se emite el WARNING de diagnóstico del shortfall real.
+    assert any(
+        "shortfall=1" in rec.message and "SIN compensación con IA" in rec.message
+        for rec in caplog.records
+    ), [rec.message for rec in caplog.records]
 
-    # 2) Tras el dedup por image_path: la ruta que la compensación recicló NO queda
-    #    dos veces en chapters.images. Como la generación inicial aportó 1 ruta única
-    #    (gen_1_0) y la comp recicló esa misma ruta, quedan 2 imágenes ÚNICAS
-    #    (search_ok + gen_1_0), sin duplicados.
+    # El capítulo queda con las imágenes conseguidas: 2 únicas (search_ok_1 +
+    # gen_1_0), sin duplicados ni imagen IA extra.
     with get_db() as conn:
         row = conn.execute("SELECT images FROM chapters WHERE id = ?", (cid,)).fetchone()
     stored = json.loads(row["images"] or "[]")
@@ -504,10 +508,10 @@ def test_image_gen_split_dedupes_preexisting_duplicate_before_shortfall(store, t
     duplicada entre sí, el dedup por ``image_path`` lo limpia ANTES de calcular
     ok_count/shortfall, para que la misma imagen cuente como UNA.
 
-    Setup: num_images=3, ratio=0.75 -> n_search=2 / n_generate=1; cuota IA =
-    round(3*0.25)=1, YA consumida por n_generate=1 -> el shortfall resultante
-    del dedup NO se compensa (cuota de ratio agotada) y el capítulo queda con
-    2 imágenes únicas. Verifica también el WARNING de cuota agotada vía caplog.
+    Setup: num_images=3, ratio=0.75 -> n_search=2 / n_generate=1; con §17 #30
+    el shortfall resultante del dedup NO se compensa jamás con IA (sin cuota:
+    la compensación con generación se eliminó por completo); el capítulo queda
+    con 2 imágenes únicas. Verifica también el WARNING de shortfall vía caplog.
 
       - search devuelve 2 copias de la MISMA ruta A (duplicado entre sí).
       - generate devuelve 1 ruta B nueva.
@@ -864,3 +868,77 @@ def test_image_gen_bilingual_book_resolves_en_capability_and_payload(
     assert len(stored) >= 1
     for p in stored:
         assert os.path.isfile(p), f"imagen persistida no existe: {p}"
+    stored = json.loads(row["images"] or "[]")
+    assert len(stored) >= 1
+    for p in stored:
+        assert os.path.isfile(p), f"imagen persistida no existe: {p}"
+
+
+# ---------------------------------------------------------------------------
+# §17 #31/#30 (fix acumulación): reset de image_gen + re-ejecución => REEMPLAZO
+# ---------------------------------------------------------------------------
+def test_image_gen_rerun_replaces_images_no_accumulation(store, tmp_path, monkeypatch):
+    """Fix acumulación (interacción §17 #31 merge × reset image_gen): al
+    re-ejecutar image_gen sobre un capítulo que YA tiene imágenes persistidas
+    (simula book_72 tras varios resets: 127-140 imgs/capítulo),
+    ``chapters.images`` queda con EXACTAMENTE las imágenes de la NUEVA
+    ejecución — no se fusionan las viejas.
+
+    La primera (y única) llamada de ``persist_chapter_images`` por capítulo
+    dentro de la ejecución debe ser overwrite=True; el merge §17 #31 solo
+    aplica a múltiples llamadas intra-ejecución (compensación IA, hoy inexistente)."""
+    monkeypatch.setenv("IMAGE_PROVIDER", "local")
+    monkeypatch.setenv("IMAGE_STORAGE_ROOT", str(tmp_path / "images_root"))
+    monkeypatch.setenv("IMAGE_LOCAL_OUTPUT_DIR", str(tmp_path / "local_out"))
+
+    book_id = _make_book(1)
+    cid = _first_chapter_id(book_id)
+    persist_chapter_result(book_id, cid, "draft_es", _DRAFT_ES)
+
+    # "Ejecución previa": 3 imágenes viejas ya persistidas (existen en disco,
+    # como pasaría tras un reset real de image_gen).
+    old_dir = tmp_path / "old_imgs"
+    old_dir.mkdir()
+    old_paths = []
+    for i in range(3):
+        p = os.path.join(str(old_dir), f"old_run_{i}.png")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write("x")
+        old_paths.append(p)
+    persist_chapter_images(book_id, cid, old_paths)
+    with get_db() as conn:
+        row = conn.execute("SELECT images FROM chapters WHERE id = ?", (cid,)).fetchone()
+    assert len(json.loads(row["images"])) == 3  # precondición
+
+    # Re-ejecución real de image_gen (módulo real, provider local, ratio=0).
+    with get_db() as conn:
+        conn.execute("UPDATE books SET image_search_ratio = 0.0 WHERE id = ?", (book_id,))
+
+    modules = {
+        "image_generator": {
+            "manifest": {"id": "image_generator", "config": {"timeout_seconds": 30}},
+            "execute": img_main.execute,
+        }
+    }
+    cap_map = {"generate_chapter_images": ["image_generator"]}
+    executor = autopilot.default_executor_factory(modules, cap_map, store=store)
+
+    job = _job_ready_at_phase(store, book_id, "image_gen")
+    final = autopilot.run_job(job, store, executor, max_attempts=2, sleep_fn=_NOSLEEP)
+
+    assert final["status"] == autopilot.JOB_COMPLETED
+
+    with get_db() as conn:
+        row = conn.execute("SELECT images FROM chapters WHERE id = ?", (cid,)).fetchone()
+    stored = json.loads(row["images"] or "[]")
+
+    # (1) Solo imágenes de la NUEVA ejecución: ninguna vieja queda.
+    new_names = {os.path.basename(p) for p in stored}
+    assert not any(os.path.basename(p).startswith("old_run_") for p in stored), (
+        f"ACUMULACIÓN: imágenes de la ejecución previa siguen en chapters.images: {new_names}"
+    )
+    # (2) Las nuevas existen en disco y son rutas distintas de las viejas.
+    assert len(stored) >= 1
+    for p in stored:
+        assert os.path.isfile(p), f"imagen nueva no existe: {p}"
+    assert not (set(stored) & set(old_paths)), "rutas viejas re-persistidas"
