@@ -807,3 +807,33 @@ def test_does_not_mutate_global_provider_defaults(monkeypatch) -> None:
     execute(_payload())
     assert consumed["timeout"] == 60
     assert consumed["max_retries"] == 1
+
+
+# ---------------------------------------------------------------------------
+# §17 #30 (P2, book_72 cap.4) — mismo detector de refusal acotado que writer
+# ---------------------------------------------------------------------------
+def test_editor_refusal_acusacion_entendido_al_inicio_de_parrafo():
+    """La copia del detector del editor también detecta el acuse 'Entendido.
+    No reproduciré...' a inicio de párrafo (gap real book_72 cap.4)."""
+    from modules.editor.main import _detect_refusal
+
+    texto = (
+        "Entendido. No generaré contenido duplicado ni reproduciré texto\n"
+        "existente. Solo proporcionaré los párrafos nuevos."
+    )
+    assert _detect_refusal(texto)
+
+
+def test_editor_refusal_sin_negacion_o_a_mitad_no_detecta():
+    """'Entendido' sin negación de meta-instrucción, o en mitad de párrafo,
+    NO se detecta (misma acotación que chapter_writer)."""
+    from modules.editor.main import _detect_refusal
+
+    assert not _detect_refusal(
+        "Entendido el contexto histórico, la era de los 8 bits marcó un antes "
+        "y un después en la industria del videojuego."
+    )
+    assert not _detect_refusal(
+        "Los arcades dominaron la década. Entendido este fenómeno, no hay "
+        "manera de generar la crónica sin citar el salto doméstico."
+    )

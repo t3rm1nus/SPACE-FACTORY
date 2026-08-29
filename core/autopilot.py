@@ -1269,6 +1269,40 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         _num = base.get("num_images")
         num_images = int(_num) if _num is not None else 3
         num_images = max(0, min(num_images, 20))
+
+        # §17 #30 (P1b, book_72): query diferenciada por capítulo. Con títulos
+        # genéricos de fallback ("... - Parte N"), las queries idénticas hacían
+        # que SearXNG devolviera los mismos top-results a todos los capítulos
+        # (12 contenidos únicos en 51 imágenes). Preferimos el primer heading
+        # usable del outline del capítulo (EN nativo si aplica), luego el
+        # objective; si nada es usable, el campo no se rellena y la query cae
+        # al título (comportamiento histórico).
+        chapter_search_topic = ""
+        try:
+            _chapter = editorial._get_chapter(job["book_id"], chapter_id)
+            _raw_outline = (
+                (_chapter or {}).get("outline_en" if img_lang == "en" else "outline")
+                or (_chapter or {}).get("outline")
+                or ""
+            )
+            _sections = []
+            if str(_raw_outline).strip():
+                _parsed = json.loads(_raw_outline)
+                if isinstance(_parsed, list):
+                    _sections = _parsed
+                elif isinstance(_parsed, dict):
+                    _sections = _parsed.get("sections", []) or []
+            for _sec in _sections:
+                _head = str((_sec or {}).get("heading") or "").strip()
+                if _head and len(_head) >= 3:
+                    chapter_search_topic = _head[:2000]
+                    break
+            if not chapter_search_topic:
+                _obj = str((_chapter or {}).get("objective") or "").strip()
+                if _obj:
+                    chapter_search_topic = _obj[:2000]
+        except Exception:  # noqa: BLE001 - fail-safe: sin tema usable, query histórica
+            chapter_search_topic = ""
         n_search = max(0, min(round(num_images * ratio), num_images))
         n_generate = num_images - n_search
 
@@ -1286,6 +1320,7 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
                 "num_images": n_search,
                 "language": img_lang,
                 "topic": topic,
+                "chapter_search_topic": chapter_search_topic,
             }
             if img_lang == "en":
                 # §17 #28: keywords EN para el anclaje nativo (el capítulo/

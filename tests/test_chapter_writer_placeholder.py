@@ -204,3 +204,37 @@ def test_continuation_step_rechaza_refusal() -> None:
     assert step["status"] == "rejected_refusal"
     assert step["md"] == md  # la frase de rechazo NO aparece en el capítulo
     assert FRASE_RECHAZO_REAL not in step["md"]
+
+
+# ---------------------------------------------------------------------------
+# §17 #30 (P2, book_72 cap.4) — detector de refusal acotado
+# ---------------------------------------------------------------------------
+def test_refusal_acusacion_entendido_al_inicio_de_parrafo():
+    """El acuse de meta-instrucción 'Entendido. No reproduciré...' a INICIO de
+    párrafo (caso real book_72 cap.4 que se coló en el DOCX) se detecta."""
+    from modules.chapter_writer.main import _detect_refusal
+
+    texto = (
+        "## Introduction\n\nEntendido. No reproduciré ningún contenido existente. "
+        "Solo proporcionaré los nuevos párrafos solicitados.\n\n"
+        "La historia de los videojuegos comenzó en los laboratorios."
+    )
+    assert _detect_refusal(texto)
+
+
+def test_refusal_entendido_sin_negacion_o_a_mitad_no_detecta():
+    """'Entendido' a mitad de párrafo, o al inicio SIN negación de meta-
+    instrucción, NO se detecta (evita falsos positivos con prosa legítima)."""
+    from modules.chapter_writer.main import _detect_refusal
+
+    legitimo_sin_negacion = (
+        "Entendido el alcance del proyecto, conviene revisar la historia de los "
+        "videojuegos desde sus orígenes académicos."
+    )
+    legitimo_a_mitad = (
+        "La historia de los videojuegos es apasionante. Entendido este punto, "
+        "no hay forma de reproducir la era dorada sin hablar de los arcades."
+    )
+    assert not _detect_refusal(legitimo_sin_negacion)
+    assert not _detect_refusal(legitimo_a_mitad)
+    assert not _detect_refusal("")

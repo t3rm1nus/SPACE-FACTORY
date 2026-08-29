@@ -1,0 +1,50 @@
+server_e2e_out.log size: 25801 bytes
+server_e2e_out.log total chars: 25619
+'shortfall' found in server_e2e_out.log: False
+
+--- Last 30 lines of log ---
+{"timestamp": "2026-08-28 17:44:01", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:01] \"GET /api/autopilot HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:02", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:02] \"GET /api/tasks HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:04", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:04] \"GET /api/stats HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:06", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:06] \"GET /api/books HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:07", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:07] \"GET /api/books/71/load HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:53", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:53] \"GET /api/modules HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:54", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:54] \"GET /api/autopilot HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:55", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:55] \"GET /api/tasks HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:57", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:57] \"GET /api/stats HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:59", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:59] \"GET /api/books HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:59", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:59] \"GET /api/books/71/autopilot HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:44:59", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:44:59] \"GET /api/books/71/load HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:00", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:00] \"GET /api/books/71/autopilot HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:00", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:00] \"GET /api/books/71/load HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:02", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:02] \"\u001b[36mGET / HTTP/1.1\u001b[0m\" 304 -"}
+{"timestamp": "2026-08-28 17:45:02", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:02] \"\u001b[36mGET /style.css HTTP/1.1\u001b[0m\" 304 -"}
+{"timestamp": "2026-08-28 17:45:02", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:02] \"\u001b[36mGET /app.js HTTP/1.1\u001b[0m\" 304 -"}
+{"timestamp": "2026-08-28 17:45:02", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:02] \"GET /api/modules HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:03", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:03] \"GET /api/autopilot HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:04", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:04] \"GET /api/tasks HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:06", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:06] \"GET /api/stats HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:08", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:08] \"GET /api/books HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:08", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:08] \"GET /api/books/71/load HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:17", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:17] \"GET /api/stream HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:17", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:17] \"GET /api/modules HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:18", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:18] \"GET /api/autopilot HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:19", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:19] \"GET /api/tasks HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:21", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:21] \"GET /api/stats HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:23", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:23] \"GET /api/books HTTP/1.1\" 200 -"}
+{"timestamp": "2026-08-28 17:45:24", "level": "INFO", "logger": "werkzeug", "message": "127.0.0.1 - - [28/Aug/2026 19:45:24] \"GET /api/books/71/load HTTP/1.1\" 200 -"}
+
+--- All .log files in project root ---
+  server_e2e_out.log: size=25801, shortfall=False, has_image_gen=False
+  server_e2e_err.log: size=0, shortfall=False, has_image_gen=False
+  server_out.log: size=48257, shortfall=False, has_image_gen=True
+  server_err.log: size=0, shortfall=False, has_image_gen=False
+  server_book38_retry.err.log: size=1332, shortfall=False, has_image_gen=False
+  server_book38_retry.log: size=0, shortfall=False, has_image_gen=False
+  db_b.log: size=204, shortfall=False, has_image_gen=False
+  server_relaunch.log: size=105555, shortfall=False, has_image_gen=True
+  server_relaunch.err.log: size=0, shortfall=False, has_image_gen=False
+  server_restart2.log: size=18071, shortfall=False, has_image_gen=False
+  server_restart2.err.log: size=0, shortfall=False, has_image_gen=False
+  server_restart.err.log: size=1332, shortfall=False, has_image_gen=False
+  server_restart.log: size=0, shortfall=False, has_image_gen=False

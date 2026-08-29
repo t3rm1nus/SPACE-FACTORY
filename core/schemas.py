@@ -419,6 +419,12 @@ class ImageSearchPayload(TaskPayload):
     # §17 #28: anclaje temático en idioma nativo EN (candidatos/keywords EN).
     topic_en: Optional[str] = Field(default=None, max_length=2000)
     title_en: Optional[str] = Field(default=None, max_length=500)
+    # §17 #30 (P1b, book_72): tema de búsqueda diferenciado por capítulo
+    # (primer heading usable del outline del capítulo, u objective). Con
+    # títulos genéricos de fallback ("... - Parte N") las queries idénticas
+    # hacían que SearXNG devolviera los mismos top-results a todos los
+    # capítulos (12 contenidos únicos en 51 imágenes descargadas).
+    chapter_search_topic: Optional[str] = Field(default=None, max_length=2000)
 
 
 class ImageGenerateOutput(BaseModel):

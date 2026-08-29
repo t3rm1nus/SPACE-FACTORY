@@ -1,0 +1,81 @@
+============================================================
+PASO 0: Estado previo al reset
+============================================================
+Log size antes del reset: 1831 bytes
+Status actual del job: FAILED
+Current phase: quality_gate
+Error actual: quality_gate#overall_status=FAIL
+BD book 72: image_count=5, image_search_ratio=1.0
+
+============================================================
+PASO 1: POST /api/books/72/autopilot/reset
+============================================================
+Body: {"from_phase": "image_gen"}
+Status del job tras reset: PENDING
+Current phase tras reset: quality_gate
+  planner: PASS
+  research: PASS
+  outline: PASS
+  writer: PASS
+  fact_check: PASS
+  editor: PASS
+  image_plan: PASS
+  image_gen: PENDING
+  quality_gate: PENDING
+  docx: PENDING
+
+============================================================
+PASO 2: Polling GET /api/books/72/autopilot
+============================================================
+[1] poll: status=RUNNING current_phase=image_gen
+[2] poll: status=RUNNING current_phase=image_gen
+[3] poll: status=RUNNING current_phase=image_gen
+[4] poll: status=RUNNING current_phase=image_gen
+[5] poll: status=RUNNING current_phase=docx
+[6] poll: status=COMPLETED current_phase=docx
+
+============================================================
+PASO 3: Análisis post-ejecución
+============================================================
+Status final: COMPLETED
+Current phase: docx
+Error: None
+docx_path: output\docx\book_72_es.docx
+  planner: status=PASS attempts=1 error=None
+  research: status=PASS attempts=1 error=None
+  outline: status=PASS attempts=1 error=None
+  writer: status=PASS attempts=1 error=None
+  fact_check: status=PASS attempts=1 error=None
+  editor: status=PASS attempts=1 error=None
+  image_plan: status=PASS attempts=1 error=None
+  image_gen: status=PASS attempts=1 error=None
+  quality_gate: status=PASS attempts=1 error=None
+  docx: status=PASS attempts=1 error=None
+
+--- Log lines with 'shortfall' (esta ejecución) ---
+{"timestamp": "2026-08-29 12:22:38", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:22:43", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:22:48", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:22:53", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:22:58", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:23:03", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:23:05", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:23:07", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:23:12", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+{"timestamp": "2026-08-29 12:23:20", "level": "WARNING", "logger": "core.autopilot", "message": "[fix ratio] image_gen_split: shortfall=1 tras búsqueda paginada (ratio=1.00): el capítulo queda con 4 de 5 imágenes solicitadas, SIN compensación con IA (§17 #30)"}
+
+--- Quality gate: image check ---
+quality_gate status: PASS
+quality_gate error: None
+  check [book_planner]: status=PASS message='Libro existe'
+  check [book_planner]: status=PASS message='Metadatos completos'
+  check [None]: status=PASS message='Índice presente (se generará a partir de los capítulos)'
+  check [book_planner]: status=PASS message='Capítulos presentes'
+
+--- DOCX verification ---
+docx exists: output\docx\book_72_es.docx
+docx size: 5698206 bytes
+
+============================================================
+ESTADO FINAL: COMPLETED
+============================================================

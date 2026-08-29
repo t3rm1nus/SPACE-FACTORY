@@ -1,0 +1,66 @@
+============================================================
+PASO 0: Estado previo al reset
+============================================================
+Log size antes del reset: 2326 bytes
+Status actual del job: FAILED
+Current phase: quality_gate
+Error actual: quality_gate#overall_status=FAIL
+BD book 72: image_count=5, image_search_ratio=1.0
+
+============================================================
+PASO 1: POST /api/books/72/autopilot/reset
+============================================================
+Body: {"from_phase": "image_gen"}
+Status del job tras reset: PENDING
+Current phase tras reset: quality_gate
+  planner: PASS
+  research: PASS
+  outline: PASS
+  writer: PASS
+  fact_check: PASS
+  editor: PASS
+  image_plan: PASS
+  image_gen: PENDING
+  quality_gate: PENDING
+  docx: PENDING
+
+============================================================
+PASO 2: Polling GET /api/books/72/autopilot
+============================================================
+[1] poll: status=FAILED current_phase=quality_gate
+
+============================================================
+PASO 3: Análisis post-ejecución
+============================================================
+Status final: FAILED
+Current phase: quality_gate
+Error: quality_gate#overall_status=FAIL
+docx_path: None
+  planner: status=PASS attempts=1 error=None
+  research: status=PASS attempts=1 error=None
+  outline: status=PASS attempts=1 error=None
+  writer: status=PASS attempts=1 error=None
+  fact_check: status=PASS attempts=1 error=None
+  editor: status=PASS attempts=1 error=None
+  image_plan: status=PASS attempts=1 error=None
+  image_gen: status=PASS attempts=1 error=None
+  quality_gate: status=FAIL attempts=2 error=quality_gate#overall_status=FAIL
+  docx: status=PENDING attempts=0 error=None
+
+--- Log lines with 'shortfall' (esta ejecución) ---
+(ninguna)
+
+--- Quality gate: image check ---
+quality_gate status: FAIL
+quality_gate error: quality_gate#overall_status=FAIL
+  check [book_planner]: status=PASS message='Libro existe'
+  check [book_planner]: status=PASS message='Metadatos completos'
+  check [None]: status=PASS message='Índice presente (se generará a partir de los capítulos)'
+  check [book_planner]: status=PASS message='Capítulos presentes'
+
+--- DOCX verification ---
+No docx file found for book 72
+
+============================================================
+ESTADO FINAL: FAILED
+============================================================

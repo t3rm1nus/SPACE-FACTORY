@@ -75,6 +75,11 @@ _REFUSAL_PATTERNS = [
     r"as an ai language model",
     r"i cannot assist",
     r"i'm sorry, but i can't",
+    # §17 #30 (P2, book_72 cap.4): misma lista que chapter_writer — acuse de
+    # meta-instrucción SOLO a inicio de párrafo ("Entendido.") con negación de
+    # reproducir/generar/proporcionar/copiar en esa línea; sin negación o en
+    # mitad de párrafo NO matchea.
+    r"(?m)^\s*entendido\.[^\n]{0,240}?\b(?:no\s+(?:reproducir[ée]|generar[ée]|proporcionar[ée]|copiar[ée])|(?:s[oó]lo|solo)\s+proporcionar[ée])\b",
 ]
 
 

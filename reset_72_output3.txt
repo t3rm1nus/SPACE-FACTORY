@@ -1,0 +1,110 @@
+============================================================
+PASO 0: Estado previo al reset
+============================================================
+Log size antes del reset: 2652 bytes
+Status actual del job: FAILED
+Current phase: quality_gate
+Error actual: quality_gate#overall_status=FAIL
+BD book 72: image_count=5, image_search_ratio=1.0
+
+============================================================
+PASO 1: POST /api/books/72/autopilot/reset
+============================================================
+Body: {"from_phase": "image_gen"}
+Status del job tras reset: PENDING
+Current phase tras reset: quality_gate
+  planner: PASS
+  research: PASS
+  outline: PASS
+  writer: PASS
+  fact_check: PASS
+  editor: PASS
+  image_plan: PASS
+  image_gen: PENDING
+  quality_gate: PENDING
+  docx: PENDING
+
+============================================================
+PASO 2: Polling GET /api/books/72/autopilot
+============================================================
+[1] poll: status=RUNNING current_phase=image_gen
+[2] poll: status=RUNNING current_phase=image_gen
+[3] poll: status=RUNNING current_phase=image_gen
+[4] poll: status=RUNNING current_phase=image_gen
+[5] poll: status=RUNNING current_phase=image_gen
+[6] poll: status=RUNNING current_phase=image_gen
+[7] poll: status=RUNNING current_phase=image_gen
+[8] poll: status=RUNNING current_phase=image_gen
+[9] poll: status=RUNNING current_phase=image_gen
+[10] poll: status=RUNNING current_phase=image_gen
+[11] poll: status=RUNNING current_phase=image_gen
+[12] poll: status=RUNNING current_phase=image_gen
+[13] poll: status=RUNNING current_phase=image_gen
+[14] poll: status=RUNNING current_phase=image_gen
+[15] poll: status=RUNNING current_phase=image_gen
+[16] poll: status=RUNNING current_phase=image_gen
+[17] poll: status=RUNNING current_phase=image_gen
+[18] poll: status=RUNNING current_phase=image_gen
+[19] poll: status=RUNNING current_phase=image_gen
+[20] poll: status=RUNNING current_phase=image_gen
+[21] poll: status=RUNNING current_phase=image_gen
+[22] poll: status=RUNNING current_phase=image_gen
+[23] poll: status=RUNNING current_phase=image_gen
+[24] poll: status=RUNNING current_phase=image_gen
+[25] poll: status=RUNNING current_phase=image_gen
+[26] poll: status=RUNNING current_phase=image_gen
+[27] poll: status=RUNNING current_phase=image_gen
+[28] poll: status=RUNNING current_phase=image_gen
+[29] poll: status=RUNNING current_phase=image_gen
+[30] poll: status=RUNNING current_phase=image_gen
+[31] poll: status=RUNNING current_phase=image_gen
+[32] poll: status=RUNNING current_phase=image_gen
+[33] poll: status=RUNNING current_phase=image_gen
+[34] poll: status=RUNNING current_phase=image_gen
+[35] poll: status=RUNNING current_phase=image_gen
+[36] poll: status=RUNNING current_phase=image_gen
+[37] poll: status=RUNNING current_phase=image_gen
+[38] poll: status=RUNNING current_phase=image_gen
+[39] poll: status=RUNNING current_phase=image_gen
+[40] poll: status=RUNNING current_phase=image_gen
+[41] poll: status=RUNNING current_phase=image_gen
+[42] poll: status=RUNNING current_phase=image_gen
+[43] poll: status=RUNNING current_phase=image_gen
+[44] poll: status=RUNNING current_phase=image_gen
+[45] poll: status=RUNNING current_phase=image_gen
+[46] poll: status=RUNNING current_phase=image_gen
+[47] poll: status=RUNNING current_phase=image_gen
+[48] poll: status=RUNNING current_phase=image_gen
+[49] poll: status=FAILED current_phase=image_gen
+
+============================================================
+PASO 3: Análisis post-ejecución
+============================================================
+Status final: FAILED
+Current phase: image_gen
+Error: image_gen#575: image_gen_split#search_chapter_images_en: Timeout tras 170s ejecutando image_search
+docx_path: None
+  planner: status=PASS attempts=1 error=None
+  research: status=PASS attempts=1 error=None
+  outline: status=PASS attempts=1 error=None
+  writer: status=PASS attempts=1 error=None
+  fact_check: status=PASS attempts=1 error=None
+  editor: status=PASS attempts=1 error=None
+  image_plan: status=PASS attempts=1 error=None
+  image_gen: status=FAIL attempts=2 error=image_gen#575: image_gen_split#search_chapter_images_en: Timeout tras 170s ejecutando image_search
+  quality_gate: status=PENDING attempts=0 error=None
+  docx: status=PENDING attempts=0 error=None
+
+--- Log lines with 'shortfall' (esta ejecución) ---
+(ninguna)
+
+--- Quality gate: image check ---
+quality_gate status: PENDING
+quality_gate error: None
+
+--- DOCX verification ---
+No docx file found for book 72
+
+============================================================
+ESTADO FINAL: FAILED
+============================================================

@@ -1,0 +1,1663 @@
+{
+  "attempts": 2,
+  "book_id": 75,
+  "created_at": "2026-08-29 13:31:55",
+  "current_phase": "docx",
+  "data": {
+    "num_images": 3,
+    "source_count": 3,
+    "sources": [
+      {
+        "accessed_at": "2026-08-29T13:33:23.120867+00:00",
+        "content": "Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando ...",
+        "source_type": "web_searxng",
+        "title": "AVIONES COMERCIALES",
+        "url": "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html"
+      },
+      {
+        "accessed_at": "2026-08-29T13:33:23.130866+00:00",
+        "content": "Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros.",
+        "source_type": "web_searxng",
+        "title": "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo. 100 años de historia – EPISTÊMAI",
+        "url": "https://epistemai.es/archivos/2146"
+      },
+      {
+        "accessed_at": "2026-08-29T13:33:23.131866+00:00",
+        "content": "Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+        "source_type": "web_wikipedia",
+        "title": "Trans-Europa Compañía de Aviación",
+        "url": "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+      }
+    ]
+  },
+  "docx_path": "output\\docx\\book_75_es.docx",
+  "duration": 684.673,
+  "error": null,
+  "job_id": "book_75",
+  "phases": [
+    {
+      "attempts": 1,
+      "capability": "create_book_plan",
+      "completed_at": "2026-08-29 13:32:52",
+      "duration": 55.438,
+      "error": null,
+      "id": "planner",
+      "label": "BOOK PLANNER",
+      "metrics": {
+        "chapters": [
+          {
+            "estimated_words": 3000,
+            "image_requirements": 3,
+            "key_questions": [
+              "¿Cuándo se inició la aviación comercial?",
+              "Qué problemas enfrentaron los primeros correos aéreos?"
+            ],
+            "number": 1,
+            "objective": "Explorar cómo la primera avión comercial fue utilizada para el correo aéreo y sus desafíos iniciales.",
+            "outline_en": null,
+            "research_requirements": [
+              "Informes históricos sobre el desarrollo de la aviación comercial",
+              "Documentos oficiales del período"
+            ],
+            "sections": [
+              {
+                "heading": "El Primer Servicio Comercial Aéreo",
+                "objective": "Describir el primer servicio aéreo comercial operado por una aerolínea."
+              },
+              {
+                "heading": "Desafíos y Limitaciones Iniciales",
+                "objective": "Analizar los problemas técnicos, económicos y logísticos que enfrentaron los primeros correos aéreos."
+              },
+              {
+                "heading": "Avances Tecnológicos en el Correo Aéreo",
+                "objective": "Explorar cómo la tecnología evolucionó para mejorar la eficiencia del correo aéreo"
+              }
+            ],
+            "title": "El Nacimiento del Correo Aéreo",
+            "title_en": null
+          },
+          {
+            "estimated_words": 3000,
+            "image_requirements": 3,
+            "key_questions": [
+              "¿Cuándo se desarrollaron los primeros jets comerciales?",
+              "¿Cómo afectaron estos aviones a la industria aeroespacial?"
+            ],
+            "number": 2,
+            "objective": "Tratar el desarrollo y el impacto de los primeros jets comerciales en la industria aeroespacial.",
+            "outline_en": null,
+            "research_requirements": [
+              "Documentos técnicos de las aerolíneas",
+              "Artículos académicos sobre el desarrollo de los jets"
+            ],
+            "sections": [
+              {
+                "heading": "Primeros Jets Comerciales",
+                "objective": "Introducir a los primeros aviones comerciales basados en motores jet."
+              },
+              {
+                "heading": "Desafíos y Desarrollos Técnicos",
+                "objective": "Explorar los desafíos técnicos enfrentados durante el desarrollo de los jets comerciales."
+              },
+              {
+                "heading": "Impacto en la Industria Aérea",
+                "objective": "Analizar cómo los jets comerciales cambiaron la industria aeroespacial y el transporte global"
+              }
+            ],
+            "title": "El Surgimiento de los Jets Comerciales",
+            "title_en": null
+          },
+          {
+            "estimated_words": 3000,
+            "image_requirements": 3,
+            "key_questions": [
+              "¿Cómo han evolucionado los jets comerciales?",
+              "¿Qué tecnologías modernas están transformando el transporte aéreo?"
+            ],
+            "number": 3,
+            "objective": "Explorar los avances posteriores en la aviación comercial, desde la introducción de jetes más eficientes hasta la actualidad.",
+            "outline_en": null,
+            "research_requirements": [
+              "Informes de industria sobre avances tecnológicos",
+              "Artículos de revistas especializadas"
+            ],
+            "sections": [
+              {
+                "heading": "Avances Técnicos en los Jets Comerciales",
+                "objective": "Describir las mejoras tecnológicas en los jets comerciales modernos."
+              },
+              {
+                "heading": "Tecnologías Innovadoras en el Transporte Aéreo",
+                "objective": "Explorar nuevas tecnologías que están transformando la industria del transporte aéreo."
+              },
+              {
+                "heading": "El Futuro de la Aviación Comercial",
+                "objective": "Analizar tendencias y desafíos futuros para el desarrollo de la aviación comercial"
+              }
+            ],
+            "title": "La Modernización del Aviación Comercial",
+            "title_en": null
+          }
+        ],
+        "cost": 0.0,
+        "description": "Una breve historia de cómo la aviación comercial ha transformado nuestras vidas, desde sus inicios en el correo aéreo hasta el desarrollo de los primeros jets comerciales.",
+        "description_en": null,
+        "genre": null,
+        "language": "es",
+        "model": "qwen-agent:latest",
+        "provider": "ollama",
+        "subtitle": "Desde los primeros correos aéreos hasta los avances modernos",
+        "target_audience": "General",
+        "title": "La Evolución del Aviación Comercial",
+        "title_en": null,
+        "tokens_input": 484,
+        "tokens_output": 915
+      },
+      "module": "book_planner",
+      "started_at": "2026-08-29 13:31:56",
+      "status": "PASS",
+      "task_id": 2135
+    },
+    {
+      "attempts": 2,
+      "capability": "research_web",
+      "completed_at": "2026-08-29 13:33:23",
+      "duration": 11.61,
+      "error": null,
+      "id": "research",
+      "label": "RESEARCH",
+      "metrics": {
+        "error": null,
+        "execution_mode": "llm",
+        "language": "es",
+        "quality_gate": "PASS",
+        "query": "Los inicios de la aviacion comercial",
+        "source_count": 3,
+        "sources": [
+          {
+            "accessed_at": "2026-08-29T13:33:23.120867+00:00",
+            "content": "Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando ...",
+            "source_type": "web_searxng",
+            "title": "AVIONES COMERCIALES",
+            "url": "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html"
+          },
+          {
+            "accessed_at": "2026-08-29T13:33:23.130866+00:00",
+            "content": "Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros.",
+            "source_type": "web_searxng",
+            "title": "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo. 100 años de historia – EPISTÊMAI",
+            "url": "https://epistemai.es/archivos/2146"
+          },
+          {
+            "accessed_at": "2026-08-29T13:33:23.131866+00:00",
+            "content": "Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+            "source_type": "web_wikipedia",
+            "title": "Trans-Europa Compañía de Aviación",
+            "url": "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+          }
+        ],
+        "status": "PASS",
+        "stored_sources": [
+          {
+            "accessed_at": "2026-08-29 13:33:23",
+            "author": null,
+            "chapter_ids": [],
+            "hash": "f4835468281f4b69",
+            "id": 868,
+            "notes": "content_snippet=Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando ...",
+            "publication_date": null,
+            "publisher": null,
+            "relevance": 48,
+            "source_type": "web_searxng",
+            "status": "verified",
+            "title": "AVIONES COMERCIALES",
+            "url": "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html",
+            "url_hash": "9e188877e4d2d160fbd0c2a938ea6a2f40146d2c8273742b68b9cd68ecb3939c"
+          },
+          {
+            "accessed_at": "2026-08-29 13:33:23",
+            "author": null,
+            "chapter_ids": [],
+            "hash": "2d68dda73d07a62d",
+            "id": 869,
+            "notes": "content_snippet=Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros.",
+            "publication_date": null,
+            "publisher": null,
+            "relevance": 39,
+            "source_type": "web_searxng",
+            "status": "verified",
+            "title": "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo. 100 años de historia – EPISTÊMAI",
+            "url": "https://epistemai.es/archivos/2146",
+            "url_hash": "82e4dd3efd32f4e7bab7599f022619ec77e215c41d6e7354874bca5935b7469b"
+          },
+          {
+            "accessed_at": "2026-08-29 13:33:09",
+            "author": null,
+            "chapter_ids": [],
+            "hash": "d794552b4230f77f",
+            "id": 867,
+            "notes": "content_snippet=Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+            "publication_date": null,
+            "publisher": null,
+            "relevance": 36,
+            "source_type": "web_wikipedia",
+            "status": "verified",
+            "title": "Trans-Europa Compañía de Aviación",
+            "url": "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n",
+            "url_hash": "12e67ee93f855834812183b5559abba26eaa75eab5b2b92f1d454e8ac4876325"
+          }
+        ]
+      },
+      "module": "research",
+      "started_at": "2026-08-29 13:33:11",
+      "status": "PASS",
+      "task_id": 2137
+    },
+    {
+      "attempts": 1,
+      "capability": "create_book_plan",
+      "completed_at": "2026-08-29 13:33:42",
+      "duration": 18.343,
+      "error": null,
+      "id": "outline",
+      "label": "OUTLINE",
+      "metrics": {
+        "chapters": [
+          {
+            "estimated_words": 1000,
+            "image_requirements": 3,
+            "key_questions": [
+              "¿Cuándo ocurrieron los primeros vuelos comerciales?",
+              "Cómo se desarrollaron las primeras compañías aéreas?"
+            ],
+            "number": 1,
+            "objective": "Explorar los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial y cómo esto marcó el inicio de la aviación comercial.",
+            "outline_en": null,
+            "research_requirements": [
+              "AVIONES COMERCIALES"
+            ],
+            "sections": [
+              {
+                "heading": "Los Primeros Vuelos Comerciales",
+                "objective": "Analar los primeros intentos de establecer líneas aéreas comerciales durante la Primera Guerra Mundial."
+              },
+              {
+                "heading": "Desarrollo Inicial de las Compañías Aéreas",
+                "objective": "Explorar cómo se crearon y evolucionaron las primeras compañías aéreas en el siglo XX."
+              }
+            ],
+            "title": "El Nacimiento de la Aviación Comercial",
+            "title_en": null
+          },
+          {
+            "estimated_words": 1000,
+            "image_requirements": 3,
+            "key_questions": [
+              "¿Cuándo comenzó la aviación comercial en España?",
+              "Cómo ha evolucionado el aeropuerto de El Rompedizo?"
+            ],
+            "number": 2,
+            "objective": "Descubrir la historia de la aviación comercial en España, desde los inicios hasta la era moderna.",
+            "outline_en": null,
+            "research_requirements": [
+              "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo"
+            ],
+            "sections": [
+              {
+                "heading": "La Aviación Comercial en Málaga",
+                "objective": "Explorar cómo la aviación comercial se desarrolló en la ciudad de Málaga y el papel del aeropuerto de El Rompedizo."
+              },
+              {
+                "heading": "Historia del Aeropuerto de El Rompedizo",
+                "objective": "Analar los primeros años de operación del aeropuerto de El Rompedizo y su evolución hasta la actualidad."
+              }
+            ],
+            "title": "La Aviación Comercial en España",
+            "title_en": null
+          },
+          {
+            "estimated_words": 1000,
+            "image_requirements": 3,
+            "key_questions": [
+              "¿Cuándo se desarrollaron los primeros jets comerciales?",
+              "Cómo han evolucionado las compañías aéreas en la era moderna?"
+            ],
+            "number": 3,
+            "objective": "Explorar el desarrollo de los primeros jets comerciales y cómo esta tecnología ha transformado la industria aérea.",
+            "outline_en": null,
+            "research_requirements": [
+              "Trans-Europa Compañía de Aviación"
+            ],
+            "sections": [
+              {
+                "heading": "Los Primeros Jets Comerciales",
+                "objective": "Explorar cómo se desarrollaron los primeros jets comerciales y su impacto en la industria aérea."
+              },
+              {
+                "heading": "Desarrollo de las Compañías Aéreas Modernas",
+                "objective": "Analar cómo han evolucionado las compañías aéreas en la era moderna, con énfasis en Trans-Europa Compañía de Aviación."
+              }
+            ],
+            "title": "Aviación Comercial Moderna",
+            "title_en": null
+          }
+        ],
+        "cost": 0.0,
+        "description": "Explora el fascinante viaje de la aviación comercial, desde sus inicios en el correo aéreo durante la Primera Guerra Mundial hasta el desarrollo de los primeros jets comerciales. Descubre cómo esta innovadora tecnología ha transformado nuestras vidas y cómo se han desarrollado las compañías aéreas.",
+        "description_en": null,
+        "genre": null,
+        "language": "es",
+        "model": "qwen-agent:latest",
+        "provider": "ollama",
+        "subtitle": "Una Breve Historia desde los Correos Aéreos hasta los Primeros Jets",
+        "target_audience": "General",
+        "title": "Los Inicios de la Aviación Comercial",
+        "title_en": null,
+        "tokens_input": 880,
+        "tokens_output": 907
+      },
+      "module": "book_planner",
+      "started_at": "2026-08-29 13:33:24",
+      "status": "PASS",
+      "task_id": 2138
+    },
+    {
+      "attempts": 1,
+      "capability": "write_chapter_es",
+      "completed_at": "2026-08-29 13:38:36",
+      "duration": 293.578,
+      "error": null,
+      "id": "writer",
+      "label": "CHAPTER WRITER",
+      "metrics": {
+        "per_chapter": true,
+        "subs": {
+          "done": 3,
+          "total": 3
+        },
+        "words": 0
+      },
+      "module": "chapter_writer",
+      "started_at": "2026-08-29 13:33:42",
+      "status": "PASS",
+      "subs": {
+        "chapters": {
+          "633": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\75\\chapter_1\\chapter.md",
+              "continuation_rejected_as_duplicate": false,
+              "cost": 0.0,
+              "deterministic_used": true,
+              "duplicate_detected": false,
+              "duplicate_rejections": 0,
+              "duplicate_sections": [],
+              "execution_mode": "deterministic",
+              "final_quality_gate": "PASS",
+              "final_word_count": 1601,
+              "initial_word_count": 94,
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 75,
+                  "language": "es",
+                  "title": "Los inicios de la aviacion comercial"
+                },
+                "chapter_outline": {
+                  "number": 1,
+                  "objective": null,
+                  "sections": [
+                    {
+                      "heading": "El Primer Servicio Comercial Aéreo",
+                      "objective": "Describir el primer servicio aéreo comercial operado por una aerolínea."
+                    },
+                    {
+                      "heading": "Desafíos y Limitaciones Iniciales",
+                      "objective": "Analizar los problemas técnicos, económicos y logísticos que enfrentaron los primeros correos aéreos."
+                    },
+                    {
+                      "heading": "Avances Tecnológicos en el Correo Aéreo",
+                      "objective": "Explorar cómo la tecnología evolucionó para mejorar la eficiencia del correo aéreo"
+                    }
+                  ],
+                  "title": "El Nacimiento del Correo Aéreo"
+                },
+                "continuation_rejected_as_duplicate": false,
+                "deterministic_used": true,
+                "duplicate_detected": false,
+                "duplicate_rejections": 0,
+                "duplicate_sections": [],
+                "final_quality_gate": "PASS",
+                "final_word_count": 1601,
+                "initial_word_count": 94,
+                "minimum_words": 1500,
+                "model": "",
+                "previous_chapter_summaries": [],
+                "provider": "ollama",
+                "rejected_continuations": 0,
+                "repeated_continuation": false,
+                "research": null,
+                "sources": [
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.120867+00:00",
+                    "content": "Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando ...",
+                    "source_type": "web_searxng",
+                    "title": "AVIONES COMERCIALES",
+                    "url": "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html"
+                  },
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.130866+00:00",
+                    "content": "Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros.",
+                    "source_type": "web_searxng",
+                    "title": "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo. 100 años de historia – EPISTÊMAI",
+                    "url": "https://epistemai.es/archivos/2146"
+                  },
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.131866+00:00",
+                    "content": "Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+                    "source_type": "web_wikipedia",
+                    "title": "Trans-Europa Compañía de Aviación",
+                    "url": "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+                  }
+                ],
+                "structural_anomalies": [],
+                "style_guide": "Divulgativo, riguroso y claro",
+                "subsections_map": {},
+                "successful_continuations": 0,
+                "target_word_count": 3000,
+                "text": "# El Nacimiento del Correo Aéreo\n\n## Introducción\nEste capítulo desarrolla el tema propuesto en el outline.\n\n## El Primer Servicio Comercial Aéreo\nDescribir el primer servicio aéreo comercial operado por una aerolínea.\n\nEn este apartado, dedicado a «El Primer Servicio Comercial Aéreo», se desarrolla el siguiente eje: Describir el primer servicio aéreo comercial operado por una aerolínea.. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nHay que tener presente que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Al mismo tiempo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nDesarrollando esta idea, cabe señalar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nA modo de aclaración, es útil recordar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nTeniendo en cuenta lo anterior, se añade que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Al mismo tiempo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nDentro de este marco, conviene subrayar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nEn relación con lo expuesto, cabe añadir que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Al mismo tiempo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nSiguiendo con este hilo, resulta pertinente notar que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Al mismo tiempo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nCompleta el cuadro anterior el hecho de que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nEn este punto, cabe precisar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Como complemento de lo anterior, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nConviene destacar aquí que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Como complemento de lo anterior, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nResulta relevante comprender que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Como complemento de lo anterior, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nUn elemento fundamental es que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Como complemento de lo anterior, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n## Desafíos y Limitaciones Iniciales\nAnalizar los problemas técnicos, económicos y logísticos que enfrentaron los primeros correos aéreos.\n## Avances Tecnológicos en el Correo Aéreo\nExplorar cómo la tecnología evolucionó para mejorar la eficiencia del correo aéreo\n\nEn este apartado, dedicado a «Avances Tecnológicos en el Correo Aéreo», se desarrolla el siguiente eje: Explorar cómo la tecnología evolucionó para mejorar la eficiencia del correo aéreo. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nDesarrollando esta idea, cabe señalar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nA modo de aclaración, es útil recordar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n## Conclusión\nEl capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente.\n\n## Fuentes utilizadas\n- https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html\n- https://epistemai.es/archivos/2146\n- https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n",
+                "tokens_input": 0,
+                "tokens_output": 0,
+                "total_added_words": 0,
+                "total_continuation_attempts": 0,
+                "unexpected_sections": [
+                  "Introducción",
+                  "Conclusión"
+                ],
+                "word_count": 1601
+              },
+              "minimum_words": 1500,
+              "model": "",
+              "provider": "ollama",
+              "quality_errors": [
+                "secciones fuera del outline detectadas: Introducción, Conclusión"
+              ],
+              "quality_gate": "PASS",
+              "rejected_continuations": 0,
+              "repeated_continuation": false,
+              "sources_used": [
+                "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html",
+                "https://epistemai.es/archivos/2146",
+                "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+              ],
+              "structural_anomalies": [],
+              "subsections_map": {},
+              "successful_continuations": 0,
+              "target_word_count": 3000,
+              "tokens_input": 0,
+              "tokens_output": 0,
+              "total_added_words": 0,
+              "total_continuation_attempts": 0,
+              "unexpected_sections": [
+                "Introducción",
+                "Conclusión"
+              ],
+              "word_count": 1601
+            },
+            "module": "chapter_writer",
+            "status": "PASS"
+          },
+          "634": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\75\\chapter_2\\chapter.md",
+              "continuation_rejected_as_duplicate": true,
+              "cost": 0.0,
+              "deterministic_used": true,
+              "duplicate_detected": true,
+              "duplicate_rejections": 4,
+              "duplicate_sections": [],
+              "execution_mode": "deterministic",
+              "final_quality_gate": "PASS",
+              "final_word_count": 1641,
+              "initial_word_count": 1094,
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 75,
+                  "language": "es",
+                  "title": "Los inicios de la aviacion comercial"
+                },
+                "chapter_outline": {
+                  "number": 2,
+                  "objective": null,
+                  "sections": [
+                    {
+                      "heading": "Primeros Jets Comerciales",
+                      "objective": "Introducir a los primeros aviones comerciales basados en motores jet."
+                    },
+                    {
+                      "heading": "Desafíos y Desarrollos Técnicos",
+                      "objective": "Explorar los desafíos técnicos enfrentados durante el desarrollo de los jets comerciales."
+                    },
+                    {
+                      "heading": "Impacto en la Industria Aérea",
+                      "objective": "Analizar cómo los jets comerciales cambiaron la industria aeroespacial y el transporte global"
+                    }
+                  ],
+                  "title": "El Surgimiento de los Jets Comerciales"
+                },
+                "continuation_rejected_as_duplicate": true,
+                "deterministic_used": true,
+                "duplicate_detected": true,
+                "duplicate_rejections": 4,
+                "duplicate_sections": [],
+                "final_quality_gate": "PASS",
+                "final_word_count": 1641,
+                "initial_word_count": 1094,
+                "minimum_words": 1500,
+                "model": "qwen-agent:latest",
+                "previous_chapter_summaries": [],
+                "provider": "ollama",
+                "rejected_continuations": 4,
+                "repeated_continuation": false,
+                "research": null,
+                "sources": [
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.120867+00:00",
+                    "content": "Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando ...",
+                    "source_type": "web_searxng",
+                    "title": "AVIONES COMERCIALES",
+                    "url": "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html"
+                  },
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.130866+00:00",
+                    "content": "Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros.",
+                    "source_type": "web_searxng",
+                    "title": "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo. 100 años de historia – EPISTÊMAI",
+                    "url": "https://epistemai.es/archivos/2146"
+                  },
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.131866+00:00",
+                    "content": "Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+                    "source_type": "web_wikipedia",
+                    "title": "Trans-Europa Compañía de Aviación",
+                    "url": "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+                  }
+                ],
+                "structural_anomalies": [],
+                "style_guide": "Divulgativo, riguroso y claro",
+                "subsections_map": {},
+                "successful_continuations": 0,
+                "target_word_count": 3000,
+                "text": "# El Surgimiento de los Jets Comerciales\n\n## Primeros Jets Comerciales\n\nEl desarrollo de los primeros jets comerciales fue un hito significativo en la historia del transporte aéreo, marcando el inicio de una era de velocidad y eficiencia que revolucionó la industria aeroespacial y el transporte global. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte.\n\nEl primer jet comercial operativo fue el de la compañía BOAC (British Overseas Airways Corporation), conocido como \"Comet\". Fue diseñado por Supermarine Aviation Systems Ltd. bajo la dirección del ingeniero Geoffrey de Havilland. El Comet entró en servicio en 1952 y marcó un hito importante en la historia del avión comercial, ya que era el primer jet con asientos individuales.\n\nEl Comet fue seguido por otros aviones comerciales como el DC-8 de Boeing, el 707 también de Boeing, y el Convair 340. Estos aviones no solo aumentaron significativamente la velocidad y capacidad de los vuelos comerciales, sino que también redujeron significativamente los tiempos de viaje entre ciudades.\n\nEl desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Uno de los principales desafíos fue el problema del \"turbochoque\", que era un fenómeno en el que el aire entraba en la turbina y causaba una pérdida de potencia. Este problema se solucionó con el desarrollo de turbinas más eficientes y avanzadas.\n\nEl desarrollo de los primeros jets comerciales también tuvo un impacto significativo en la industria aeroespacial. Los aviones comerciales como el Comet, el DC-8 y el 707 no solo aumentaron significativamente la velocidad y capacidad de los vuelos comerciales, sino que también impulsaron el desarrollo de nuevos materiales, técnicas de fabricación y sistemas de control.\n\nEn conclusión, el surgimiento de los primeros jets comerciales fue un hito importante en la historia del transporte aéreo. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Sin embargo, el impacto de estos aviones en la industria aeroespacial y el transporte global es indudable.\n\n## Desafíos y Desarrollos Técnicos\n\nEl desarrollo de los primeros jets comerciales fue un proceso complejo que enfrentó numerosos desafíos técnicos. Uno de los principales desafíos fue el problema del \"turbochoque\", que era un fenómeno en el que el aire entraba en la turbina y causaba una pérdida de potencia. Este problema se solucionó con el desarrollo de turbinas más eficientes y avanzadas.\n\nOtro desafío significativo fue el problema del \"vuelo a baja altitud\". Los primeros jets comerciales no eran diseñados para volar a altitudes bajas, lo que limitaba su capacidad para operar en ciertas rutas. Este problema se solucionó con el desarrollo de nuevos materiales y técnicas de fabricación que permitieron construir aviones más fuertes y resistentes.\n\nEl desarrollo de los primeros jets comerciales también tuvo un impacto significativo en la industria aeroespacial. Los aviones comerciales como el Comet, el DC-8 y el 707 no solo aumentaron significativamente la velocidad y capacidad de los vuelos comerciales, sino que también impulsaron el desarrollo de nuevos materiales, técnicas de fabricación y sistemas de control.\n\nAdemás, el desarrollo de los primeros jets comerciales tuvo un impacto significativo en la economía global. La reducción del tiempo de viaje entre ciudades y países permitió a las empresas expandir sus operaciones y aumentar su rentabilidad. Además, la capacidad para transportar más pasajeros y mercancía a mayores velocidades abrió nuevas oportunidades comerciales.\n\nEn conclusión, el desarrollo de los primeros jets comerciales fue un proceso complejo que enfrentó numerosos desafíos técnicos. Sin embargo, el impacto de estos aviones en la industria aeroespacial, el transporte global y la economía mundial es indudable. El problema del \"turbochoque\", el problema del \"vuelo a baja altitud\" y el desarrollo de nuevos materiales y técnicas de fabricación fueron solo algunos de los desafíos que se enfrentaron durante este proceso.\n\n## Impacto en la Industria Aérea\nEl surgimiento de los primeros jets comerciales tuvo un impacto significativo en la industria aeroespacial. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte.\n\nEl desarrollo de los primeros jets comerciales también tuvo un impacto significativo en la economía global. La reducción del tiempo de viaje entre ciudades y países permitió a las empresas expandir sus operaciones y aumentar su rentabilidad. Además, la capacidad para transportar más pasajeros y mercancía a mayores velocidades abrió nuevas oportunidades comerciales.\n\nAdemás, el desarrollo de los primeros jets comerciales tuvo un impacto significativo en la cultura popular. Los aviones comerciales como el Comet, el DC-8 y el 707 se convirtieron en símbolos de progreso y modernidad, y su diseño futurista y avanzado inspiró a artistas y diseñadores de todo el mundo.\n\nEn conclusión, el surgimiento de los primeros jets comerciales tuvo un impacto significativo en la industria aeroespacial, el transporte global y la economía mundial. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Sin embargo, el impacto de estos aviones en la industria aeroespacial y el transporte global es indudable.\n\n\nEn este apartado, dedicado a «Impacto en la Industria Aérea», se desarrolla el siguiente eje: Analizar cómo los jets comerciales cambiaron la industria aeroespacial y el transporte global. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nDentro de este marco, conviene subrayar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En esta misma línea, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Este detalle completa la perspectiva general del apartado.\n\nEn relación con lo expuesto, cabe añadir que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. En esta misma línea, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Este detalle completa la perspectiva general del apartado.\n\nSiguiendo con este hilo, resulta pertinente notar que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. En esta misma línea, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Este detalle completa la perspectiva general del apartado.\n\nCompleta el cuadro anterior el hecho de que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En esta misma línea, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Este detalle completa la perspectiva general del apartado.\n\nEn este punto, cabe precisar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por añadidura, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Este detalle completa la perspectiva general del apartado.\n## Conclusión\n\nEl surgimiento de los primeros jets comerciales fue un hito importante en la historia del transporte aéreo. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos.\n\nEl impacto de estos aviones en la industria aeroespacial, el transporte global y la economía mundial es indudable. La reducción del tiempo de viaje entre ciudades y países permitió a las empresas expandir sus operaciones y aumentar su rentabilidad. Además, la capacidad para transportar más pasajeros y mercancía a mayores velocidades abrió nuevas oportunidades comerciales.\n\nEn conclusión, el surgimiento de los primeros jets comerciales fue un hito importante en la historia del transporte aéreo. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Sin embargo, el impacto de estos aviones en la industria aeroespacial y el transporte global es indudable.",
+                "tokens_input": 2148,
+                "tokens_output": 1724,
+                "total_added_words": 0,
+                "total_continuation_attempts": 4,
+                "unexpected_sections": [
+                  "Conclusión"
+                ],
+                "word_count": 1641
+              },
+              "minimum_words": 1500,
+              "model": "qwen-agent:latest",
+              "provider": "ollama",
+              "quality_errors": [
+                "secciones fuera del outline detectadas: Conclusión",
+                "duplicación potencial detectada en una continuación",
+                "una continuación fue rechazada por ser una repetición"
+              ],
+              "quality_gate": "PASS",
+              "rejected_continuations": 4,
+              "repeated_continuation": false,
+              "sources_used": [
+                "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html",
+                "https://epistemai.es/archivos/2146",
+                "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+              ],
+              "structural_anomalies": [],
+              "subsections_map": {},
+              "successful_continuations": 0,
+              "target_word_count": 3000,
+              "tokens_input": 2148,
+              "tokens_output": 1724,
+              "total_added_words": 0,
+              "total_continuation_attempts": 4,
+              "unexpected_sections": [
+                "Conclusión"
+              ],
+              "word_count": 1641
+            },
+            "module": "chapter_writer",
+            "status": "PASS"
+          },
+          "635": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "chapter_md_path": "data\\artifacts\\75\\chapter_3\\chapter.md",
+              "continuation_rejected_as_duplicate": true,
+              "cost": 0.0,
+              "deterministic_used": true,
+              "duplicate_detected": true,
+              "duplicate_rejections": 1,
+              "duplicate_sections": [],
+              "execution_mode": "deterministic",
+              "final_quality_gate": "PASS",
+              "final_word_count": 1654,
+              "initial_word_count": 1129,
+              "metadata": {
+                "book_metadata": {
+                  "book_id": 75,
+                  "language": "es",
+                  "title": "Los inicios de la aviacion comercial"
+                },
+                "chapter_outline": {
+                  "number": 3,
+                  "objective": null,
+                  "sections": [
+                    {
+                      "heading": "Avances Técnicos en los Jets Comerciales",
+                      "objective": "Describir las mejoras tecnológicas en los jets comerciales modernos."
+                    },
+                    {
+                      "heading": "Tecnologías Innovadoras en el Transporte Aéreo",
+                      "objective": "Explorar nuevas tecnologías que están transformando la industria del transporte aéreo."
+                    },
+                    {
+                      "heading": "El Futuro de la Aviación Comercial",
+                      "objective": "Analizar tendencias y desafíos futuros para el desarrollo de la aviación comercial"
+                    }
+                  ],
+                  "title": "La Modernización del Aviación Comercial"
+                },
+                "continuation_rejected_as_duplicate": true,
+                "deterministic_used": true,
+                "duplicate_detected": true,
+                "duplicate_rejections": 1,
+                "duplicate_sections": [],
+                "final_quality_gate": "PASS",
+                "final_word_count": 1654,
+                "initial_word_count": 1129,
+                "minimum_words": 1500,
+                "model": "qwen-agent:latest",
+                "previous_chapter_summaries": [],
+                "provider": "ollama",
+                "rejected_continuations": 1,
+                "repeated_continuation": false,
+                "research": null,
+                "sources": [
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.120867+00:00",
+                    "content": "Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando ...",
+                    "source_type": "web_searxng",
+                    "title": "AVIONES COMERCIALES",
+                    "url": "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html"
+                  },
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.130866+00:00",
+                    "content": "Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros.",
+                    "source_type": "web_searxng",
+                    "title": "Los inicios de la aviación comercial en Málaga y el aeropuerto de El Rompedizo. 100 años de historia – EPISTÊMAI",
+                    "url": "https://epistemai.es/archivos/2146"
+                  },
+                  {
+                    "accessed_at": "2026-08-29T13:33:23.131866+00:00",
+                    "content": "Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+                    "source_type": "web_wikipedia",
+                    "title": "Trans-Europa Compañía de Aviación",
+                    "url": "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+                  }
+                ],
+                "structural_anomalies": [],
+                "style_guide": "Divulgativo, riguroso y claro",
+                "subsections_map": {},
+                "successful_continuations": 0,
+                "target_word_count": 3000,
+                "text": "# La Modernización del Aviación Comercial\n\n## Avances Técnicos en los Jets Comerciales\n\nLos jets comerciales han experimentado un desarrollo tecnológico espectacular desde su primera versión experimental en el siglo XX. Desde la década de 1950, cuando se lanzó el Boeing 707, hasta las avanguardistas aeronaves modernas de hoy, estas máquinas han evolucionado significativamente en términos de eficiencia, seguridad y capacidad.\n\nLa introducción del jet era un hito revolucionario. Los primeros jets comerciales como el Boeing 707 y la Douglas DC-8 pudieron transportar a menudo hasta 150 pasajeros a velocidades significativamente más altas que los aviones propulsados por turbinas. Sin embargo, estos primeros modelos tenían limitaciones en términos de eficiencia energética y capacidad de carga.\n\nLos avances posteriores han sido cruciales para mejorar la eficiencia y reducir el costo operativo de los jets comerciales. La introducción del combustible jet fue un paso importante. El combustible jet es más eficiente que el combustible turbogás, lo que permite a las aeronaves volar más lejos con menos combustible.\n\nAdemás, la innovación en materiales ha sido fundamental para mejorar la eficiencia de los jets comerciales. Los aviones modernos están hechos de materiales como el aluminio y el carbono compuesto, que son mucho más ligeros que los materiales tradicionales. Esto no solo mejora la eficiencia energética, sino que también reduce el costo del mantenimiento.\n\nLa introducción de sistemas de control automatizados también ha sido crucial para mejorar la seguridad y la eficiencia de los jets comerciales. Los sistemas de control automatizados permiten a los pilotos mantener un vuelo más seguro y preciso, lo que reduce el riesgo de accidentes.\n\nAdemás, las avanguardistas aeronaves modernas están equipadas con sistemas de navegación avanzados, como el GPS, que permiten a los pilotos seguir rutas precisas y evitar obstáculos. Los sistemas de comunicación también han mejorado significativamente, lo que permite a los pilotos mantener contacto constante con la torre de control.\n\nEn resumen, los avances tecnológicos en los jets comerciales han sido cruciales para mejorar la eficiencia, seguridad y capacidad de estos aviones. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\n## Tecnologías Innovadoras en el Transporte Aéreo\nLa industria del transporte aéreo ha experimentado un revolucionario cambio con la introducción de nuevas tecnologías. Estas innovaciones han transformado la forma en que los pasajeros viajan y cómo las aerolíneas operan.\n\nUna de las tecnologías más importantes es el avión eléctrico. Los primeros aviones eléctricos experimentales se lanzaron en los últimos años, pero ya están comenzando a tener un impacto significativo en la industria del transporte aéreo. Los aviones eléctricos son mucho más eficientes que los aviones propulsados por combustible, lo que significa que pueden reducir significativamente el costo de operación y las emisiones de gases de efecto invernadero.\n\nAdemás, la innovación en materiales ha sido crucial para mejorar la eficiencia de los aviones eléctricos. Los aviones eléctricos están hechos de materiales como el aluminio y el carbono compuesto, que son mucho más ligeros que los materiales tradicionales. Esto no solo mejora la eficiencia energética, sino que también reduce el costo del mantenimiento.\n\nLa introducción de sistemas de control automatizados también ha sido crucial para mejorar la seguridad y la eficiencia de los aviones eléctricos. Los sistemas de control automatizados permiten a los pilotos mantener un vuelo más seguro y preciso, lo que reduce el riesgo de accidentes.\n\nAdemás, las avanguardistas aeronaves eléctricas están equipadas con sistemas de navegación avanzados, como el GPS, que permiten a los pilotos seguir rutas precisas y evitar obstáculos. Los sistemas de comunicación también han mejorado significativamente, lo que permite a los pilotos mantener contacto constante con la torre de control.\n\nEn resumen, las innovaciones en materiales y sistemas de control automatizados han sido cruciales para mejorar la eficiencia, seguridad y capacidad de los aviones eléctricos. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\n\nEn este apartado, dedicado a «Tecnologías Innovadoras en el Transporte Aéreo», se desarrolla el siguiente eje: Explorar nuevas tecnologías que están transformando la industria del transporte aéreo.. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nEn este punto, cabe precisar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Asimismo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. En suma, esto contribuye a contextualizar el tema tratado.\n\nConviene destacar aquí que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Asimismo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En suma, esto contribuye a contextualizar el tema tratado.\n\nResulta relevante comprender que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Asimismo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. En suma, esto contribuye a contextualizar el tema tratado.\n\nUn elemento fundamental es que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Asimismo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En suma, esto contribuye a contextualizar el tema tratado.\n\nHay que tener presente que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Asimismo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. En suma, esto contribuye a contextualizar el tema tratado.\n## El Futuro de la Aviación Comercial\n\nEl futuro de la aviación comercial es incierto pero prometedor. A medida que la tecnología avanza, se espera que la industria del transporte aéreo experimente un cambio significativo.\n\nUna de las principales tendencias en el futuro de la aviación comercial es la adopción de los aviones eléctricos. Los primeros aviones eléctricos experimentales se lanzaron en los últimos años, pero ya están comenzando a tener un impacto significativo en la industria del transporte aéreo. Los aviones eléctricos son mucho más eficientes que los aviones propulsados por combustible, lo que significa que pueden reducir significativamente el costo de operación y las emisiones de gases de efecto invernadero.\n\nAdemás, la innovación en materiales ha sido crucial para mejorar la eficiencia de los aviones eléctricos. Los aviones eléctricos están hechos de materiales como el aluminio y el carbono compuesto, que son mucho más ligeros que los materiales tradicionales. Esto no solo mejora la eficiencia energética, sino que también reduce el costo del mantenimiento.\n\nLa introducción de sistemas de control automatizados también ha sido crucial para mejorar la seguridad y la eficiencia de los aviones eléctricos. Los sistemas de control automatizados permiten a los pilotos mantener un vuelo más seguro y preciso, lo que reduce el riesgo de accidentes.\n\nAdemás, las avanguardistas aeronaves eléctricas están equipadas con sistemas de navegación avanzados, como el GPS, que permiten a los pilotos seguir rutas precisas y evitar obstáculos. Los sistemas de comunicación también han mejorado significativamente, lo que permite a los pilotos mantener contacto constante con la torre de control.\n\nEn resumen, el futuro de la aviación comercial es incierto pero prometedor. A medida que la tecnología avanza, se espera que la industria del transporte aéreo experimente un cambio significativo. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\n## Conclusión\n\nLa modernización del aviación comercial ha sido una evolución continua desde su primera versión experimental en el siglo XX. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\nLa adopción de los aviones eléctricos es una de las principales tendencias en el futuro de la aviación comercial. Los primeros aviones eléctricos experimentales se lanzaron en los últimos años, pero ya están comenzando a tener un impacto significativo en la industria del transporte aéreo.\n\nEn resumen, la modernización del aviación comercial ha sido una evolución continua desde su primera versión experimental en el siglo XX. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.",
+                "tokens_input": 2153,
+                "tokens_output": 1762,
+                "total_added_words": 0,
+                "total_continuation_attempts": 1,
+                "unexpected_sections": [
+                  "Conclusión"
+                ],
+                "word_count": 1654
+              },
+              "minimum_words": 1500,
+              "model": "qwen-agent:latest",
+              "provider": "ollama",
+              "quality_errors": [
+                "secciones fuera del outline detectadas: Conclusión",
+                "duplicación potencial detectada en una continuación",
+                "una continuación fue rechazada por ser una repetición"
+              ],
+              "quality_gate": "PASS",
+              "rejected_continuations": 1,
+              "repeated_continuation": false,
+              "sources_used": [
+                "https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html",
+                "https://epistemai.es/archivos/2146",
+                "https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n"
+              ],
+              "structural_anomalies": [],
+              "subsections_map": {},
+              "successful_continuations": 0,
+              "target_word_count": 3000,
+              "tokens_input": 2153,
+              "tokens_output": 1762,
+              "total_added_words": 0,
+              "total_continuation_attempts": 1,
+              "unexpected_sections": [
+                "Conclusión"
+              ],
+              "word_count": 1654
+            },
+            "module": "chapter_writer",
+            "status": "PASS"
+          }
+        },
+        "done": 3,
+        "total": 3
+      },
+      "task_id": null
+    },
+    {
+      "attempts": 1,
+      "capability": "fact_check_chapter",
+      "completed_at": "2026-08-29 13:38:56",
+      "duration": 20.469,
+      "error": null,
+      "id": "fact_check",
+      "label": "FACT CHECK",
+      "metrics": {
+        "per_chapter": true,
+        "subs": {
+          "done": 3,
+          "total": 3
+        },
+        "words": 0
+      },
+      "module": "fact_checker",
+      "started_at": "2026-08-29 13:38:36",
+      "status": "PASS",
+      "subs": {
+        "chapters": {
+          "633": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "claims_checked": 1,
+              "conflicting_claims": 0,
+              "corrections": [],
+              "execution_mode": "real",
+              "issues": [
+                {
+                  "claim": "Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional.",
+                  "consistency_check": "SKIPPED_NO_SOURCE",
+                  "error_type": "accuracy_partial",
+                  "reason": "La afirmación se repite varias veces en el capítulo sin ninguna fuente específica. Además, la información sobre Trans Europa Compañía de Aviación no es precisa o completa. [Degradado a WARNING: ERROR sin source_url y sin firma de fabricación estructural]",
+                  "severity": "WARNING",
+                  "source_url": null,
+                  "suggestion": "Se recomienda verificar la información sobre Trans Europa Compañía de Aviación utilizando fuentes confiables y proporcionar una descripción más precisa de sus operaciones."
+                }
+              ],
+              "quality_gate": "PASS",
+              "status": "FAIL",
+              "supported_claims": 0,
+              "unsupported_claims": []
+            },
+            "module": "fact_checker",
+            "status": "PASS"
+          },
+          "634": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "claims_checked": 0,
+              "conflicting_claims": 0,
+              "corrections": [],
+              "execution_mode": "real",
+              "issues": [],
+              "quality_gate": "PASS",
+              "status": "PASS",
+              "supported_claims": 0,
+              "unsupported_claims": []
+            },
+            "module": "fact_checker",
+            "status": "PASS"
+          },
+          "635": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "claims_checked": 0,
+              "conflicting_claims": 0,
+              "corrections": [],
+              "execution_mode": "real",
+              "issues": [],
+              "quality_gate": "PASS",
+              "status": "PASS",
+              "supported_claims": 0,
+              "unsupported_claims": []
+            },
+            "module": "fact_checker",
+            "status": "PASS"
+          }
+        },
+        "done": 3,
+        "total": 3
+      },
+      "task_id": null
+    },
+    {
+      "attempts": 1,
+      "capability": "edit_chapter",
+      "completed_at": "2026-08-29 13:42:20",
+      "duration": 202.985,
+      "error": null,
+      "id": "editor",
+      "label": "EDITOR",
+      "metrics": {
+        "per_chapter": true,
+        "subs": {
+          "done": 3,
+          "total": 3
+        },
+        "words": 0
+      },
+      "module": "editor",
+      "started_at": "2026-08-29 13:38:56",
+      "status": "PASS",
+      "subs": {
+        "chapters": {
+          "633": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor)."
+              ],
+              "edited_text": "# El Nacimiento del Correo Aéreo\n\n## Introducción\nEste capítulo desarrolla el tema propuesto en el outline.\n\n## El Primer Servicio Comercial Aéreo\nDescribir el primer servicio aéreo comercial operado por una aerolínea.\n\nEn este apartado, dedicado a «El Primer Servicio Comercial Aéreo», se desarrolla el siguiente eje: Describir el primer servicio aéreo comercial operado por una aerolínea.. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nHay que tener presente que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Al mismo tiempo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nDesarrollando esta idea, cabe señalar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nA modo de aclaración, es útil recordar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nTeniendo en cuenta lo anterior, se añade que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Al mismo tiempo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nDentro de este marco, conviene subrayar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nEn relación con lo expuesto, cabe añadir que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Al mismo tiempo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nSiguiendo con este hilo, resulta pertinente notar que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Al mismo tiempo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nCompleta el cuadro anterior el hecho de que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nEn este punto, cabe precisar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Como complemento de lo anterior, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nConviene destacar aquí que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Como complemento de lo anterior, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nResulta relevante comprender que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Como complemento de lo anterior, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nUn elemento fundamental es que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Como complemento de lo anterior, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Por tanto, se trata de un matiz que enriquece el desarrollo.\n## Desafíos y Limitaciones Iniciales\nAnalizar los problemas técnicos, económicos y logísticos que enfrentaron los primeros correos aéreos.\n## Avances Tecnológicos en el Correo Aéreo\nExplorar cómo la tecnología evolucionó para mejorar la eficiencia del correo aéreo\n\nEn este apartado, dedicado a «Avances Tecnológicos en el Correo Aéreo», se desarrolla el siguiente eje: Explorar cómo la tecnología evolucionó para mejorar la eficiencia del correo aéreo. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nDesarrollando esta idea, cabe señalar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n\nA modo de aclaración, es útil recordar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Al mismo tiempo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Por tanto, se trata de un matiz que enriquece el desarrollo.\n## Conclusión\nEl capítulo sintetiza los puntos abordados y prepara la transición hacia el siguiente.\n\n## Fuentes utilizadas\n- https://www.aero.upm.es/departamentos/economia/investiga/informe2008/aviones_comerciales.html\n- https://epistemai.es/archivos/2146\n- https://es.wikipedia.org/wiki/Trans-Europa_Compa%C3%B1%C3%ADa_de_Aviaci%C3%B3n",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura."
+              ],
+              "execution_mode": "fallback",
+              "input_words": 1601,
+              "output_words": 1601,
+              "placeholder_detected": false,
+              "quality_gate": "PASS"
+            },
+            "module": "editor",
+            "status": "PASS"
+          },
+          "634": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor)."
+              ],
+              "edited_text": "# El Surgimiento de los Jets Comerciales\n\n## Primeros Jets Comerciales\n\nEl desarrollo de los primeros jets comerciales fue un hito significativo en la historia del transporte aéreo, marcando el inicio de una era de velocidad y eficiencia que revolucionó la industria aeroespacial y el transporte global. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte.\n\nEl primer jet comercial operativo fue el de la compañía BOAC (British Overseas Airways Corporation), conocido como \"Comet\". Fue diseñado por Supermarine Aviation Systems Ltd. bajo la dirección del ingeniero Geoffrey de Havilland. El Comet entró en servicio en 1952 y marcó un hito importante en la historia del avión comercial, ya que era el primer jet con asientos individuales.\n\nEl Comet fue seguido por otros aviones comerciales como el DC-8 de Boeing, el 707 también de Boeing, y el Convair 340. Estos aviones no solo aumentaron significativamente la velocidad y capacidad de los vuelos comerciales, sino que también redujeron significativamente los tiempos de viaje entre ciudades.\n\nEl desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Uno de los principales desafíos fue el problema del \"turbochoque\", que era un fenómeno en el que el aire entraba en la turbina y causaba una pérdida de potencia. Este problema se solucionó con el desarrollo de turbinas más eficientes y avanzadas.\n\nEl desarrollo de los primeros jets comerciales también tuvo un impacto significativo en la industria aeroespacial. Los aviones comerciales como el Comet, el DC-8 y el 707 no solo aumentaron significativamente la velocidad y capacidad de los vuelos comerciales, sino que también impulsaron el desarrollo de nuevos materiales, técnicas de fabricación y sistemas de control.\n\nEn conclusión, el surgimiento de los primeros jets comerciales fue un hito importante en la historia del transporte aéreo. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Sin embargo, el impacto de estos aviones en la industria aeroespacial y el transporte global es indudable.\n\n## Desafíos y Desarrollos Técnicos\n\nEl desarrollo de los primeros jets comerciales fue un proceso complejo que enfrentó numerosos desafíos técnicos. Uno de los principales desafíos fue el problema del \"turbochoque\", que era un fenómeno en el que el aire entraba en la turbina y causaba una pérdida de potencia. Este problema se solucionó con el desarrollo de turbinas más eficientes y avanzadas.\n\nOtro desafío significativo fue el problema del \"vuelo a baja altitud\". Los primeros jets comerciales no eran diseñados para volar a altitudes bajas, lo que limitaba su capacidad para operar en ciertas rutas. Este problema se solucionó con el desarrollo de nuevos materiales y técnicas de fabricación que permitieron construir aviones más fuertes y resistentes.\n\nEl desarrollo de los primeros jets comerciales también tuvo un impacto significativo en la industria aeroespacial. Los aviones comerciales como el Comet, el DC-8 y el 707 no solo aumentaron significativamente la velocidad y capacidad de los vuelos comerciales, sino que también impulsaron el desarrollo de nuevos materiales, técnicas de fabricación y sistemas de control.\n\nAdemás, el desarrollo de los primeros jets comerciales tuvo un impacto significativo en la economía global. La reducción del tiempo de viaje entre ciudades y países permitió a las empresas expandir sus operaciones y aumentar su rentabilidad. Además, la capacidad para transportar más pasajeros y mercancía a mayores velocidades abrió nuevas oportunidades comerciales.\n\nEn conclusión, el desarrollo de los primeros jets comerciales fue un proceso complejo que enfrentó numerosos desafíos técnicos. Sin embargo, el impacto de estos aviones en la industria aeroespacial, el transporte global y la economía mundial es indudable. El problema del \"turbochoque\", el problema del \"vuelo a baja altitud\" y el desarrollo de nuevos materiales y técnicas de fabricación fueron solo algunos de los desafíos que se enfrentaron durante este proceso.\n\n## Impacto en la Industria Aérea\nEl surgimiento de los primeros jets comerciales tuvo un impacto significativo en la industria aeroespacial. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte.\n\nEl desarrollo de los primeros jets comerciales también tuvo un impacto significativo en la economía global. La reducción del tiempo de viaje entre ciudades y países permitió a las empresas expandir sus operaciones y aumentar su rentabilidad. Además, la capacidad para transportar más pasajeros y mercancía a mayores velocidades abrió nuevas oportunidades comerciales.\n\nAdemás, el desarrollo de los primeros jets comerciales tuvo un impacto significativo en la cultura popular. Los aviones comerciales como el Comet, el DC-8 y el 707 se convirtieron en símbolos de progreso y modernidad, y su diseño futurista y avanzado inspiró a artistas y diseñadores de todo el mundo.\n\nEn conclusión, el surgimiento de los primeros jets comerciales tuvo un impacto significativo en la industria aeroespacial, el transporte global y la economía mundial. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Sin embargo, el impacto de estos aviones en la industria aeroespacial y el transporte global es indudable.\n\n\nEn este apartado, dedicado a «Impacto en la Industria Aérea», se desarrolla el siguiente eje: Analizar cómo los jets comerciales cambiaron la industria aeroespacial y el transporte global. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nDentro de este marco, conviene subrayar que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En esta misma línea, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Este detalle completa la perspectiva general del apartado.\n\nEn relación con lo expuesto, cabe añadir que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. En esta misma línea, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Este detalle completa la perspectiva general del apartado.\n\nSiguiendo con este hilo, resulta pertinente notar que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. En esta misma línea, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Este detalle completa la perspectiva general del apartado.\n\nCompleta el cuadro anterior el hecho de que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En esta misma línea, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Este detalle completa la perspectiva general del apartado.\n\nEn este punto, cabe precisar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Por añadidura, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Este detalle completa la perspectiva general del apartado.\n## Conclusión\n\nEl surgimiento de los primeros jets comerciales fue un hito importante en la historia del transporte aéreo. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos.\n\nEl impacto de estos aviones en la industria aeroespacial, el transporte global y la economía mundial es indudable. La reducción del tiempo de viaje entre ciudades y países permitió a las empresas expandir sus operaciones y aumentar su rentabilidad. Además, la capacidad para transportar más pasajeros y mercancía a mayores velocidades abrió nuevas oportunidades comerciales.\n\nEn conclusión, el surgimiento de los primeros jets comerciales fue un hito importante en la historia del transporte aéreo. Estos aviones no solo superaron las barreras de la velocidad tradicional, sino que también abrieron nuevas rutas comerciales y aumentaron significativamente la capacidad de transporte. El desarrollo de los primeros jets comerciales fue un logro tecnológico importante, pero también enfrentó desafíos significativos. Sin embargo, el impacto de estos aviones en la industria aeroespacial y el transporte global es indudable.",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura."
+              ],
+              "execution_mode": "fallback",
+              "input_words": 1641,
+              "output_words": 1641,
+              "placeholder_detected": false,
+              "quality_gate": "PASS"
+            },
+            "module": "editor",
+            "status": "PASS"
+          },
+          "635": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "changes_summary": [
+                "Sin cambios aplicados (fallback por indisponibilidad del proveedor)."
+              ],
+              "edited_text": "# La Modernización del Aviación Comercial\n\n## Avances Técnicos en los Jets Comerciales\n\nLos jets comerciales han experimentado un desarrollo tecnológico espectacular desde su primera versión experimental en el siglo XX. Desde la década de 1950, cuando se lanzó el Boeing 707, hasta las avanguardistas aeronaves modernas de hoy, estas máquinas han evolucionado significativamente en términos de eficiencia, seguridad y capacidad.\n\nLa introducción del jet era un hito revolucionario. Los primeros jets comerciales como el Boeing 707 y la Douglas DC-8 pudieron transportar a menudo hasta 150 pasajeros a velocidades significativamente más altas que los aviones propulsados por turbinas. Sin embargo, estos primeros modelos tenían limitaciones en términos de eficiencia energética y capacidad de carga.\n\nLos avances posteriores han sido cruciales para mejorar la eficiencia y reducir el costo operativo de los jets comerciales. La introducción del combustible jet fue un paso importante. El combustible jet es más eficiente que el combustible turbogás, lo que permite a las aeronaves volar más lejos con menos combustible.\n\nAdemás, la innovación en materiales ha sido fundamental para mejorar la eficiencia de los jets comerciales. Los aviones modernos están hechos de materiales como el aluminio y el carbono compuesto, que son mucho más ligeros que los materiales tradicionales. Esto no solo mejora la eficiencia energética, sino que también reduce el costo del mantenimiento.\n\nLa introducción de sistemas de control automatizados también ha sido crucial para mejorar la seguridad y la eficiencia de los jets comerciales. Los sistemas de control automatizados permiten a los pilotos mantener un vuelo más seguro y preciso, lo que reduce el riesgo de accidentes.\n\nAdemás, las avanguardistas aeronaves modernas están equipadas con sistemas de navegación avanzados, como el GPS, que permiten a los pilotos seguir rutas precisas y evitar obstáculos. Los sistemas de comunicación también han mejorado significativamente, lo que permite a los pilotos mantener contacto constante con la torre de control.\n\nEn resumen, los avances tecnológicos en los jets comerciales han sido cruciales para mejorar la eficiencia, seguridad y capacidad de estos aviones. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\n## Tecnologías Innovadoras en el Transporte Aéreo\nLa industria del transporte aéreo ha experimentado un revolucionario cambio con la introducción de nuevas tecnologías. Estas innovaciones han transformado la forma en que los pasajeros viajan y cómo las aerolíneas operan.\n\nUna de las tecnologías más importantes es el avión eléctrico. Los primeros aviones eléctricos experimentales se lanzaron en los últimos años, pero ya están comenzando a tener un impacto significativo en la industria del transporte aéreo. Los aviones eléctricos son mucho más eficientes que los aviones propulsados por combustible, lo que significa que pueden reducir significativamente el costo de operación y las emisiones de gases de efecto invernadero.\n\nAdemás, la innovación en materiales ha sido crucial para mejorar la eficiencia de los aviones eléctricos. Los aviones eléctricos están hechos de materiales como el aluminio y el carbono compuesto, que son mucho más ligeros que los materiales tradicionales. Esto no solo mejora la eficiencia energética, sino que también reduce el costo del mantenimiento.\n\nLa introducción de sistemas de control automatizados también ha sido crucial para mejorar la seguridad y la eficiencia de los aviones eléctricos. Los sistemas de control automatizados permiten a los pilotos mantener un vuelo más seguro y preciso, lo que reduce el riesgo de accidentes.\n\nAdemás, las avanguardistas aeronaves eléctricas están equipadas con sistemas de navegación avanzados, como el GPS, que permiten a los pilotos seguir rutas precisas y evitar obstáculos. Los sistemas de comunicación también han mejorado significativamente, lo que permite a los pilotos mantener contacto constante con la torre de control.\n\nEn resumen, las innovaciones en materiales y sistemas de control automatizados han sido cruciales para mejorar la eficiencia, seguridad y capacidad de los aviones eléctricos. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\n\nEn este apartado, dedicado a «Tecnologías Innovadoras en el Transporte Aéreo», se desarrolla el siguiente eje: Explorar nuevas tecnologías que están transformando la industria del transporte aéreo.. A continuación se exponen las consideraciones más relevantes sobre este punto.\n\nEn este punto, cabe precisar que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Asimismo, Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. En suma, esto contribuye a contextualizar el tema tratado.\n\nConviene destacar aquí que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Asimismo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En suma, esto contribuye a contextualizar el tema tratado.\n\nResulta relevante comprender que Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. Asimismo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. En suma, esto contribuye a contextualizar el tema tratado.\n\nUn elemento fundamental es que Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. Asimismo, Trans Europa Compañía de Aviación fue una compañía aérea española de vuelos chárter que operó entre 1965 y 1982. Al margen de las rutas intra-españolas, durante su existencia también llegó a operar vuelos de carácter internacional. En suma, esto contribuye a contextualizar el tema tratado.\n\nHay que tener presente que Durante el año 1918, mientras Europa se debatía en los últimos estertores de la Primera Guerra Mundial, la prensa se hizo eco de los primeros intentos de establecer diversas líneas aéreas comerciales que transportasen el correo y, también, pasajeros. Asimismo, Los inicios de la aviación comercial surgen con los primeros vuelos de transporte de valijas de correo durante la Primera Guerra Mundial, en los comienzos de la segunda década del siglo XX. Seguidamente se crearon en 1919 las primeras compañías aéreas, que en nuestros días siguen volando. En suma, esto contribuye a contextualizar el tema tratado.\n## El Futuro de la Aviación Comercial\n\nEl futuro de la aviación comercial es incierto pero prometedor. A medida que la tecnología avanza, se espera que la industria del transporte aéreo experimente un cambio significativo.\n\nUna de las principales tendencias en el futuro de la aviación comercial es la adopción de los aviones eléctricos. Los primeros aviones eléctricos experimentales se lanzaron en los últimos años, pero ya están comenzando a tener un impacto significativo en la industria del transporte aéreo. Los aviones eléctricos son mucho más eficientes que los aviones propulsados por combustible, lo que significa que pueden reducir significativamente el costo de operación y las emisiones de gases de efecto invernadero.\n\nAdemás, la innovación en materiales ha sido crucial para mejorar la eficiencia de los aviones eléctricos. Los aviones eléctricos están hechos de materiales como el aluminio y el carbono compuesto, que son mucho más ligeros que los materiales tradicionales. Esto no solo mejora la eficiencia energética, sino que también reduce el costo del mantenimiento.\n\nLa introducción de sistemas de control automatizados también ha sido crucial para mejorar la seguridad y la eficiencia de los aviones eléctricos. Los sistemas de control automatizados permiten a los pilotos mantener un vuelo más seguro y preciso, lo que reduce el riesgo de accidentes.\n\nAdemás, las avanguardistas aeronaves eléctricas están equipadas con sistemas de navegación avanzados, como el GPS, que permiten a los pilotos seguir rutas precisas y evitar obstáculos. Los sistemas de comunicación también han mejorado significativamente, lo que permite a los pilotos mantener contacto constante con la torre de control.\n\nEn resumen, el futuro de la aviación comercial es incierto pero prometedor. A medida que la tecnología avanza, se espera que la industria del transporte aéreo experimente un cambio significativo. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\n## Conclusión\n\nLa modernización del aviación comercial ha sido una evolución continua desde su primera versión experimental en el siglo XX. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.\n\nLa adopción de los aviones eléctricos es una de las principales tendencias en el futuro de la aviación comercial. Los primeros aviones eléctricos experimentales se lanzaron en los últimos años, pero ya están comenzando a tener un impacto significativo en la industria del transporte aéreo.\n\nEn resumen, la modernización del aviación comercial ha sido una evolución continua desde su primera versión experimental en el siglo XX. Desde la introducción del jet hasta el uso de materiales avanzados y sistemas de control automatizados, las aeronaves modernas son mucho más eficientes y seguras que sus predecesores.",
+              "editorial_notes": [
+                "No se pudo invocar la edición con LLM. El texto se devuelve sin cambios.",
+                "Revisar manualmente gramática, ortografía, estilo y estructura."
+              ],
+              "execution_mode": "fallback",
+              "input_words": 1654,
+              "output_words": 1654,
+              "placeholder_detected": false,
+              "quality_gate": "PASS"
+            },
+            "module": "editor",
+            "status": "PASS"
+          }
+        },
+        "done": 3,
+        "total": 3
+      },
+      "task_id": null
+    },
+    {
+      "attempts": 1,
+      "capability": "create_chapter_image_plan",
+      "completed_at": "2026-08-29 13:43:24",
+      "duration": 64.25,
+      "error": null,
+      "id": "image_plan",
+      "label": "IMAGE PLAN",
+      "metrics": {
+        "per_chapter": true,
+        "subs": {
+          "done": 3,
+          "total": 3
+        },
+        "words": 0
+      },
+      "module": "image_planner",
+      "started_at": "2026-08-29 13:42:20",
+      "status": "PASS",
+      "subs": {
+        "chapters": {
+          "633": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "identity_notes": [
+                "Mantener un tono neutral en las imágenes para simular la modernidad del avión.",
+                "Incluir detalles específicos de los aviones y entornos relevantes al tema del capítulo.",
+                "Evitar texto legible en las imágenes."
+              ],
+              "images": [
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "El inicio del servicio aéreo comercial: primeros vuelos de correo durante la Primera Guerra Mundial",
+                  "composition": "El avión ocupa el centro de la imagen, con el cielo y el sol como elementos secundarios que crean un contraste dramático.",
+                  "description": "Una imagen dramática de un avión de la Primera Guerra Mundial en el cielo, con el sol brillando fuertemente en el fondo. El avión está transportando una valija de correo, ilustrando el inicio del servicio aéreo comercial.",
+                  "environment": "Cielo claro durante la Primera Guerra Mundial",
+                  "image_id": "1",
+                  "lighting": "Sol brillante en el fondo, iluminando el avión y destacándolo contra el cielo azul",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, No incluir texto legible, no mostrar detalles innecesarios, mantener la atmósfera histórica y dramática",
+                  "placement": "Portada del capítulo",
+                  "prompt": "Un avión de la Primera Guerra Mundial transportando una valija de correo en el cielo, con el sol brillante en el fondo. El tono debe ser marrón oscuro para simular el metal del avión.",
+                  "purpose": "Apertura",
+                  "subject": "Avión de la Primera Guerra Mundial",
+                  "visual_style": "Fotografía editorial con un tono de marrón oscuro para simular el color del metal del avión y el ambiente histórico."
+                },
+                {
+                  "aspect_ratio": "3:2",
+                  "caption": "La evolución del correo aéreo: servicios rápidos y eficientes en la era moderna",
+                  "composition": "El avión ocupa el centro de la imagen, con la ciudad como elemento secundario que muestra la eficiencia del servicio.",
+                  "description": "Una imagen de un avión moderno en el cielo, con una valija de correo visible dentro. El avión está volando sobre una ciudad metropolitana, ilustrando la eficiencia y rapidez del correo aéreo actual.",
+                  "environment": "Ciudad metropolitana en el fondo",
+                  "image_id": "2",
+                  "lighting": "Iluminación natural durante el día, con un cielo azul claro y sol brillante",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, No incluir texto legible, no mostrar detalles innecesarios, mantener la atmósfera contemporánea y eficiente",
+                  "placement": "Medio del capítulo",
+                  "prompt": "Un avión moderno transportando una valija de correo en el cielo, sobre una ciudad metropolitana. El tono debe ser neutro para simular la modernidad del avión.",
+                  "purpose": "Explicación",
+                  "subject": "Avión moderno transportando valija de correo",
+                  "visual_style": "Fotografía editorial con un tono neutro para simular la modernidad del avión."
+                },
+                {
+                  "aspect_ratio": "4:3",
+                  "caption": "La expansión del correo aéreo internacional: Trans Europa Compañía de Aviación",
+                  "composition": "El avión ocupa el centro de la imagen, con las dos ciudades como elementos secundarios que muestran la expansión del servicio aéreo internacional.",
+                  "description": "Una imagen de una Trans Europa Compañía de Aviación volando entre dos ciudades, con los detalles del avión y la ciudad resaltados. El texto 'Trans Europa' debe aparecer en el avión.",
+                  "environment": "Dos ciudades en el fondo",
+                  "image_id": "3",
+                  "lighting": "Iluminación natural durante el día, con un cielo azul claro y sol brillante",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, No incluir texto legible fuera del avión, no mostrar detalles innecesarios, mantener la atmósfera contemporánea y expansiva",
+                  "placement": "Final del capítulo",
+                  "prompt": "Un avión Trans Europa Compañía de Aviación volando entre dos ciudades. El texto 'Trans Europa' debe aparecer en el avión. El tono debe ser neutro para simular la modernidad del avión.",
+                  "purpose": "Ilustración",
+                  "subject": "Avión Trans Europa Compañía de Aviación",
+                  "visual_style": "Fotografía editorial con un tono neutro para simular la modernidad del avión."
+                }
+              ],
+              "visual_style": "Fotografía editorial con un tono neutro para simular la modernidad del avión y el ambiente histórico."
+            },
+            "module": "image_planner",
+            "status": "PASS"
+          },
+          "634": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "identity_notes": [
+                "Consistencia en el uso de colores neutros y tonos cálidos para representar el ambiente aeroespacial.",
+                "Incluir detalles visuales específicos como asientos individuales, paneles de control y ventanas grandes en los aviones jet comerciales.",
+                "Evitar imágenes abstractas o conceptuales que no sean relevantes con la descripción del texto."
+              ],
+              "images": [
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "El primer jet comercial operativo: el Comet de BOAC",
+                  "composition": "El avión ocupa el centro de la imagen, con una gran cantidad de detalles visuales como las ventanas individuales y la forma aerodinámica del fuselaje.",
+                  "description": "Una vista panorámica de un avión jet comercial en el aire, con la ciudad y los edificios en el horizonte.",
+                  "environment": "Ciudad urbana en el horizonte",
+                  "image_id": "1",
+                  "lighting": "Iluminación natural durante el amanecer, con tonos de amarillo y rojo en el cielo.",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, Fotografía de un avión en tierra o en el hangar",
+                  "placement": "Portada",
+                  "prompt": "Un avión jet comercial volando sobre una ciudad urbana al amanecer, con detalles visuales como las ventanas individuales y la forma aerodinámica del fuselaje.",
+                  "purpose": "Apertura",
+                  "subject": "Avión jet comercial",
+                  "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "El desarrollo tecnológico que permitió el surgimiento de los primeros jets comerciales",
+                  "composition": "El diagrama muestra una línea temporal con marcadores en puntos clave, incluyendo el Comet de BOAC y otros aviones como el DC-8 y el 707.",
+                  "description": "Un diagrama ilustrando la evolución de los aviones comerciales desde el primer vuelo de correo durante la Primera Guerra Mundial hasta los primeros jets comerciales operativos.",
+                  "environment": "Diagrama en blanco y negro",
+                  "image_id": "2",
+                  "lighting": "Iluminación natural con tonos claros",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, Imagen realista de un avión en el aire o en tierra",
+                  "placement": "Medio del capítulo",
+                  "prompt": "Un diagrama ilustrando la evolución de los aviones comerciales desde el primer vuelo de correo durante la Primera Guerra Mundial hasta los primeros jets comerciales operativos.",
+                  "purpose": "Explicación",
+                  "subject": "Evolución de los aviones comerciales",
+                  "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "El impacto de los primeros jets comerciales en la economía global y la cultura popular",
+                  "composition": "Los pasajeros están sentados en asientos individuales, mirando hacia adelante mientras el avión cruza el cielo. El interior del avión muestra detalles como los paneles de control y las ventanas grandes.",
+                  "description": "Un grupo de pasajeros en un avión jet comercial, con vistas panorámicas desde el aire y detalles internos del avión.",
+                  "environment": "Interior del avión jet comercial",
+                  "image_id": "3",
+                  "lighting": "Iluminación artificial con luces blancas y tonos cálidos",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, Imagen de un avión en tierra o en el hangar",
+                  "placement": "Final del capítulo",
+                  "prompt": "Un grupo de pasajeros en un avión jet comercial, con vistas panorámicas desde el aire y detalles internos del avión.",
+                  "purpose": "Ilustración",
+                  "subject": "Avión jet comercial con pasajeros",
+                  "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+                }
+              ],
+              "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+            },
+            "module": "image_planner",
+            "status": "PASS"
+          },
+          "635": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "identity_notes": [
+                "La imagen debe mantener un tono profesional y educativo.",
+                "Se debe usar una paleta de colores que se adapte a la guía de estilo visual del capítulo.",
+                "Las imágenes deben ser detalladas y realistas para transmitir el mensaje del texto."
+              ],
+              "images": [
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "El primer jet comercial: un hito revolucionario en la historia de la aviación comercial.",
+                  "composition": "El avión ocupa la mitad superior de la imagen, con una composición equilibrada que destaca su forma aerodinámica.",
+                  "description": "Una vista panorámica de un Boeing 707 en el aire, con la ciudad y las montañas en segundo plano.",
+                  "environment": "Ciudad y montañas",
+                  "image_id": "1",
+                  "lighting": "Iluminación natural durante el amanecer",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, No incluir personas, ciudades nocturnas, o cualquier otro elemento que no sea el avión y el paisaje natural.",
+                  "placement": "Portada del capítulo",
+                  "prompt": "Un Boeing 707 en vuelo sobre una ciudad y montañas al amanecer.",
+                  "purpose": "Apertura",
+                  "subject": "Boeing 707",
+                  "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "El desarrollo tecnológico de los jets comerciales: desde la primera versión experimental hasta las aeronaves eléctricas modernas.",
+                  "composition": "El diagrama ocupa la totalidad de la imagen, con una disposición clara que destaca las diferentes etapas del desarrollo tecnológico.",
+                  "description": "Un diagrama interactivo mostrando los avances tecnológicos en los jets comerciales desde el Boeing 707 hasta un avión eléctrico moderno.",
+                  "environment": "Fondo blanco con un fondo negro para destacar el contenido gráfico",
+                  "image_id": "2",
+                  "lighting": "Iluminación uniforme",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, No incluir texto explicativo, solo el diagrama gráfico.",
+                  "placement": "Interior del capítulo",
+                  "prompt": "Un diagrama interactivo mostrando los avances tecnológicos en los jets comerciales desde el Boeing 707 hasta un avión eléctrico moderno.",
+                  "purpose": "Explicación",
+                  "subject": "Avances tecnológicos en los jets comerciales",
+                  "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "caption": "La futura revolución: los aviones eléctricos prometen una mayor eficiencia y seguridad en el transporte aéreo.",
+                  "composition": "El avión ocupa la totalidad de la imagen, centrado en el centro, con un fondo claro para destacar los detalles del diseño.",
+                  "description": "Un avión eléctrico en vuelo, con detalles de su diseño innovador y sistemas automatizados visibles.",
+                  "environment": "Fondo claro con iluminación natural",
+                  "image_id": "3",
+                  "lighting": "Iluminación uniforme y equilibrada",
+                  "negative_prompt": "text, watermark, logo, signature, brand name, low quality, blurry, deformed, mutated, extra fingers, bad anatomy, jpeg artifacts, oversaturated, No incluir texto explicativo, solo la imagen del avión eléctrico en vuelo.",
+                  "placement": "Interior del capítulo",
+                  "prompt": "Un avión eléctrico en vuelo, con detalles de su diseño innovador y sistemas automatizados visibles.",
+                  "purpose": "Ilustración",
+                  "subject": "Avión eléctrico",
+                  "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+                }
+              ],
+              "visual_style": "Fotografía editorial, paleta coherente, detalle realista"
+            },
+            "module": "image_planner",
+            "status": "PASS"
+          }
+        },
+        "done": 3,
+        "total": 3
+      },
+      "task_id": null
+    },
+    {
+      "attempts": 1,
+      "capability": "generate_chapter_images",
+      "completed_at": "2026-08-29 13:43:38",
+      "duration": 14.547,
+      "error": null,
+      "id": "image_gen",
+      "label": "IMAGE GENERATOR",
+      "metrics": {
+        "per_chapter": true,
+        "subs": {
+          "done": 3,
+          "total": 3
+        },
+        "words": 0
+      },
+      "module": "image_search",
+      "started_at": "2026-08-29 13:43:24",
+      "status": "PASS",
+      "subs": {
+        "chapters": {
+          "633": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "results": [
+                {
+                  "aspect_ratio": "3:2",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:29.130476+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "HISTORIA CRONOLÓGICA DE LA AVIACIÓN COMERCIAL :'''NO LO SE!!!... ¿O SI?",
+                    "chapter_number": 1,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 1 de 3."
+                  },
+                  "height": 294,
+                  "image_id": "img_01_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\1\\images\\img_01_web.jpg",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "El Primer Servicio Comercial Aéreo",
+                  "provider": "searxng",
+                  "resolution": "450x294",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgI5ghVh_tXF3nfoPLcpVCYLhBC2aCdOrL5AHq_tWyyxNlp5ECPWvl4nRl2i-CiayJqVGfwkSfwVmsZsNBH_symwGX-4le0FzidTwMVEGmpRZ64b-llI-Trrf3odp2MeHBqogTAzFzwhk4/s1600/st-pete.jpg",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 450
+                },
+                {
+                  "aspect_ratio": "4:3",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:29.544678+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Así empezó todo | elsecretodelospajaros",
+                    "chapter_number": 1,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 2 de 3."
+                  },
+                  "height": 1329,
+                  "image_id": "img_02_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\1\\images\\img_02_web.jpg",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "El Primer Servicio Comercial Aéreo",
+                  "provider": "searxng",
+                  "resolution": "1825x1329",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://elsecretodelospajaros.net/wp-content/uploads/2022/09/1903-first-flight.jpg",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 1825
+                },
+                {
+                  "aspect_ratio": "4:3",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:30.056726+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Evolución de la Seguridad Operacional en la Aviación Comercial",
+                    "chapter_number": 1,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 3 de 3."
+                  },
+                  "height": 478,
+                  "image_id": "img_03_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\1\\images\\img_03_web.png",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "El Primer Servicio Comercial Aéreo",
+                  "provider": "searxng",
+                  "resolution": "640x478",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://s3.amazonaws.com/s3.timetoast.com/public/uploads/photo/16431945/image/ba4e028d60d72672f7a11fa2bc331ff6",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 640
+                }
+              ]
+            },
+            "module": "image_search",
+            "status": "PASS"
+          },
+          "634": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "results": [
+                {
+                  "aspect_ratio": "16:9",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:32.285433+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Breve historia de la aviación comercial",
+                    "chapter_number": 2,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 1 de 3."
+                  },
+                  "height": 379,
+                  "image_id": "img_01_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\2\\images\\img_01_web.jpg",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "Primeros Jets Comerciales",
+                  "provider": "searxng",
+                  "resolution": "722x379",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjaqkzkL5zBnl4S94d0UlNUlxzDdGiuhCwsHfk3q_xCK5DD_HT9VDgAKGQGSYYqq-OBYABV1sOsc0vzxwOzQ7o42DS1vo9ixcF2wPfG-BNkLI_lxIOAKKM5eEp0piWcUmA7ioA0_j8fhWot/w1200-h630-p-k-no-nu/infografia_evolucion_aviacion_comercial.jpg",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 722
+                },
+                {
+                  "aspect_ratio": "4:3",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:33.635770+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Un paso para la aviación: el día que el primer avión comercial hizo un ...",
+                    "chapter_number": 2,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 2 de 3."
+                  },
+                  "height": 718,
+                  "image_id": "img_02_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\2\\images\\img_02_web.jpg",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "Primeros Jets Comerciales",
+                  "provider": "searxng",
+                  "resolution": "960x718",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://laopinion.com/wp-content/uploads/sites/3/2022/07/GettyImages-1162554845.jpg?quality=80&strip=all&w=960",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 960
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:35.720723+00:00",
+                  "engine": "duckduckgo images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Inicios de la aviación comercial - ASTRONÁUTICA CHILE",
+                    "chapter_number": 2,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 3 de 3."
+                  },
+                  "height": 330,
+                  "image_id": "img_03_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\2\\images\\img_03_web.jpg",
+                  "license": null,
+                  "model": "duckduckgo images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "Primeros Jets Comerciales",
+                  "provider": "searxng",
+                  "resolution": "660x330",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://astronauticachile.cl/wp-content/uploads/2017/04/inicios-de-la-aviacion-comercial-thumbs-660x330.jpg",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 660
+                }
+              ]
+            },
+            "module": "image_search",
+            "status": "PASS"
+          },
+          "635": {
+            "attempts": 1,
+            "duration": null,
+            "error": null,
+            "metrics": {
+              "results": [
+                {
+                  "aspect_ratio": "16:9",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:38.229200+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "CDTI Innovación y la PAE organizan una jornada sobre prioridades ...",
+                    "chapter_number": 3,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 1 de 3."
+                  },
+                  "height": 316,
+                  "image_id": "img_01_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\3\\images\\img_01_web.jpg",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "Avances Técnicos en los Jets Comerciales",
+                  "provider": "searxng",
+                  "resolution": "817x316",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://actualidadaeroespacial.com/wp-content/uploads/2025/04/CDTI-Innovacion-y-la-PAE-organizan-una-jornada-sobre-prioridades-tecnologicas-para-la-aviacion-comercial-del-futuro-140425.jpg",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 817
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:38.459625+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Prioridades tecnológicas para la aviación comercial del futuro – PAE ...",
+                    "chapter_number": 3,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 2 de 3."
+                  },
+                  "height": 506,
+                  "image_id": "img_02_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\3\\images\\img_02_web.jpg",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "Avances Técnicos en los Jets Comerciales",
+                  "provider": "searxng",
+                  "resolution": "900x506",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://plataforma-aeroespacial.es/wp-content/uploads/2025/04/prioridadeaAviacioncomercial.jpg",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 900
+                },
+                {
+                  "aspect_ratio": "16:9",
+                  "attempts": 1,
+                  "created_at": "2026-08-29T13:43:38.878234+00:00",
+                  "engine": "bing images",
+                  "error": null,
+                  "extra": {
+                    "book_id": 75,
+                    "caption": "Innovaciones clave en aerolíneas 2025: el radar de OAG - Noticias ...",
+                    "chapter_number": 3,
+                    "language": "es",
+                    "placement": "Apoyo.",
+                    "purpose": "Imagen web 3 de 3."
+                  },
+                  "height": 449,
+                  "image_id": "img_03_web",
+                  "image_path": "data\\images\\books\\75\\chapters\\3\\images\\img_03_web.webp",
+                  "license": null,
+                  "model": "bing images",
+                  "negative_prompt": "text, watermark, low quality",
+                  "prompt": "Avances Técnicos en los Jets Comerciales",
+                  "provider": "searxng",
+                  "resolution": "800x449",
+                  "seed": 0,
+                  "source_type": "web_search",
+                  "source_url": "https://www.airline92.com/foto-articulo-fichero_11393_20260306.webp,800,700,0.webp",
+                  "status": "ok",
+                  "steps": 1,
+                  "thumbnail_paths": [],
+                  "width": 800
+                }
+              ]
+            },
+            "module": "image_search",
+            "status": "PASS"
+          }
+        },
+        "done": 3,
+        "total": 3
+      },
+      "task_id": null
+    },
+    {
+      "attempts": 1,
+      "capability": "final_quality_control",
+      "completed_at": "2026-08-29 13:43:40",
+      "duration": 1.156,
+      "error": null,
+      "id": "quality_gate",
+      "label": "QUALITY GATE",
+      "metrics": {
+        "book_checks": [
+          {
+            "message": "Libro existe",
+            "origin_phase": "book_planner",
+            "status": "PASS"
+          },
+          {
+            "message": "Metadatos completos",
+            "origin_phase": "book_planner",
+            "status": "PASS"
+          },
+          {
+            "message": "Índice presente (se generará a partir de los capítulos)",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Capítulos presentes",
+            "origin_phase": "book_planner",
+            "status": "PASS"
+          }
+        ],
+        "chapter_checks": [
+          {
+            "message": "Capítulos suficientes: 3",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "No excede máximo configurado: 3 <= 3",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Números de capítulo únicos",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Todos los capítulos están numerados",
+            "origin_phase": "book_planner",
+            "status": "PASS"
+          },
+          {
+            "message": "Ningún capítulo vacío",
+            "origin_phase": null,
+            "status": "PASS"
+          }
+        ],
+        "document_checks": [
+          {
+            "message": "Ruta DOCX no proporcionada",
+            "origin_phase": null,
+            "status": "WARNING"
+          },
+          {
+            "message": "PDF no requerido",
+            "origin_phase": null,
+            "status": "PASS"
+          }
+        ],
+        "image_checks": [
+          {
+            "message": "3 imágenes por capítulo",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Todos los archivos de imagen existen",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Imágenes legibles",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Metadata presente en imágenes",
+            "origin_phase": null,
+            "status": "PASS"
+          }
+        ],
+        "is_complete": true,
+        "language_checks": [
+          {
+            "message": "Español solicitado",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Inglés no solicitado",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Español completo en todos los capítulos",
+            "origin_phase": null,
+            "status": "PASS"
+          }
+        ],
+        "overall_status": "WARNING",
+        "source_checks": [
+          {
+            "message": "Investigación faltante en capítulos: [1, 2, 3]",
+            "origin_phase": null,
+            "status": "WARNING"
+          },
+          {
+            "message": "Fuentes presentes en todos los capítulos",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "URLs válidas",
+            "origin_phase": null,
+            "status": "PASS"
+          },
+          {
+            "message": "Sin fuentes inventadas",
+            "origin_phase": null,
+            "status": "PASS"
+          }
+        ]
+      },
+      "module": "quality_control",
+      "started_at": "2026-08-29 13:43:38",
+      "status": "PASS",
+      "task_id": 2154
+    },
+    {
+      "attempts": 1,
+      "capability": "build_book_docx",
+      "completed_at": "2026-08-29 13:43:42",
+      "duration": 2.297,
+      "error": null,
+      "id": "docx",
+      "label": "DOCUMENT BUILDER",
+      "metrics": {
+        "docx_path": "output\\docx\\book_75_es.docx"
+      },
+      "module": "document_builder",
+      "started_at": "2026-08-29 13:43:40",
+      "status": "PASS",
+      "task_id": 2155
+    }
+  ],
+  "status": "COMPLETED",
+  "updated_at": "2026-08-29 13:43:42"
+}

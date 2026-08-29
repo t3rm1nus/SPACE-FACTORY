@@ -1,0 +1,32 @@
+============================================================
+PASO 0: Estado previo al reset
+============================================================
+Log size antes del reset: 5562050 bytes
+Status actual del job: FAILED
+Current phase: quality_gate
+Error actual: quality_gate#overall_status=FAIL
+BD book 72: image_count=5, image_search_ratio=0.6
+
+============================================================
+PASO 1: POST /api/books/72/autopilot/reset
+============================================================
+Body: {"from_phase": "image_gen"}
+Status del job tras reset: PENDING
+Current phase tras reset: quality_gate
+  planner: PASS
+  research: PASS
+  outline: PASS
+  writer: PASS
+  fact_check: PASS
+  editor: PASS
+  image_plan: PASS
+  image_gen: PENDING
+  quality_gate: PENDING
+  docx: PENDING
+
+============================================================
+PASO 2: Polling GET /api/books/72/autopilot
+============================================================
+[1] poll: status=RUNNING current_phase=image_gen
+[2] poll: status=RUNNING current_phase=image_gen
+[3] poll: status=RUNNING current_phase=image_gen

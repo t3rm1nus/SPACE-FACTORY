@@ -23,6 +23,7 @@ Reglas de resiliencia (patrón research/writer):
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -148,10 +149,62 @@ def _write_metadata(images_dir: str, data: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# §17 #30 (P1a, book_72) — dedupe cross-chapter por hash de contenido
+# ---------------------------------------------------------------------------
+def _content_hashes_path(book_id: int) -> str:
+    """Ruta del registro de hashes de contenido de imágenes del libro.
+
+    Vive junto a los directorios per-chapter (``<root>/books/<id>/chapters/``).
+    Cada capítulo es una invocación independiente del módulo (task del
+    scheduler), así que NO hay set en memoria compartido entre capítulos: el
+    registro se persiste en disco y se lee/actualiza por invocación.
+    """
+    root = Path(_storage_root())
+    return str(root / "books" / str(book_id) / "chapters" / "_content_hashes.json")
+
+
+def _load_content_hashes(book_id: int) -> dict:
+    """Carga el registro hash→capítulo del libro (fail-safe: {} si no existe)."""
+    try:
+        with open(_content_hashes_path(book_id), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:  # noqa: BLE001 - sin registro previo / corrupto: empezar limpio
+        return {}
+
+
+def _save_content_hashes(book_id: int, mapping: dict) -> None:
+    """Persiste el registro (best-effort: un fallo de I/O no aborta el lote)."""
+    try:
+        path = _content_hashes_path(book_id)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(mapping, f, ensure_ascii=False, indent=2)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "image_search: no se pudo persistir el registro de hashes: %s", exc
+        )
+
+
+# ---------------------------------------------------------------------------
 # Query de búsqueda
 # ---------------------------------------------------------------------------
-def _search_query(chapter_title: Optional[str], chapter_text: Optional[str]) -> str:
-    """Construye una query determinista a partir del título (fallback: primeras palabras del texto)."""
+def _search_query(
+    chapter_title: Optional[str],
+    chapter_text: Optional[str],
+    search_topic: Optional[str] = None,
+) -> str:
+    """Construye una query determinista a partir del título (fallback: primeras palabras del texto).
+
+    §17 #30 (P1b, book_72): si el payload trae ``search_topic`` (primer heading
+    usable del outline del capítulo, u objective — resuelto en autopilot), se
+    usa ESE tema en vez del título genérico: con títulos de fallback
+    ("... - Parte N") las queries idénticas devolvían los mismos resultados
+    a todos los capítulos. Sin tema usable, cae al comportamiento histórico.
+    """
+    topic = str(search_topic or "").strip()
+    if topic:
+        return topic[:200]
     title = (chapter_title or "").strip()
     if title:
         return title[:200]
@@ -415,7 +468,7 @@ def _search_query_en(data: dict) -> str:
     Prioridad: title_en > chapter_title_en > chapter_text_en (primeras
     palabras) > cadena genérica EN. NUNCA cae al título/texto en español:
     era exactamente la causa del mismatch de idioma de book_67."""
-    for field in ("title_en", "chapter_title_en"):
+    for field in ("chapter_search_topic", "title_en", "chapter_title_en"):
         value = str(data.get(field) or "").strip()
         if value:
             return value[:200]
@@ -465,12 +518,18 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
     num_images = max(0, min(num_images, MAX_IMAGES))
 
     images_dir = _images_dir(book_id, chapter_number)
+    # §17 #30 (P1a): registro de hashes de contenido del libro. Cada entrada
+    # sha1 -> {"chapter": N, "path": "..."} permite descartar la misma imagen
+    # física cuando aparece en OTRO capítulo del mismo libro.
+    _hash_registry = _load_content_hashes(book_id)
     # Query nativa por idioma (§17 #28): ES usa el comportamiento histórico;
     # EN usa campos nativos EN (title_en etc.) si existen.
     if lang_is_en:
         query = _search_query_en(data)
     else:
-        query = _search_query(chapter_title, chapter_text)
+        query = _search_query(
+            chapter_title, chapter_text, search_topic=data.get("chapter_search_topic")
+        )
 
     # §17 #24: para libros EN se acota SearXNG por idioma; cualquier otro
     # idioma/ausente mantiene el comportamiento histórico (sin filtro).
@@ -687,6 +746,28 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
                 slot += 1
                 continue
 
+            # §17 #30 (P1a, book_72) — dedupe cross-chapter por contenido: la
+            # misma imagen física (mismos bytes) ya usada en OTRO capítulo del
+            # mismo libro se descarta y el slot sigue intentando con el
+            # siguiente candidato SIN consumir slot de error (mismo tratamiento
+            # que la denylist). El mismo hash en el PROPIO capítulo se permite
+            # (re-ejecución/overwrite intencional del capítulo).
+            _digest = hashlib.sha1(data_bytes).hexdigest()
+            _owner = _hash_registry.get(_digest)
+            if _owner is not None:
+                try:
+                    _owner_chapter = int(_owner.get("chapter", -1)) if isinstance(_owner, dict) else int(_owner)
+                except (TypeError, ValueError):
+                    _owner_chapter = -1
+                if _owner_chapter != chapter_number:
+                    logger.warning(
+                        "image_search: descartada imagen duplicada entre capítulos "
+                        "(mismo contenido que cap %s): %s",
+                        _owner_chapter,
+                        img_src,
+                    )
+                    continue
+
             width, height = _image_dimensions(data_bytes)
             w = int(width or 1024)
             h = int(height or 576)
@@ -727,6 +808,10 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
             )
             meta["image_path"] = image_path
             _write_metadata(images_dir, meta)
+            # §17 #30 (P1a): registra el contenido aceptado para el dedupe
+            # cross-chapter de los siguientes capítulos del libro.
+            _hash_registry[_digest] = {"chapter": chapter_number, "path": image_path}
+            _save_content_hashes(book_id, _hash_registry)
             results.append(meta)
             generated += 1
             slot += 1

@@ -1,0 +1,27 @@
+=== GREP outline_en/description_en frontend/editorial.py ===
+278: def update_chapter_outline_en(book_id: int, number: int, sections: list[dict]) -> dict:
+279:     """Persiste el outline EN de un capítulo (chapters.outline_en, JSON)."""
+285:             "UPDATE chapters SET outline_en = ?, updated_at = datetime('now') "
+314: def update_book_description_en(book_id: int, description_en: str) -> dict:
+315:     """Persiste la descripción EN del libro (books.description_en)."""
+319:             "UPDATE books SET description_en = ?, updated_at = datetime('now') WHERE id = ?",
+320:             (description_en, book_id),
+822:             raw_outline_en = (chapter.get("outline_en") or "").strip()
+824:             if raw_outline_en:
+826:                     parsed_en = json.loads(raw_outline_en)
+834:                     f"[§17 #21] book {book_id}: chapters.outline_en NULL/inválido → "
+847:                 # en español; se usa description_en si existe, si no None (el
+850:                     ((book.get("description_en") or "").strip() or None)
+1026:     # books.title_en / description_en y chapters.title_en si existen;
+1033:         desc_en = (book.get("description_en") or "").strip()
+=== BOOKS BILINGUES (languages LIKE '%en%') ===
+total=8
+book=65 languages=es,en title_en_NULL=0 desc_en_NULL=0
+book=66 languages=es,en title_en_NULL=1 desc_en_NULL=1
+book=67 languages=es,en title_en_NULL=1 desc_en_NULL=1
+book=68 languages=es,en title_en_NULL=1 desc_en_NULL=1
+book=69 languages=es,en title_en_NULL=1 desc_en_NULL=1
+book=70 languages=es,en title_en_NULL=1 desc_en_NULL=1
+book=71 languages=es,en title_en_NULL=1 desc_en_NULL=1
+book=72 languages=es,en title_en_NULL=1 desc_en_NULL=1
+=== CHAPTERS outline_en NULL por libro ===

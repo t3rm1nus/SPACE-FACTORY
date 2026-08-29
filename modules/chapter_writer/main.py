@@ -49,6 +49,13 @@ REFUSAL_PATTERNS = [
     r"as an ai language model",
     r"i cannot assist",
     r"i'm sorry, but i can't",
+    # §17 #30 (P2, book_72 cap.4): acuse de meta-instrucción del LLM filtrado
+    # a prosa. SOLO matchea cuando el párrafo EMPIEZA con "Entendido." y en
+    # esa misma línea (frase inicial o siguiente, hasta ~240 chars) aparece
+    # negación de reproducir/generar/proporcionar/copiar contenido. "Entendido"
+    # a mitad de párrafo, o sin la negación, NO matchea (evita falsos positivos
+    # con prosa legítima).
+    r"(?m)^\s*entendido\.[^\n]{0,240}?\b(?:no\s+(?:reproducir[ée]|generar[ée]|proporcionar[ée]|copiar[ée])|(?:s[oó]lo|solo)\s+proporcionar[ée])\b",
 ]
 
 

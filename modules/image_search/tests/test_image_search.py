@@ -273,6 +273,68 @@ def test_download_invalid_image_content_marks_error(tmp_path, monkeypatch):
     # (c) la función no lanza excepción — al retornar (y validar shape) queda confirmado.
 
 
+def test_dedupe_cross_chapter_por_hash(tmp_path, monkeypatch):
+    """§17 #30 (P1a, book_72): la misma imagen física (mismos bytes) ya usada
+    en OTRO capítulo del mismo libro se descarta SIN consumir slot de error y
+    el slot sigue con el siguiente candidato. El mismo contenido en el PROPIO
+    capítulo se permite (re-ejecución/overwrite)."""
+    same = _png_bytes(64, 64)
+    other = _png_bytes(100, 100)  # contenido distinto (bytes distintos, ≥64px)
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": _search_results(2)})
+        return _FakeResp(content=same if url.endswith("img1.png") else other)
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    # Capítulo 1: descarga img1.png (contenido A). El registro queda con 1 hash.
+    out1 = image_search.search_chapter_images(_payload(chapter_number=1, num_images=1))
+    v1 = ImageGenerateOutput(**validate_output("generate_image", out1))
+    assert v1.generated == 1 and v1.failed == 0
+
+    # Capítulo 2: primer candidato es el MISMO contenido A → descartado sin
+    # error ni slot; el segundo candidato (contenido B) ocupa el slot.
+    out2 = image_search.search_chapter_images(_payload(chapter_number=2, num_images=1))
+    v2 = ImageGenerateOutput(**validate_output("generate_image", out2))
+    assert v2.generated == 1
+    assert v2.failed == 0  # el duplicado NO consumió slot de error
+    assert v2.results[0].status == "ok"
+    assert "chapters" + os.sep + "2" + os.sep in v2.results[0].image_path
+
+    # Registro del libro: 2 contenidos únicos (A del cap 1, B del cap 2).
+    registry = image_search_main._load_content_hashes(1)
+    assert len(registry) == 2
+
+    # Re-ejecución del PROPIO capítulo 1 con el mismo contenido: permitida.
+    out1b = image_search.search_chapter_images(_payload(chapter_number=1, num_images=1))
+    v1b = ImageGenerateOutput(**validate_output("generate_image", out1b))
+    assert v1b.generated == 1 and v1b.failed == 0
+
+
+def test_query_prefiere_chapter_search_topic(tmp_path, monkeypatch):
+    """§17 #30 (P1b): con chapter_search_topic en el payload (heading del
+    outline del capítulo), la query a SearXNG usa ESE tema en vez del título
+    genérico; sin el campo, cae al comportamiento histórico (chapter_title)."""
+    captured: list[dict] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            captured.append(dict(kwargs.get("params") or {}))
+        return _FakeResp(json_data={"results": []})
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    image_search.search_chapter_images(
+        _payload(num_images=1, chapter_search_topic="La era del realidad virtual (2016)")
+    )
+    assert captured and "La era del realidad virtual (2016)" in captured[0]["q"]
+
+    captured.clear()
+    image_search.search_chapter_images(_payload(num_images=1))
+    assert captured and "La Caverna de los Ecos" in captured[0]["q"]
+
+
 def test_denylist_bloquea_dominio_y_no_ocupa_slot(tmp_path, monkeypatch):
     """§17 #5 — denylist de dominios: un resultado con img_src en scribd.com
     (editorial/repositorio con copyright) se descarta SIN ser descargado ni

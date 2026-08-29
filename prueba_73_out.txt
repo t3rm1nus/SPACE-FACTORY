@@ -1,0 +1,86 @@
+book_id: 75 | chapters: 3 | image_count: 3
+job: PENDING planner
+[1] RUNNING planner
+[2] RUNNING planner
+[3] RUNNING planner
+[4] RUNNING planner
+[5] RUNNING planner
+[6] RUNNING research
+[7] RUNNING research
+[8] RUNNING research
+[9] RUNNING outline
+[10] RUNNING outline
+[11] RUNNING writer
+[12] RUNNING writer
+[13] RUNNING writer
+[14] RUNNING writer
+[15] RUNNING writer
+[16] RUNNING writer
+[17] RUNNING writer
+[18] RUNNING writer
+[19] RUNNING writer
+[20] RUNNING writer
+[21] RUNNING writer
+[22] RUNNING writer
+[23] RUNNING writer
+[24] RUNNING writer
+[25] RUNNING writer
+[26] RUNNING writer
+[27] RUNNING writer
+[28] RUNNING writer
+[29] RUNNING writer
+[30] RUNNING writer
+[31] RUNNING writer
+[32] RUNNING writer
+[33] RUNNING writer
+[34] RUNNING writer
+[35] RUNNING writer
+[36] RUNNING writer
+[37] RUNNING writer
+[38] RUNNING writer
+[39] RUNNING fact_check
+[40] RUNNING fact_check
+[41] RUNNING editor
+[42] RUNNING editor
+[43] RUNNING editor
+[44] RUNNING editor
+[45] RUNNING editor
+[46] RUNNING editor
+[47] RUNNING editor
+[48] RUNNING editor
+[49] RUNNING editor
+[50] RUNNING editor
+[51] RUNNING editor
+[52] RUNNING editor
+[53] RUNNING editor
+[54] RUNNING editor
+[55] RUNNING editor
+[56] RUNNING editor
+[57] RUNNING editor
+[58] RUNNING editor
+[59] RUNNING editor
+[60] RUNNING editor
+[61] RUNNING image_plan
+[62] RUNNING image_plan
+[63] RUNNING image_plan
+[64] RUNNING image_plan
+[65] RUNNING image_plan
+[66] RUNNING image_plan
+[67] RUNNING image_gen
+[68] RUNNING docx
+[69] COMPLETED docx
+============================================================
+ESTADO FINAL: COMPLETED | error: None
+docx_path: output\docx\book_75_es.docx
+  planner: PASS attempts=1 err=None
+  research: PASS attempts=2 err=None
+  outline: PASS attempts=1 err=None
+  writer: PASS attempts=1 err=None
+  fact_check: PASS attempts=1 err=None
+  editor: PASS attempts=1 err=None
+  image_plan: PASS attempts=1 err=None
+  image_gen: PASS attempts=1 err=None
+  quality_gate: PASS attempts=1 err=None
+  docx: PASS attempts=1 err=None
+--- queries SearXNG (primeras 8) ---
+resultado guardado en prueba_73_result.json
