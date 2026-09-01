@@ -127,12 +127,71 @@ def test_execute_llm_success(monkeypatch: pytest.MonkeyPatch) -> None:
             "target_audience": "adultos",
             "chapters": [
                 {
+                    "number": i,
+                    "title": f"Capítulo {i}",
+                    "objective": f"Objetivo {i}",
+                    "key_questions": [f"Q{i}"],
+                    "estimated_words": 3000,
+                    "research_requirements": ["investigar X"],
+                    "image_requirements": 2,
+                }
+                for i in range(1, _payload()["target_chapters"] + 1)
+            ],
+        }
+    )
+
+    class FakeResult:
+        text = plan_json
+        provider = "ollama"
+        model = "llama3.1"
+        input_tokens = 10
+        output_tokens = 20
+        cost = 0.0
+        raw_response = {"model": "llama3.1", "response": plan_json}
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+
+        def generate(self, *args: Any, **kwargs: Any) -> FakeResult:
+            return FakeResult()
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    out = execute(_payload())
+    assert out["title"] == "Título generado"
+    assert len(out["chapters"]) == _payload()["target_chapters"]
+    assert out["provider"] == "ollama"
+    assert out["tokens_input"] == 10
+    assert out["tokens_output"] == 20
+
+
+def test_execute_falls_back_when_llm_returns_fewer_chapters_than_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """JSON válido pero incompleto (menos capítulos que target) cae al fallback.
+
+    Reproduce el caso real del libro 82 / repro offline: el LLM devolvió 1
+    capítulo válido cuando se pidieron 8/25. Antes del fix se aceptaba tal cual;
+    ahora el conteo se valida y se cae al fallback determinista (target capítulos).
+    """
+    import modules.book_planner.main as main
+
+    plan_json = json.dumps(
+        {
+            "title": "Título incompleto",
+            "subtitle": "Subtítulo",
+            "description": "Descripción",
+            "target_audience": "adultos",
+            "chapters": [
+                {
                     "number": 1,
                     "title": "Capítulo 1",
                     "objective": "Objetivo 1",
                     "key_questions": ["Q1"],
                     "estimated_words": 3000,
-                    "research_requirements": ["investigar X"],
+                    "research_requirements": [],
                     "image_requirements": 2,
                 }
             ],
@@ -159,11 +218,78 @@ def test_execute_llm_success(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
 
     out = execute(_payload())
+    # Cae al fallback determinista: título de la idea y target capítulos.
+    assert out["title"] == _payload()["idea"]
+    assert len(out["chapters"]) == _payload()["target_chapters"]
+
+
+def test_execute_accepts_llm_plan_with_exact_or_more_chapters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regresión: un plan del LLM con >= target capítulos NO cae a fallback.
+
+    Comportamiento actual intacto: el fix solo rechaza planes con MENOS
+    capítulos de los pedidos; exactos o superiores se aceptan sin fallback.
+    """
+    import modules.book_planner.main as main
+
+    target = _payload()["target_chapters"]
+
+    def _llm_plan(n_chapters: int) -> str:
+        return json.dumps(
+            {
+                "title": "Título generado",
+                "subtitle": "Subtítulo",
+                "description": "Descripción",
+                "target_audience": "adultos",
+                "chapters": [
+                    {
+                        "number": i,
+                        "title": f"Capítulo {i}",
+                        "objective": f"Objetivo {i}",
+                        "key_questions": [f"Q{i}"],
+                        "estimated_words": 3000,
+                        "research_requirements": [],
+                        "image_requirements": 2,
+                    }
+                    for i in range(1, n_chapters + 1)
+                ],
+            }
+        )
+
+    class FakeProvider:
+        name = "ollama"
+        model = "llama3.1"
+        text_plan = None
+
+        def generate(self, *args: Any, **kwargs: Any):
+            class R:
+                pass
+
+            r = R()
+            r.text = FakeProvider.text_plan
+            r.provider = "ollama"
+            r.model = "llama3.1"
+            r.input_tokens = 10
+            r.output_tokens = 20
+            r.cost = 0.0
+            r.raw_response = {"model": "llama3.1", "response": FakeProvider.text_plan}
+            return r
+
+    monkeypatch.setattr(main, "get_provider", lambda: FakeProvider())
+    monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
+
+    # Caso 1: exactamente target capítulos → NO fallback, título del LLM.
+    FakeProvider.text_plan = _llm_plan(target)
+    out = execute(_payload())
     assert out["title"] == "Título generado"
-    assert len(out["chapters"]) == 1
-    assert out["provider"] == "ollama"
-    assert out["tokens_input"] == 10
-    assert out["tokens_output"] == 20
+    assert len(out["chapters"]) == target
+
+    # Caso 2: más capítulos que target → NO fallback, se aceptan todos.
+    FakeProvider.text_plan = _llm_plan(target + 2)
+    out = execute(_payload())
+    assert out["title"] == "Título generado"
+    assert len(out["chapters"]) == target + 2
 
 
 def test_execute_invalid_llm_json(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -382,11 +508,12 @@ def test_execute_keeps_llm_image_requirements_when_no_override(
             "target_audience": "adultos",
             "chapters": [
                 {
-                    "number": 1,
-                    "title": "Capítulo 1",
-                    "objective": "Objetivo 1",
+                    "number": i,
+                    "title": f"Capítulo {i}",
+                    "objective": f"Objetivo {i}",
                     "image_requirements": 2,
                 }
+                for i in range(1, _payload()["target_chapters"] + 1)
             ],
         }
     )
@@ -813,7 +940,30 @@ def test_o_monolingual_es_plan_skips_translation_no_extra_llm_call(monkeypatch) 
     """Regresión cero: libro 'es' → una sola llamada LLM, campos _en None."""
     import modules.book_planner.main as main
 
-    provider = _FakeSeqProvider([json.dumps(_ES_PLAN)])
+    # Mock local con el conteo requerido (target_chapters=25) para que el plan
+    # LLM SÍ cumpla la validación de conteo y no caiga al fallback. Replica la
+    # estructura de _ES_PLAN (title="Alimentacion sana", secciones canónicas ES)
+    # dejando intacto el _ES_PLAN compartido que usan los tests bilingües.
+    es_plan_25 = {
+        "title": "Alimentacion sana",
+        "subtitle": "Sub",
+        "description": "Guia de vida longeva",
+        "chapters": [
+            {
+                "number": i,
+                "title": f"Capítulo {i}",
+                "objective": f"Objetivo {i}",
+                "estimated_words": 3000,
+                "sections": [
+                    {"heading": "Introducción", "objective": "Presentar el tema"},
+                    {"heading": "Desarrollo", "objective": "Desarrollar puntos"},
+                    {"heading": "Conclusión", "objective": "Sintetizar ideas"},
+                ],
+            }
+            for i in range(1, _payload()["target_chapters"] + 1)
+        ],
+    }
+    provider = _FakeSeqProvider([json.dumps(es_plan_25)])
     monkeypatch.setattr(main, "get_provider", lambda: provider)
     monkeypatch.setattr(main, "DEFAULT_ROUTER_MODEL", "llama3.1")
     out = execute(_payload())
@@ -823,7 +973,7 @@ def test_o_monolingual_es_plan_skips_translation_no_extra_llm_call(monkeypatch) 
         assert c["title_en"] is None and c["outline_en"] is None
     # Comportamiento histórico intacto
     assert out["title"] == "Alimentacion sana"
-    assert len(out["chapters"]) == 2
+    assert len(out["chapters"]) == _payload()["target_chapters"]
 
 
 def test_p_fallback_plan_populates_outline_en_deterministically(monkeypatch) -> None:
@@ -944,8 +1094,10 @@ def test_planner_logs_raw_on_json_parse_failure(
     # El fallback sigue funcionando
     assert out["title"] == "Novela corta de ciencia ficción"
     assert len(out["chapters"]) == 25
-    # El texto crudo quedó registrado en DEBUG (o parte de él)
-    debug_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG]
-    raw_logs = [m for m in debug_msgs if "Respuesta cruda del planner LLM" in m]
-    assert raw_logs, f"no se loggeó el raw en DEBUG: {debug_msgs}"
+    # El texto crudo quedó registrado en WARNING (contrato nuevo 2026-09-01:
+    # el log del raw se subió de DEBUG a WARNING para que sea visible con
+    # LOG_LEVEL=INFO; misma instrumentación, solo cambió el nivel).
+    warning_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    raw_logs = [m for m in warning_msgs if "Respuesta cruda del planner LLM" in m]
+    assert raw_logs, f"no se loggeó el raw en WARNING: {warning_msgs}"
     assert 'chapters"' in raw_logs[0]

@@ -667,19 +667,45 @@ def execute(payload: dict) -> dict:
         input_tokens = result.input_tokens
         output_tokens = result.output_tokens
         plan_data = _extract_json(result.text)
+        # Validación de conteo: un JSON válido pero incompleto (menos capítulos
+        # de los pedidos) se rechaza y cae al fallback, en vez de aceptar un
+        # libro con menos capítulos de los solicitados.
+        returned_chapters = plan_data.get("chapters") if isinstance(plan_data, dict) else None
+        target = int(model_validated.target_chapters or 0)
+        if target > 0 and (not isinstance(returned_chapters, list) or len(returned_chapters) < target):
+            got = len(returned_chapters) if isinstance(returned_chapters, list) else 0
+            raise ValueError(
+                f"Plan incompleto: se pidieron {target} capítulos, el LLM devolvió {got}"
+            )
         used_fallback = False
     except Exception as e:
         if provider is not None:
             provider_name = provider.name
+        # Instrumentación prospectiva (2026-09-01): registrar la CAUSA
+        # CONCRETA del fallback a nivel WARNING (visible en stdout con
+        # LOG_LEVEL=INFO), sin tocar la lógica de decisión ni lo que sigue.
+        if provider is None:
+            cause = "provider_ausente"
+        elif isinstance(e, json.JSONDecodeError):
+            cause = "json_no_extraible"
+        elif isinstance(e, ValueError) and "No se encontró JSON" in str(e):
+            cause = "json_no_extraible"
+        elif isinstance(e, ValueError) and str(e).startswith("Plan incompleto"):
+            cause = "capitulos_incompletos"
+        else:
+            cause = "error_llm"
         log(
             logger,
             logging.WARNING,
-            f"Fallo al generar plan con LLM ({provider_name}): {e}. Usando fallback.",
+            f"Fallo al generar plan con LLM ({provider_name}): {e}. "
+            f"Causa fallback: {cause}. Usando fallback.",
         )
         if raw_text:
             # §17 #22: conserva el texto crudo (truncado) para diagnosticar
-            # truncamientos sin reproducir offline. DEBUG: no ensucia producción.
-            logger.debug(
+            # truncamientos sin reproducir offline. Subido de DEBUG a WARNING
+            # (2026-09-01): con LOG_LEVEL=INFO el debug no se escribía, y la
+            # causa del fallback quedaba sin rastro recuperable.
+            logger.warning(
                 "[§17 #22] Respuesta cruda del planner LLM (primeros 2000 chars): %r",
                 raw_text[:2000],
             )
