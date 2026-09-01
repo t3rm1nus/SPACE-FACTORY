@@ -982,8 +982,9 @@ def test_p_fallback_plan_populates_outline_en_deterministically(monkeypatch) -> 
     title_en/description_en quedan None."""
     provider = _FakeSeqProvider([RuntimeError("ollama caído")])
     out, provider = _run_execute(monkeypatch, provider)
-    # Solo hubo 1 intento de generate (el plan); ninguna llamada de traducción.
-    assert len(provider.prompts) <= 1
+    # Ahora hasta 2 llamadas: intento + retry único antes de fallback (2026-09-01).
+    # Ninguna llamada de traducción (el fallback no traduce).
+    assert len(provider.prompts) <= 2
     assert out["title_en"] is None
     assert out["description_en"] is None
     # El fallback determinista inyecta las secciones canónicas ES → mapeo EN aplica.
@@ -992,6 +993,48 @@ def test_p_fallback_plan_populates_outline_en_deterministically(monkeypatch) -> 
         assert oe is not None
         assert [s["heading"] for s in oe] == ["Introduction", "Development", "Conclusion"]
         assert c["title_en"] is None
+
+
+# 2026-09-01: _fallback_plan con entidades nombradas extraídas de la idea.
+# El fallback usa secuencias de 2+ palabras capitalizadas como títulos de los
+# primeros capítulos; el resto conserva el genérico "Parte N".
+
+
+def test_fallback_plan_uses_named_entities_from_idea() -> None:
+    """Idea con entidades reconocibles → los títulos de capítulo usan esas
+    entidades (sin "Parte N" en ellos), en orden de aparición."""
+    idea = "Reyes Católicos, Imperio Español y Guerra Civil Española: tres épocas"
+    plan = _fallback_plan(BookPlanPayload(**{**_payload(), "idea": idea}))
+    titles = [c["title"] for c in plan["chapters"]]
+    # Entidades en orden de aparición, sin "Parte N".
+    assert titles[0] == "Reyes Católicos"
+    assert titles[1] == "Imperio Español"
+    assert titles[2] == "Guerra Civil Española"
+    assert "Parte" not in titles[0] and "Parte" not in titles[1] and "Parte" not in titles[2]
+
+
+def test_fallback_plan_without_entities_unchanged() -> None:
+    """Regresión: idea sin entidades reconocibles → comportamiento histórico
+    intacto (todos los títulos son el genérico "short_title - Parte N")."""
+    idea = "Novela corta de ciencia ficción"  # sin 2+ palabras capitalizadas
+    plan = _fallback_plan(BookPlanPayload(**{**_payload(), "idea": idea}))
+    titles = [c["title"] for c in plan["chapters"]]
+    for i, t in enumerate(titles, start=1):
+        assert t == f"{idea} - Parte {i}"
+
+
+def test_fallback_plan_fewer_entities_than_target_pads_generic() -> None:
+    """N entidades < target_chapters → los primeros N usan entidades y el
+    resto completa con el genérico "- Parte N" (sin inventar entidades)."""
+    idea = "Isabel la Católica y Fernando el Católico"  # 2 entidades, 25 caps
+    plan = _fallback_plan(BookPlanPayload(**{**_payload(), "idea": idea}))
+    titles = [c["title"] for c in plan["chapters"]]
+    assert titles[0] == "Isabel la Católica"
+    assert titles[1] == "Fernando el Católico"
+    # El resto completa con el genérico (short_title = idea completa, 7 palabras
+    # ≤ 8 → sin "..."), mismo formato que el comportamiento histórico.
+    for i in range(2, len(titles)):
+        assert titles[i] == f"{idea} - Parte {i + 1}"
 
 
 def test_max_tokens_scales_with_target_chapters() -> None:

@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any, Optional
 
 from core.schemas import BookPlanChapter, BookPlanOutput
@@ -514,6 +515,30 @@ def _short_idea_title(idea: str, max_words: int = 8) -> str:
     return short
 
 
+def _extract_named_entities(text: str) -> list[str]:
+    """Extrae candidatos a entidad nombrada de un texto (determinista, sin NLP).
+
+    Criterio simple: secuencias de 2+ palabras capitalizadas consecutivas,
+    tolerando conectores minúsculos intermedios (de, del, la, y, von, ...).
+    Ej.: "Reyes Católicos, Imperio Español y Guerra Civil" → 3 entidades;
+    "Estados Unidos de América" → 1 entidad. Una sola palabra capitalizada
+    NO cuenta (evita falsos positivos con inicios de oración).
+
+    Fail-safe: lista vacía si no hay coincidencias (nunca inventa).
+    """
+    if not text:
+        return []
+    cap = r"[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+"
+    connector = r"(?:de|del|la|el|los|las|von|van|da|do|das|dos)"
+    pattern = re.compile(
+        cap + r"(?:\s+" + cap + r"|\s+" + connector + r"\s+" + cap + r")+(?:\s+"
+        + connector + r"\s+" + cap + r")*"
+    )
+    matches = pattern.findall(text)
+    # Dedupe preservando orden de aparición.
+    return list(dict.fromkeys(m.strip() for m in matches if m.strip()))
+
+
 def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
     """Plan básico determinista cuando no hay LLM disponible."""
     title = validated.idea.strip()
@@ -521,13 +546,30 @@ def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
     subtitle = "Plan editorial"
     chapters = []
     base_words = 3000
+    # 2026-09-01: si la idea contiene entidades nombradas reconocibles
+    # (secuencias de 2+ palabras capitalizadas), se usan como título de los
+    # primeros capítulos (en orden de aparición) en vez del genérico
+    # "Parte N". Si hay menos entidades que capítulos, el resto conserva el
+    # título genérico; si no hay ninguna, comportamiento histórico intacto.
+    entities = _extract_named_entities(validated.idea)
+    if entities:
+        logger.warning(
+            "[planner][fallback] %d entidad(es) nombrada(s) detectadas en la "
+            "idea; se usan como títulos de capítulo: %s",
+            len(entities),
+            entities[:10],
+        )
     for i in range(1, validated.target_chapters + 1):
+        if i <= len(entities):
+            chapter_title = entities[i - 1]
+        else:
+            # Sin prefijo "Capítulo N:" (lo añade document_builder/_add_toc).
+            # Título corto derivado de la idea, NO la idea completa.
+            chapter_title = f"{short_title} - Parte {i}"
         chapters.append(
             {
                 "number": i,
-                # Sin prefijo "Capítulo N:" (lo añade document_builder/_add_toc).
-                # Título corto derivado de la idea, NO la idea completa.
-                "title": f"{short_title} - Parte {i}",
+                "title": chapter_title,
                 "objective": f"Desarrollar el núcleo del capítulo {i}.",
                 "key_questions": [f"Pregunta clave {i}"],
                 "estimated_words": base_words,
@@ -647,64 +689,111 @@ def execute(payload: dict) -> dict:
     output_tokens = 0
     provider_name = "none"
     model_name = ""
+    plan_data: Optional[dict[str, Any]] = None
+    used_fallback = True  # asume fallback; el éxito del LLM lo desactiva
+    # Retry único (2026-09-01): ante fallo del LLM (cualquiera de las 4 causas
+    # instrumentadas), se reintenta UNA sola vez la MISMA llamada (mismo prompt,
+    # mismo provider, sin backoff ni timeouts nuevos — el provider ya tiene su
+    # timeout propio) antes de caer a _fallback_plan. Aplica a las 4 causas
+    # incluida provider_ausente: si el provider sigue ausente, el intento 2
+    # falla rápido y sin llamadas de red.
+    llm_attempts = 2
+    last_cause = "error_llm"
+    last_exc: Optional[BaseException] = None
 
-    try:
-        provider = get_provider()
-        prompt = _build_prompt(model_validated)
-        result = provider.generate(
-            prompt,
-            system="Devuelve solo JSON válido, sin texto adicional.",
-            model=DEFAULT_ROUTER_MODEL,
-            # §17 #22: presupuesto dinámico — 2000 fijo truncaba el JSON con
-            # ~20 capítulos (~90-130 tokens/capítulo) y caía al fallback.
-            max_tokens=_planner_max_tokens(int(model_validated.target_chapters or 0)),
-            temperature=0.4,
-        )
-        raw = result.raw_response
-        raw_text = result.text
-        provider_name = result.provider
-        model_name = result.model
-        input_tokens = result.input_tokens
-        output_tokens = result.output_tokens
-        plan_data = _extract_json(result.text)
-        # Validación de conteo: un JSON válido pero incompleto (menos capítulos
-        # de los pedidos) se rechaza y cae al fallback, en vez de aceptar un
-        # libro con menos capítulos de los solicitados.
-        returned_chapters = plan_data.get("chapters") if isinstance(plan_data, dict) else None
-        target = int(model_validated.target_chapters or 0)
-        if target > 0 and (not isinstance(returned_chapters, list) or len(returned_chapters) < target):
-            got = len(returned_chapters) if isinstance(returned_chapters, list) else 0
-            raise ValueError(
-                f"Plan incompleto: se pidieron {target} capítulos, el LLM devolvió {got}"
+    for llm_attempt in range(1, llm_attempts + 1):
+        try:
+            provider = get_provider()
+            prompt = _build_prompt(model_validated)
+            result = provider.generate(
+                prompt,
+                system="Devuelve solo JSON válido, sin texto adicional.",
+                model=DEFAULT_ROUTER_MODEL,
+                # §17 #22: presupuesto dinámico — 2000 fijo truncaba el JSON con
+                # ~20 capítulos (~90-130 tokens/capítulo) y caía al fallback.
+                max_tokens=_planner_max_tokens(int(model_validated.target_chapters or 0)),
+                temperature=0.4,
             )
-        used_fallback = False
-    except Exception as e:
-        if provider is not None:
-            provider_name = provider.name
-        # Instrumentación prospectiva (2026-09-01): registrar la CAUSA
-        # CONCRETA del fallback a nivel WARNING (visible en stdout con
-        # LOG_LEVEL=INFO), sin tocar la lógica de decisión ni lo que sigue.
-        if provider is None:
-            cause = "provider_ausente"
-        elif isinstance(e, json.JSONDecodeError):
-            cause = "json_no_extraible"
-        elif isinstance(e, ValueError) and "No se encontró JSON" in str(e):
-            cause = "json_no_extraible"
-        elif isinstance(e, ValueError) and str(e).startswith("Plan incompleto"):
-            cause = "capitulos_incompletos"
-        else:
-            cause = "error_llm"
+            raw = result.raw_response
+            raw_text = result.text
+            provider_name = result.provider
+            model_name = result.model
+            input_tokens = result.input_tokens
+            output_tokens = result.output_tokens
+            plan_data = _extract_json(result.text)
+            # Validación de conteo: un JSON válido pero incompleto (menos capítulos
+            # de los pedidos) se rechaza y cae al fallback, en vez de aceptar un
+            # libro con menos capítulos de los solicitados.
+            returned_chapters = plan_data.get("chapters") if isinstance(plan_data, dict) else None
+            target = int(model_validated.target_chapters or 0)
+            if target > 0 and (not isinstance(returned_chapters, list) or len(returned_chapters) < target):
+                got = len(returned_chapters) if isinstance(returned_chapters, list) else 0
+                raise ValueError(
+                    f"Plan incompleto: se pidieron {target} capítulos, el LLM devolvió {got}"
+                )
+            used_fallback = False
+            if llm_attempt > 1:
+                logger.warning(
+                    "[planner] Retry %d/%d del LLM tuvo éxito: plan válido obtenido "
+                    "sin caer a fallback.",
+                    llm_attempt,
+                    llm_attempts,
+                )
+            break
+        except Exception as e:
+            last_exc = e
+            if provider is not None:
+                provider_name = provider.name
+            # Instrumentación prospectiva (2026-09-01): registrar la CAUSA
+            # CONCRETA del fallo a nivel WARNING (visible en stdout con
+            # LOG_LEVEL=INFO).
+            if provider is None:
+                cause = "provider_ausente"
+            elif isinstance(e, json.JSONDecodeError):
+                cause = "json_no_extraible"
+            elif isinstance(e, ValueError) and "No se encontró JSON" in str(e):
+                cause = "json_no_extraible"
+            elif isinstance(e, ValueError) and str(e).startswith("Plan incompleto"):
+                cause = "capitulos_incompletos"
+            else:
+                cause = "error_llm"
+            last_cause = cause
+            if llm_attempt < llm_attempts:
+                logger.warning(
+                    "[planner] Intento %d/%d falló (causa: %s): %s. "
+                    "Reintentando UNA vez antes de caer a fallback.",
+                    llm_attempt,
+                    llm_attempts,
+                    cause,
+                    e,
+                )
+            else:
+                logger.warning(
+                    "[planner] Intento %d/%d falló (causa: %s): %s. "
+                    "Sin más reintentos: cae a fallback.",
+                    llm_attempt,
+                    llm_attempts,
+                    cause,
+                    e,
+                )
+
+    if used_fallback:
+        # El bucle agotó los intentos sin un plan válido del LLM (o no hubo
+        # break de éxito): cae al fallback determinista. NOTA: la condición es
+        # used_fallback (flag de éxito), NO plan_data is None — un intento puede
+        # haber obtenido un JSON parseable pero incompleto (capitulos_
+        # incompletos), y ese plan_data NO debe sobrevivir al fallback.
         log(
             logger,
             logging.WARNING,
-            f"Fallo al generar plan con LLM ({provider_name}): {e}. "
-            f"Causa fallback: {cause}. Usando fallback.",
+            f"Fallo al generar plan con LLM ({provider_name}): {last_exc}. "
+            f"Causa fallback: {last_cause}. Usando fallback.",
         )
         if raw_text:
             # §17 #22: conserva el texto crudo (truncado) para diagnosticar
-            # truncamientos sin reproducir offline. Subido de DEBUG a WARNING
-            # (2026-09-01): con LOG_LEVEL=INFO el debug no se escribía, y la
-            # causa del fallback quedaba sin rastro recuperable.
+            # truncamientos. WARNING desde 2026-09-01 (antes DEBUG, se perdía
+            # con LOG_LEVEL=INFO). Nota: raw_text corresponde al último intento
+            # que llegó a obtener respuesta del LLM (intento 1 o 2).
             logger.warning(
                 "[§17 #22] Respuesta cruda del planner LLM (primeros 2000 chars): %r",
                 raw_text[:2000],
