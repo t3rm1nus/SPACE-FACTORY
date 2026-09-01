@@ -769,3 +769,42 @@ DIAGNÓSTICO 2026-09-01 (cierre de vía histórica):
 - CONCLUSIÓN: causa raíz de book_89 NO recuperable retroactivamente.
   Vía histórica CERRADA. Pivote a fix prospectivo (ver PASO 2 más abajo
   / próximo changelog).
+
+---
+INSTRUMENTACIÓN PROSPECTIVA 2026-09-01 (cierre parcial):
+- modules/book_planner/main.py: causa de fallback (provider_ausente /
+  json_no_extraible / capitulos_incompletos / error_llm) y raw_text
+  ahora en logger.warning (antes DEBUG, se perdía con LOG_LEVEL=INFO
+  de producción). Líneas ~697-711.
+- test_planner_logs_raw_on_json_parse_failure actualizado al contrato
+  nuevo (WARNING en vez de DEBUG).
+- Cobertura añadida para la rama capitulos_incompletos:
+  test_execute_falls_back_when_llm_returns_fewer_chapters_than_target
+  y test_execute_accepts_llm_plan_with_exact_or_more_chapters (ambos
+  PASSED). No relacionados con §17 #49 (siguen sin implicar cambios
+  en research/autopilot.py).
+- Commit: b69e5d6 (modules/book_planner/main.py + tests/test_book_planner.py,
+  solo esos 2 ficheros).
+- Efecto: el PRÓXIMO fallback de book_planner en producción quedará
+  trazado en stdout con causa explícita. La causa histórica de
+  book_89 sigue sin poder recuperarse (vía cerrada).
+- PENDIENTE REAL: aún no se ha reproducido/observado el fallback en
+  vivo con esta instrumentación activa. Sub-issue queda KNOWN_ISSUE,
+  no CERRADO, hasta esa confirmación o hasta que se decida no
+  perseguirlo más.
+
+---
+
+# CHANGELOG — BOOK_PLANNER FALLBACK LOGGING / 2026-09-01
+
+El fallback de book_planner (`_fallback_plan`) quedaba sin rastro: el
+motivo solo se registraba vía logger.debug (invisible con LOG_LEVEL=INFO
+de producción) y el raw del LLM se perdía. Instrumentación prospectiva:
+la causa concreta (provider_ausente / json_no_extraible /
+capitulos_incompletos / error_llm) y el raw_text ahora se emiten a nivel
+WARNING (modules/book_planner/main.py ~697-711), visible en stdout en
+producción. test_planner_logs_raw_on_json_parse_failure actualizado al
+contrato nuevo + 2 tests de cobertura para la rama capitulos_incompletos
+(5/5 PASSED). Commit b69e5d6. La causa histórica de book_89 sigue
+irrecuperable (vía cerrada); el sub-issue permanece KNOWN_ISSUE hasta
+observar el fallback en vivo con la instrumentación activa.
