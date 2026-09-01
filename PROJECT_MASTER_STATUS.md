@@ -794,6 +794,24 @@ INSTRUMENTACIÓN PROSPECTIVA 2026-09-01 (cierre parcial):
   perseguirlo más.
 
 ---
+MITIGACIÓN PROACTIVA 2026-09-01 (antes de reintentar "Historia de los
+videojuegos" / book_89-like):
+- Retry único: si la llamada al LLM del planner falla (cualquiera de
+  las 4 causas), se reintenta UNA vez antes de caer a _fallback_plan.
+  Reduce frecuencia de fallback sin conocer la causa raíz original.
+- _fallback_plan con entidades: si aun así cae a fallback, títulos de
+  capítulo usan entidades nombradas extraídas de validated.idea (regex
+  determinista, sin NLP, sin conectores "y/e/o/u" para evitar fusionar
+  entidades distintas) en vez de "- Parte N" genérico. Si no hay
+  entidades reconocibles, comportamiento histórico sin cambios.
+- Objetivo: aunque el fallback se dispare, el índice y las queries de
+  imagen (chapter_search_topic) dejan de ser genéricos/contaminados
+  (evita el patrón "GTA 6" de book_89).
+- Commit: 0c759af. 67/67 tests test_book_planner.py PASSED.
+- PENDIENTE: validación real con generación de libro nueva desde
+  frontend ("Historia de los videojuegos" o similar) — próxima acción.
+
+---
 
 # CHANGELOG — BOOK_PLANNER FALLBACK LOGGING / 2026-09-01
 
@@ -808,3 +826,18 @@ contrato nuevo + 2 tests de cobertura para la rama capitulos_incompletos
 (5/5 PASSED). Commit b69e5d6. La causa histórica de book_89 sigue
 irrecuperable (vía cerrada); el sub-issue permanece KNOWN_ISSUE hasta
 observar el fallback en vivo con la instrumentación activa.
+
+---
+
+# CHANGELOG — BOOK_PLANNER RETRY + FALLBACK ENTITIES / 2026-09-01
+
+Dos mitigaciones proactivas sobre el fallback sistémico (§20): (1) retry
+único de la llamada LLM del planner (mismo prompt/provider, sin backoff)
+antes de caer a _fallback_plan, con logging WARNING de disparo/éxito/agotado;
+(2) _fallback_plan genera títulos desde entidades nombradas extraídas de
+validated.idea (regex determinista, sin conectores "y/e/o/u"), eliminando
+el "- Parte N" genérico cuando la idea las contiene. Bug intermedio
+detectado y corregido en el propio desarrollo (el plan incompleto
+sobrevivía al fallback por condicionar a plan_data is None en vez del flag
+de éxito). 67/67 tests del módulo PASSED. Commit 0c759af (código+tests) y
+este changelog. Pendiente: validación real desde frontend.
