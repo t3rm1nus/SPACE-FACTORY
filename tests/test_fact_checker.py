@@ -1153,3 +1153,46 @@ def test_accuracy_partial_error_type_no_fabrication_signature() -> None:
     # Degradado por consistencia (fail-safe), pero la clasificación original persiste.
     assert out[0]["error_type"] == "accuracy_partial"
     assert all(not k.startswith("_") for k in out[0])
+
+
+# ---------------------------------------------------------------------------
+# §17 #47 — falsos positivos del bigrama de nombre propio compuesto
+# Determinantes/artículos ("El", "La", "Los", ...) formaban bigramas falsos
+# con cualquier palabra capitalizada siguiente (book_77/78/80/84).
+# ---------------------------------------------------------------------------
+def test_determinant_bigrams_are_not_fabrication_signature() -> None:
+    """REGRESIÓN §17 #47: claims reales con bigrama artículo+nombre capitalizado
+    (book_84 'El Imperio romántico...', book_77 'La Cancionero de Palacio...')
+    NO deben disparar _has_fabrication_signature (sin fecha ni cifra, la rama 1
+    no aplica; el bigrama era el único disparador)."""
+    from modules.fact_checker import main as _fc
+
+    assert (
+        _fc._has_fabrication_signature(
+            "El Imperio romántico, un subestilo dentro del Imperio, "
+            "se destaca por su enfoque en los temas históricos y mitológicos."
+        )
+        is False
+    )
+    assert (
+        _fc._has_fabrication_signature(
+            "La Cancionero de Palacio fue compilada durante el reinado "
+            "de los Reyes Católicos."
+        )
+        is False
+    )
+
+
+def test_real_proper_noun_pair_still_triggers_signature() -> None:
+    """NO-regresión §17 #47: el caso real book_59 ('Adolf Eichmann...') sigue
+    disparando la firma por bigrama de nombre propio compuesto (barrera dura
+    intacta)."""
+    from modules.fact_checker import main as _fc
+
+    assert (
+        _fc._has_fabrication_signature(
+            "Adolf Eichmann estuvo a cargo de los campos de concentración "
+            "en Palestina entre 1942 y 1948."
+        )
+        is True
+    )

@@ -47,6 +47,24 @@ _PROPER_NOUN_PATTERN = re.compile(r"(?<!^)(?<![.!?\x22\x27]\s)(?<!\n)\b[A-ZÁÉ�
 _PROPER_NOUN_PAIR_PATTERN = re.compile(
     r"\b[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+\s+(?:[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+|de\s+[A-ZÁÉÍÓÚÜÑ][a-záéíóúüñ]+)"
 )
+# §17 #47 (2026-08-31): determinantes/artículos excluidos como primera palabra
+# válida del bigrama. El patrón anterior aceptaba 1 sola minúscula en la
+# primera palabra (`+`), por lo que artículos de 2 letras a inicio de frase
+# ("El", "La", "Los", "Un", "The", "A", "An") formaban bigramas falsos con
+# cualquier palabra capitalizada siguiente ("El Imperio", "La Cancionero de
+# Palacio", "Los Serrano", "El boom", "Los años") → falsos positivos
+# fabrication_structural confirmados en book_77/78/80/84.
+_DETERMINANTS_FIRST_WORD = frozenset(
+    {"El", "La", "Los", "Las", "Un", "Una", "Unos", "Unas", "The", "A", "An"}
+)
+# Artículo inmediatamente anterior al match (p.ej. "La Cancionero de Palacio"
+# también matchea arrancando en "Cancionero de Palacio"; y "de los Reyes
+# Católicos" arranca en "Reyes Católicos" — artículos en minúscula a mitad de
+# frase incluidos vía IGNORECASE; se descarta si la palabra previa es un
+# determinante).
+_PRECEDING_DETERMINANT = re.compile(
+    r"\b(?:El|La|Los|Las|Un|Una|Unos|Unas|The|A|An)\s+$", re.IGNORECASE
+)
 
 
 def _is_unsupported_issue(issue: dict[str, Any]) -> bool:
@@ -63,14 +81,25 @@ def _has_fabrication_signature(claim_text: str) -> bool:
     Firma aceptada (cualquiera de):
     - fecha/año + cifra numérica (el año cuenta como cifra) + nombre propio;
     - nombre propio COMPUESTO (bigrama capitalizado: "Adolf Eichmann",
-      "Majdal Shams"), que identifica una entidad concreta verificable.
+      "Majdal Shams"), que identifica una entidad concreta verificable;
+      §17 #47: los matches cuya primera palabra es un determinante/artículo
+      (ES: El/La/Los/Las/Un/Una/Unos/Unas; EN: The/A/An), o que van
+      precedidos inmediatamente de uno, se descartan como falso positivo
+      ("El Imperio", "La Cancionero de Palacio" no son entidades propias).
     """
     has_date = bool(_DATE_PATTERN.search(claim_text))
     # La cifra puede ser la propia fecha (año de 4 dígitos) u otro número.
     has_number = bool(re.search(r"\d[\d,.]*", claim_text))
     if has_date and has_number and _PROPER_NOUN_PATTERN.search(claim_text):
         return True
-    return bool(_PROPER_NOUN_PAIR_PATTERN.search(claim_text))
+    for match in _PROPER_NOUN_PAIR_PATTERN.finditer(claim_text):
+        first_word = match.group(0).split()[0]
+        if first_word in _DETERMINANTS_FIRST_WORD:
+            continue
+        if match.start() > 0 and _PRECEDING_DETERMINANT.search(claim_text[: match.start()]):
+            continue
+        return True
+    return False
 
 
 _REANCHOR_NGRAM_WORDS = 8  # §17 #32-P3: tamaño del n-grama de re-anclaje
