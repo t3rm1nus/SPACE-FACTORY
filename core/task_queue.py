@@ -307,6 +307,32 @@ def all_tasks() -> list[dict]:
         conn.close()
 
 
+def all_tasks_for_books_view() -> list[dict]:
+    """Versión ligera de all_tasks() para api_books().
+
+    Extrae ``book_id`` del payload dentro de SQLite (``json_extract``) en vez de
+    transferir el payload completo (que puede pesar cientos de KB por tarea) a
+    Python. Mantiene el MISMO criterio de matching que api_books usaba con
+    all_tasks(): ``payload.book_id`` o, si es null, ``payload.book.id`` (COALESCE).
+
+    NO hidrata resultados externalizados: ``result`` se devuelve tal cual,
+    porque api_books solo usa result para docx_path/pdf_path, que están inline
+    (no externalizados) en las tareas build_book_docx/build_book_pdf.
+    """
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            "SELECT id, capability, status, error, created_at, finished_at, "
+            "result, "
+            "COALESCE(json_extract(payload, '$.book_id'), "
+            "         json_extract(payload, '$.book.id')) AS book_id "
+            "FROM tasks ORDER BY id DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
 def increment_attempts(task_id: int) -> None:
     """Incrementa el contador de intentos de una tarea."""
     conn = get_db()

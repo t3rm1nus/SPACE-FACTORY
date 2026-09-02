@@ -11,7 +11,10 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(DATA_DIR, "space_lair.db")
 
 # Umbral de "stale" para tareas running (segundos)
-STALE_RUNNING_SECONDS = 300
+# 420s (7 min): margen sobre el timeout_seconds más alto real de los módulos
+# (document_builder/image_generator = 360s), para no resetear tareas
+# legítimamente largas en caliente (§17 #48).
+STALE_RUNNING_SECONDS = 420
 
 
 def get_db() -> sqlite3.Connection:
@@ -21,6 +24,8 @@ def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
     return conn
 
 

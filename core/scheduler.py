@@ -249,6 +249,14 @@ def run_loop(
     # Cache de health checks para no repetir en cada iteración
     _health_cache: dict[str, bool] = {}
 
+    # Reaper en caliente de tareas 'running' huérfanas (§17 #48): igual que el
+    # patrón _health_cache, se evalúa barato cada iteración y solo ejecuta el
+    # reset cada REAP_INTERVAL_SECONDS. reset_stale_running_tasks() es
+    # idempotente y con umbral propio (STALE_RUNNING_SECONDS=420s > 360s del
+    # módulo más lento), por lo que nunca toca tareas en ejecución legítima.
+    _last_reap_ts = 0.0
+    REAP_INTERVAL_SECONDS = 60
+
     def _is_healthy(module_id: str) -> bool:
         if module_id not in _health_cache:
             _health_cache[module_id] = check_all_health(modules)[module_id]["healthy"]
@@ -306,6 +314,19 @@ def run_loop(
                     logging.INFO,
                     f"Iteraciรณn {iteration}: {processed} tarea(s) procesada(s)",
                 )
+
+            # Reaper en caliente (§17 #48): resetea tasks 'running' huérfanas
+            # (started_at > STALE_RUNNING_SECONDS) de vuelta a 'pending'.
+            now_ts = time.time()
+            if now_ts - _last_reap_ts >= REAP_INTERVAL_SECONDS:
+                _last_reap_ts = now_ts
+                reaped = task_queue.reset_stale_running()
+                if reaped:
+                    log(
+                        logger,
+                        logging.WARNING,
+                        f"Reaper: {reaped} tarea(s) 'running' huérfana(s) reseteada(s) a 'pending'",
+                    )
 
             time.sleep(SLEEP_SECONDS)
 
