@@ -23,12 +23,14 @@ Reglas de resiliencia (patrón research/writer):
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import logging
 import os
 import re
 import time
+import unicodedata
 import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,7 +45,7 @@ logger = logging.getLogger(__name__)
 # mismo estilo os.environ.get del proyecto.
 SEARXNG_URL = os.environ.get("SEARXNG_URL", "http://localhost:8081")
 SEARCH_TIMEOUT = float(os.environ.get("IMAGE_SEARCH_TIMEOUT", "15"))
-DOWNLOAD_TIMEOUT = float(os.environ.get("IMAGE_DOWNLOAD_TIMEOUT", "10"))
+DOWNLOAD_TIMEOUT = float(os.environ.get("IMAGE_DOWNLOAD_TIMEOUT", "20"))
 MAX_IMAGES = 20
 # §17 #30 — presupuesto total (s) de la fase de búsqueda + techo de páginas de
 # SearXNG. Mismo patrón env-overridable que WRITER_TOTAL_TIME_BUDGET /
@@ -53,6 +55,25 @@ IMAGE_SEARCH_TOTAL_TIME_BUDGET = float(
     os.environ.get("IMAGE_SEARCH_TOTAL_TIME_BUDGET", "90")
 )
 IMAGE_SEARCH_MAX_PAGES = int(os.environ.get("IMAGE_SEARCH_MAX_PAGES", "6"))
+
+# Resultados por página pedidos a SearXNG (param nativo `per_page`). El default
+# histórico del meta-buscador es ~10; con 20 se duplican los candidatos por
+# request y se necesita menos paginación para el mismo techo de candidatos
+# (book_84: déficit en los 20 capítulos por escasez de candidatos útiles).
+SEARXNG_PER_PAGE = int(os.environ.get("IMAGE_SEARCH_PER_PAGE", "20"))
+
+# §17 #48 Fase 4 — verificación semántica VLM del candidato seleccionado.
+# DEFAULT DESACTIVADO: con el flag a 0 el módulo se comporta EXACTAMENTE igual
+# que antes de Fase 4 (cero llamadas de red, cero coste). Mismo patrón
+# env-overridable que el resto de constantes del módulo.
+VLM_VERIFICATION_ENABLED = os.environ.get("VLM_VERIFICATION_ENABLED", "0").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+VLM_MODEL_NAME = os.environ.get("VLM_MODEL_NAME", "moondream-local")
+VLM_TIMEOUT_SECONDS = float(os.environ.get("VLM_TIMEOUT_SECONDS", "15"))
+# Servidor Ollama local (single-server, pipeline serial: sin riesgo de
+# contención con chapter_writer, confirmado en el diagnóstico de Fase 4).
+VLM_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
 _USER_AGENT = "SpaceLair/1.0 (image_search agent)"
 
@@ -72,6 +93,22 @@ _ASPECT_TOKENS = [
 # en candidatos que luego se tirarían por contenido inválido. Ampliable si
 # aparecen más formatos problemáticos (p.ej. .ico/.tif no soportados).
 _NON_RASTER_EXTENSIONS = {".svg"}
+# §17 #48 fix Cambio B: longitud máxima (en palabras) de la query de búsqueda
+# final, y número máximo de keywords salientes extraídas del chapter_text. La
+# query combina topic+heading+book_topic+keywords, pero se acorta si supera el
+# umbral para no abrumar a SearXNG con queries gigantes.
+IMAGE_QUERY_MAX_WORDS = int(os.environ.get("IMAGE_QUERY_MAX_WORDS", "12"))
+_MAX_QUERY_KEYWORDS = 4
+
+# §17 #48 Cambio C — checks de calidad de la imagen descargada antes de
+# aceptarla (dimensiones mínimas y aspect ratio razonable, para descartar
+# thumbnails/iconos/banners que SearXNG coló como candidatos). Env-overridable,
+# mismo estilo del resto de constantes del módulo.
+IMAGE_MIN_WIDTH = int(os.environ.get("IMAGE_MIN_WIDTH", "400"))
+IMAGE_MIN_HEIGHT = int(os.environ.get("IMAGE_MIN_HEIGHT", "300"))
+# Rango de aspect ratio (w/h) aceptado: descarta tiras muy alargadas o banners.
+IMAGE_MAX_ASPECT_RATIO = float(os.environ.get("IMAGE_MAX_ASPECT_RATIO", "3.0"))
+IMAGE_MIN_ASPECT_RATIO = 1.0 / IMAGE_MAX_ASPECT_RATIO
 
 # Lista mínima conocida de dominios a bloquear (riesgo reputacional/legal: portadas
 # de editoriales reales, repositorios académicos/docentes y material con copyright).
@@ -149,6 +186,187 @@ def _write_metadata(images_dir: str, data: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Extracto de keywords salientes del chapter_text (§17 #48 Cambio B)
+# ---------------------------------------------------------------------------
+def _extract_salient_keywords(
+    chapter_text: Optional[str],
+    language: Optional[str] = "es",
+    max_keywords: int = _MAX_QUERY_KEYWORDS,
+) -> list[str]:
+    """Extrae hasta ``max_keywords`` palabras/bigramas/n-gramas capitalizados
+    del texto del capítulo (candidatos a nombre propio/entidad), excluyendo
+    stopwords.
+
+    §17 #48 Cambio B: la query de búsqueda actual (chapter_search_topic +
+    topic del libro) no refleja el vocabulario específico del capítulo. Esta
+    función extrae los términos capitalizados más frecuentes del
+    ``chapter_text`` (sólo nombre propio/biagrama real, no usar el texto
+    completo para evitar over-fitting a la redacción del draft).
+
+    Fail-safe: devuelve [] si chapter_text es None/vacío, si no hay candidatos
+    claros, o si ocurre cualquier error — NUNCA lanza excepción.
+    NO usa LLM: regex + conteo de frecuencia (mismo patrón de stopwords que
+    _anchor_stopwords, reutilizando _STOPWORDS_ES de research).
+    """
+    try:
+        text = str(chapter_text or "").strip()
+        if not text:
+            return []
+        stop = _anchor_stopwords(language)
+        # 1-3 palabras capitalizadas consecutivas (entidad nominal); mayúscula
+        # inicial requerida para evitar falsos positivos de lowercase.
+        tokens = re.findall(
+            r"[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]+(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]+){0,2}",
+            text,
+        )
+        cleaned: list[str] = []
+        for tok in tokens:
+            words = tok.split()
+            # filtra candidatos cuyo primer token es stopword (p.ej. "La
+            # Casona", "El Bosque") para no engañar el ranking con determinante
+            # más nombre genérico.
+            if words[0].lower() in stop:
+                continue
+            # ignora palabras de <4 chars (descarto inicial).
+            if any(len(w) < 4 for w in words):
+                continue
+            cleaned.append(tok)
+        if not cleaned:
+            return []
+        freq: dict[str, int] = {}
+        for tok in cleaned:
+            freq[tok] = freq.get(tok, 0) + 1
+        # prioriza frecuencia DESC, luego longitud DESC (entidades más
+        # específicas suelen ser más largas), luego orden alfabético por
+        # determinismo.
+        ranked = sorted(
+            freq.items(),
+            key=lambda kv: (-kv[1], -len(kv[0].split()), kv[0]),
+        )
+        return [tok for tok, _ in ranked[:max_keywords]]
+    except Exception:  # noqa: BLE001 - defensa fail-safe total
+        return []
+def _extract_entity_keywords(
+    chapter_text: Optional[str],
+    language: Optional[str] = "es",
+    max_keywords: int = _MAX_QUERY_KEYWORDS,
+) -> list[str]:
+    """Extrae hasta ``max_keywords`` siglas/consolas/entidades con dígito o
+    token compuesto (categoría ``entity_keywords``, SEPARADA de las keywords
+    Title-Case genéricas de ``_extract_salient_keywords``).
+
+    §17 imágenes: el capítulo puede mencionar repetidamente "SNES", "PS2",
+    "Xbox Series X/S", "Wii U", "N64"... que la extracción Title-Case no
+    captura (acrónimos en mayúsculas / sufijos con dígitos o "/"). Esta
+    función los detecta de forma determinista (regex, sin NLP) para que la
+    query de imagen pueda diferenciar capítulos cuyo ``chapter_search_topic``
+    es genérico e idéntico.
+
+    Patrón 1 — sigla/acrónimo en mayúsculas (2-6 letras), opcionalmente con
+    1-2 dígitos (SNES, PS2, PS 2, GBA, NES), o 1 letra + 1-2 dígitos (N64):
+        ``\\b(?:[A-Z]{2,6}(?:\\s?\\d{1,2})?|[A-Z]{1,2}\\d{1,2})\\b``
+
+    Patrón 2 — secuencia Title-Case (1-3 palabras) con SUFIJO OBLIGATORIO:
+    dígito, o letra suelta MAYÚSCULA (opcionalmente "/"letra), para capturar
+    consolas tipo "PlayStation 2", "Xbox Series X/S", "Wii U". El sufijo
+    obligatorio es lo que distingue "entity" de un nombre propio Title-Case
+    plano (ese caso pertenece a ``_extract_salient_keywords``):
+        ``[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]+(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]+){0,2}
+        \s+(?:\d{1,2}|[A-ZÁÉÍÓÚÑÜ](?:/[A-ZÁÉÍÓÚÑÜ])?)``
+
+    Filtra stopwords, cuenta frecuencia (mismo ranking: freq DESC, longitud
+    DESC, alfabético) y devuelve lista separada. Fail-safe: [] si no hay
+    candidatos, texto vacío, o error — NUNCA lanza excepción.
+    NO usa LLM: regex + frecuencia, sin dependencias nuevas.
+    """
+    try:
+        text = str(chapter_text or "").strip()
+        if not text:
+            return []
+        stop = _anchor_stopwords(language)
+        # Patrón 1: siglas/acrónimos en mayúsculas (con posible dígito) o
+        # 1 letra + dígitos (N64).
+        pat_acronym = (
+            r"\b(?:[A-Z]{2,6}(?:\s?\d{1,2})?|[A-Z]{1,2}\d{1,2})\b"
+        )
+        # Patrón 2: secuencia Title-Case con SUFIJO OBLIGATORIO (dígito /
+        # letra mayúscula suelta / mayúscula"/"mayúscula). La primera palabra
+        # permite camelCase interno sin espacios (PlayStation, GameCube,
+        # StarCraft) como UN solo token — antes el regex partía "PlayStation"
+        # como "Station" de "PlayStation 2". El lookahead (?!\w) evita robar
+        # la 1ª letra de la palabra siguiente ("Napoleón B" no se coge).
+        pat_camel_or_word = (
+            r"[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]*(?:[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]+)*"
+        )
+        pat_follow = r"(?:\s+[A-ZÁÉÍÓÚÑÜ][a-záéíóúüñ]+)"
+        pat_suffix = r"(?:\d{1,2}|[A-ZÁÉÍÓÚÑÜ](?:/[A-ZÁÉÍÓÚÑÜ])?(?!\w))"
+        pat_title = (
+            pat_camel_or_word
+            + pat_follow + "{0,2}"
+            + r"\s+" + pat_suffix
+        )
+        tokens: list[str] = []
+        tokens.extend(re.findall(pat_acronym, text))
+        tokens.extend(re.findall(pat_title, text))
+        cleaned: list[str] = []
+        for tok in tokens:
+            words = tok.split()
+            if not words:
+                continue
+            # filtro stopwords sobre el primer token
+            if words[0].lower() in stop:
+                continue
+            # descarta acrónimos de 1 letra en solitario (p.ej. "X"); los que
+            # llevan dígito/sufijo ya son capturados por los patrones.
+            if len(words) == 1 and len(words[0]) < 2:
+                continue
+            cleaned.append(tok)
+        # §17 PUNTO 1 — numerales romanos aislados (ruido de siglas): se
+        # descartan solo cuando son el token EXACTO y completo (whole-match,
+        # case-sensitive). Los romanos fusionados en "Metal Gear Solid II" los
+        # captura el patrón 2 como una entidad entera (no "II" suelto).
+        _ROMANS = {
+            "I", "II", "III", "IV", "V", "VI", "VII", "VIII",
+            "IX", "X", "XI", "XII",
+        }
+        cleaned = [tok for tok in cleaned if tok not in _ROMANS]
+        if not cleaned:
+            return []
+        freq: dict[str, int] = {}
+        for tok in cleaned:
+            freq[tok] = freq.get(tok, 0) + 1
+        ranked = sorted(
+            freq.items(),
+            key=lambda kv: (-kv[1], -len(kv[0].split()), kv[0]),
+        )
+        return [tok for tok, _ in ranked[:max_keywords]]
+    except Exception:  # noqa: BLE001 - defensa fail-safe total
+        return []
+
+
+def _language_hint(*maybe_texts: Optional[str]) -> str:
+    """Inferencia mínima de idioma para elegir stopwords al extraer keywords.
+
+    §17 #48 Cambio B: la query ES/EN se construye en image_search con un solo
+    código ``language`` del payload (p.ej. "es"/"en"), pero el helper
+    _search_query no siempre recibe el language. Aquí se infiere heurísticamente
+    a partir de los textos que aparecen en el payload (título del libro,
+    search_topic): si alguno contiene "el/la/los" → "es", si contiene "the/a/an"
+    → "en", por defecto "es". Fail-safe: siempre devuelve un código usable por
+    _extract_salient_keywords y _anchor_stopwords.
+    """
+    try:
+        combined = " ".join(str(t or "") for t in maybe_texts).lower()
+        if re.search(r"\bl[ao]s?\b|\b(de|del|que|con)\b", combined):
+            return "es"
+        if re.search(r"\b(the|a|an|of|in|and|is|are)\b", combined):
+            return "en"
+        return "es"
+    except Exception:  # noqa: BLE001
+        return "es"
+
+
+# ---------------------------------------------------------------------------
 # §17 #30 (P1a, book_72) — dedupe cross-chapter por hash de contenido
 # ---------------------------------------------------------------------------
 def _content_hashes_path(book_id: int) -> str:
@@ -193,32 +411,202 @@ def _search_query(
     chapter_title: Optional[str],
     chapter_text: Optional[str],
     search_topic: Optional[str] = None,
+    book_topic: Optional[str] = None,
 ) -> str:
-    """Construye una query determinista a partir del título (fallback: primeras palabras del texto).
+    """Construye la query de búsqueda: combinación tema-libro + heading del
+    capítulo + keywords salientes del chapter_text.
 
     §17 #30 (P1b, book_72): si el payload trae ``search_topic`` (primer heading
     usable del outline del capítulo, u objective — resuelto en autopilot), se
-    usa ESE tema en vez del título genérico: con títulos de fallback
-    ("... - Parte N") las queries idénticas devolvían los mismos resultados
-    a todos los capítulos. Sin tema usable, cae al comportamiento histórico.
+    usa ESE tema. ``book_topic`` (título del libro, §17 #49 fix) se
+    combina aditivamente cuando no está ya contenido en el tema/título.
+
+    §17 #48 Cambio B: se AÑADEN (no reemplazan) hasta
+    ``_MAX_QUERY_KEYWORDS`` keywords salientes extraídas de ``chapter_text``
+    (véase ``_extract_salient_keywords``) para reflejar el vocabulario
+    específico del capítulo. Las keywords se añaden AL FINAL, evitando
+    duplicar palabras ya presentes (case-insensitive) y acortando la query si
+    supera ``IMAGE_QUERY_MAX_WORDS`` manteniendo el base íntegro.
+    Fail-safe: si no hay keywords/chapter_text, la query deja igual que el
+    comportamiento histórico (topic > title > chapter_text truncado).
     """
-    topic = str(search_topic or "").strip()
-    if topic:
-        return topic[:200]
-    title = (chapter_title or "").strip()
-    if title:
-        return title[:200]
-    text = (chapter_text or "").strip()
-    words = re.split(r"\s+", text)
-    meaningful = [w for w in words if w.strip()]
-    if not meaningful:
-        return "book illustration"
-    return " ".join(meaningful[:12])[:200]
+    # Query base histórica (topic > title > chapter_text truncado).
+    search_topic = str(search_topic or "").strip()
+    if search_topic:
+        base = search_topic
+        lang_hint = _language_hint(chapter_title, search_topic)
+    else:
+        title = (chapter_title or "").strip()
+        if title:
+            base = title
+        else:
+            text = (chapter_text or "").strip()
+            words = [w for w in re.split(r"\s+", text) if w.strip()]
+            base = (" ".join(words[:12])[:200] if words else "book illustration")
+        lang_hint = _language_hint(chapter_title, book_topic)
+
+    # §17 #49 fix: combina el topic/título del libro (no sólo el del capítulo).
+    book_topic = str(book_topic or "").strip()
+    if book_topic and book_topic.lower() not in base.lower():
+        _combined = f"{base} {book_topic}"
+        if len(_combined.split()) <= IMAGE_QUERY_MAX_WORDS:
+            base = _combined
+
+    # §17 #48 Cambio B: keywords salientes del chapter_text.
+    base_words = {w.lower() for w in base.split()}
+    keywords = [
+        kw
+        for kw in _extract_salient_keywords(chapter_text, lang_hint)
+        if kw.lower() not in base_words
+    ]
+    # §17 imagenes: entity_keywords (siglas/consolas con dígito o "/") se
+    # priorizan sobre las genéricas. Se les reserva un presupuesto propio de
+    # hasta ENTITY_BUDGET palabras antes de rellenar con las genéricas,
+    # respetando siempre el límite total IMAGE_QUERY_MAX_WORDS.
+    entity_keywords = [
+        kw
+        for kw in _extract_entity_keywords(chapter_text, lang_hint)
+        if kw.lower() not in base_words
+    ]
+    if keywords or entity_keywords:
+        spare = max(0, IMAGE_QUERY_MAX_WORDS - len(base.split()))
+        chosen: list[str] = []
+        used = 0
+        entity_budget = min(2, spare)  # presupuesto propio de entidades
+        entity_chosen, entity_used = [], 0
+        for kw in entity_keywords:
+            kw_words = len(kw.split())
+            if entity_used + kw_words <= entity_budget:
+                entity_chosen.append(kw)
+                entity_used += kw_words
+            if entity_used >= entity_budget:
+                break
+        chosen.extend(entity_chosen)
+        used = entity_used
+        # genéricas en el espacio restante, sin duplicar palabras ya usadas
+        used_words = base_words | {w.lower() for k in chosen for w in k.split()}
+        for kw in keywords:
+            kw_words = len(kw.split())
+            if used + kw_words <= spare and not (
+                any(w.lower() in used_words for w in kw.split())
+            ):
+                chosen.append(kw)
+                used += kw_words
+                used_words |= {w.lower() for w in kw.split()}
+        candidate = f"{base} {' '.join(chosen)}" if chosen else base
+        return candidate[:200]
+    return base[:200]
 
 
 # ---------------------------------------------------------------------------
 # Llamadas HTTP a SearXNG (resilientes)
 # ---------------------------------------------------------------------------
+# §17 #48 Fase 3 — resiliencia ante rate-limiting de SearXNG (caso book_76:
+# 0 imágenes por rate-limit indistinguible de "sin resultados reales").
+# Constantes env-overridable, mismo estilo del módulo.
+SEARXNG_MAX_RETRIES = int(os.environ.get("SEARXNG_MAX_RETRIES", "3"))
+# Base (s) del backoff exponencial con jitter: espera = base * 2**intento + jitter.
+SEARXNG_BACKOFF_BASE = float(os.environ.get("SEARXNG_BACKOFF_BASE", "1.0"))
+
+
+def _searxng_fetch(
+    query: str,
+    language: Optional[str] = None,
+    pageno: int = 1,
+    deadline: Optional[float] = None,
+) -> tuple[list, str]:
+    """Consulta SearXNG con reintentos diferenciados por causa.
+
+    §17 #48 Fase 3. Devuelve ``(results, status)`` con status:
+    - "ok": respuesta HTTP válida (aunque traiga 0 resultados — un
+      0-resultados REAL no es rate-limit; el caller lo distingue).
+    - "rate_limited": HTTP 429 y se agotaron los reintentos
+      (SEARXNG_MAX_RETRIES) o el backoff no cabía en el budget restante.
+    - "error": error de red/conexión/servidor o timeout → falla rápido
+      SIN bucle de reintentos infinito.
+
+    ``deadline`` (opcional, time.monotonic()): el backoff NUNCA puede hacer
+    que la fase se pase del budget total (IMAGE_SEARCH_TOTAL_TIME_BUDGET);
+    si la espera excedería el deadline, corta y degrada a "rate_limited".
+    Nunca lanza excepción no controlada.
+    """
+    import random
+
+    params_base: dict[str, str] = {
+        "q": query,
+        "categories": "images",
+        "format": "json",
+        "pageno": str(pageno),
+        "per_page": str(SEARXNG_PER_PAGE),
+    }
+    if language:
+        # §17 #24: acota resultados por idioma (SearXNG soporta el param
+        # nativo `language`; default histórico = sin filtro).
+        params_base["language"] = language
+
+    last_error: Optional[str] = None
+    _timeout_retries = 0  # §17 #48 Fase 3: timeout → retry SIMPLE (1 reintento inmediato, sin backoff)
+    for attempt in range(SEARXNG_MAX_RETRIES):
+        try:
+            resp = requests.get(
+                SEARXNG_URL.rstrip("/") + "/search",
+                params=params_base,
+                timeout=SEARCH_TIMEOUT,
+                headers={"User-Agent": _USER_AGENT},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return list(data.get("results") or []), "ok"
+        except requests.exceptions.Timeout as exc:
+            # Timeout de red: 1 reintento inmediato (sin backoff, acotado);
+            # si ya se usó, falla rápido — sin bucle de reintentos.
+            if _timeout_retries < 1:
+                _timeout_retries += 1
+                logger.warning(
+                    "image_search: SearXNG timeout en página %d (retry simple %d/1): %s",
+                    pageno, _timeout_retries, exc,
+                )
+                continue
+            logger.warning("image_search: SearXNG timeout persistente en página %d: %s", pageno, exc)
+            return [], "error"
+        except requests.exceptions.RequestException as exc:
+            if getattr(getattr(exc, "response", None), "status_code", None) == 429:
+                last_error = "HTTP 429 (rate limit)"
+                wait = SEARXNG_BACKOFF_BASE * (2 ** attempt) + random.uniform(0, 0.5)
+                if deadline is not None and time.monotonic() + wait > deadline:
+                    logger.warning(
+                        "image_search: rate limit (429) y el backoff (%.1fs) "
+                        "excede el budget restante: cortando sin más reintentos",
+                        wait,
+                    )
+                    return [], "rate_limited"
+                logger.warning(
+                    "image_search: HTTP 429 en página %d (intento %d/%d): backoff %.1fs",
+                    pageno, attempt + 1, SEARXNG_MAX_RETRIES, wait,
+                )
+                if attempt >= SEARXNG_MAX_RETRIES - 1:
+                    # Último intento agotado: no dormir inútilmente (no hay retry
+                    # posterior); degrada ya a rate_limited.
+                    break
+                time.sleep(wait)
+                continue
+            # Conexión caída / HTTP != 429: NO reintentar en bucle — fail fast
+            # con log claro (servidor caído no se arregla reintentando).
+            logger.warning(
+                "image_search: SearXNG error de red/HTTP (página %d): %s", pageno, exc
+            )
+            return [], "error"
+        except Exception as exc:  # noqa: BLE001 - nunca abortar el lote
+            logger.warning("image_search: SearXNG error inesperado: %s", exc)
+            return [], "error"
+    logger.warning(
+        "image_search: rate limit persistente tras %d reintentos (último: %s): "
+        "página %d marcada rate_limited (≠ 0-resultados real)",
+        SEARXNG_MAX_RETRIES, last_error, pageno,
+    )
+    return [], "rate_limited"
+
+
 def _searxng_search(
     query: str, language: Optional[str] = None, pageno: int = 1
 ) -> list[dict]:
@@ -235,6 +623,7 @@ def _searxng_search(
             "categories": "images",
             "format": "json",
             "pageno": str(pageno),
+            "per_page": str(SEARXNG_PER_PAGE),
         }
         if language:
             # §17 #24: acota resultados por idioma (SearXNG soporta el param
@@ -382,6 +771,59 @@ def _web_meta(
     }
 
 
+def _score_candidate(candidate: dict, keywords: list[str]) -> float:
+    """§17 #48 Fase 2 — score de METADATA para el ranking best-first.
+
+    Componentes (pesos, ajustables sin tocar la firma):
+    - solapamiento de ``keywords`` (las de Cambio B, pasada como parámetro)
+      contra el texto disponible del candidato (title/url/img_src): peso 2.0.
+      Sin keywords (fail-safe de Cambio B) → 0.5 neutro.
+    - proximidad de resolución al área objetivo de ilustración de capítulo
+      (~1024x768; las constantes IMAGE_MIN_* de Fase 1 actúan de suelo vía
+      quality check, aquí solo se ORDENA): peso 1.0; sin resolution → 0.5.
+    - proximidad de aspect ratio al rango fotográfico estándar 1.33-1.78
+      (dentro del rango ya validado por el quality check): peso 0.5.
+
+    TODO (no implementado a medias): penalización por dominio ya usado en
+    capítulos anteriores del mismo libro — el registro disponible en este
+    punto (_hash_registry) es por CONTENIDO (sha1 post-descarga), no por
+    dominio; requeriría un registro previo de dominios que no existe hoy.
+    """
+    text = " ".join(
+        str(candidate.get(k) or "")
+        for k in ("title", "url", "img_src", "thumbnail_src")
+    ).lower()
+    if keywords:
+        hits = sum(1 for kw in keywords if kw.lower() in text)
+        kw_score = hits / len(keywords)
+    else:
+        kw_score = 0.5
+
+    res_score = 0.5
+    ar_score = 0.5
+    m = re.match(
+        r"(\d+)\s*[x×]\s*(\d+)", str(candidate.get("resolution") or "")
+    )
+    if m:
+        try:
+            w, h = int(m.group(1)), int(m.group(2))
+        except (TypeError, ValueError):
+            w = h = 0
+        if w > 0 and h > 0:
+            area = w * h
+            target = 1024 * 768
+            res_score = min(area, target) / max(area, target)
+            ar = w / h
+            lo, hi = 1.33, 1.78
+            if lo <= ar <= hi:
+                ar_score = 1.0
+            else:
+                dist = min(abs(ar - lo), abs(ar - hi)) / ar
+                ar_score = max(0.0, 1.0 - dist)
+
+    return 2.0 * kw_score + 1.0 * res_score + 0.5 * ar_score
+
+
 def _error_meta(image_id: str, query: str, images_dir: str, reason: str, source_url: Optional[str] = None) -> dict:
     return _web_meta(
         image_id=image_id,
@@ -393,6 +835,126 @@ def _error_meta(image_id: str, query: str, images_dir: str, reason: str, source_
         error=reason,
         source_url=source_url,
     )
+
+
+# ---------------------------------------------------------------------------
+# §17 #48 Cambio C — checks de calidad de la imagen descargada
+# ---------------------------------------------------------------------------
+def _vlm_answer_is_yes(answer: str) -> bool:
+    """Parseo ROBUSTO de la respuesta del VLM (case-insensitive, sin acentos,
+    tolera espacios/puntuación inicial). Fail-open: respuesta ambigua → True
+    (mismo espíritu de resiliencia que el resto del módulo)."""
+    text = unicodedata.normalize("NFKD", (answer or "").strip())
+    text = text.encode("ascii", "ignore").decode("ascii").lower()
+    text = re.sub(r"^[\W_]+", "", text)  # espacios/puntuación inicial
+    if text.startswith(("si", "yes")):
+        return True
+    if text.startswith("no"):
+        return False
+    return True  # ambiguo/irreconocible → fail-open
+
+
+def _verify_image_relevance(
+    image_bytes: Optional[bytes],
+    topic: str,
+    keywords: Optional[list[str]] = None,
+    deadline: Optional[float] = None,
+) -> bool:
+    """§17 #48 Fase 4 — verificación semántica VLM del candidato ya seleccionado.
+
+    - Flag VLM_VERIFICATION_ENABLED=0 (DEFAULT): devuelve True inmediatamente
+      (no-op, cero llamadas de red, comportamiento idéntico al pre-Fase-4).
+    - Flag activo: llama a Ollama /api/generate (multimodal, images=[base64])
+      con prompt determinista SI/NO. Respuesta "NO" → False (el loop de Fase 2
+      descarta ese candidato y prueba el siguiente del pool).
+    - NUNCA lanza excepción y NUNCA descarta por fallo del VLM: timeout/error
+      de Ollama o presupuesto agotado → fail-open (True), loggeado como warning.
+      El fallo del VLM en sí no debe descartar un candidato que ya pasó todos
+      los filtros anteriores.
+    """
+    if not VLM_VERIFICATION_ENABLED:
+        return True
+
+    try:
+        timeout = VLM_TIMEOUT_SECONDS
+        if deadline is not None:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                logger.warning(
+                    "image_search: sin presupuesto para verificación VLM "
+                    "(%.2fs restantes): fail-open (True)",
+                    remaining,
+                )
+                return True
+            # La llamada VLM respeta el deadline global de la fase: nunca puede
+            # consumir más que el presupuesto restante (mismo patrón que
+            # _searxng_fetch de Fase 3).
+            timeout = min(timeout, remaining)
+
+        kw_ctx = ""
+        if keywords:
+            kw_ctx = " Temas clave: " + ", ".join(list(keywords)[:5]) + "."
+        prompt = (
+            f"¿Esta imagen es relevante para el tema: {topic}?{kw_ctx} "
+            "Responde únicamente SI o NO."
+        )
+        b64 = base64.b64encode(image_bytes or b"").decode("ascii")
+        resp = requests.post(
+            f"{VLM_BASE_URL}/api/generate",
+            json={
+                "model": VLM_MODEL_NAME,
+                "prompt": prompt,
+                "images": [b64],
+                "stream": False,
+                "options": {"num_predict": 8},
+            },
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        answer = str((resp.json() or {}).get("response") or "")
+        ok = _vlm_answer_is_yes(answer)
+        if not ok:
+            logger.info(
+                "image_search: VLM descarta candidato (respuesta=%r)",
+                answer.strip()[:80],
+            )
+        return ok
+    except Exception as exc:  # noqa: BLE001 - fail-open: el VLM nunca bloquea la fase
+        logger.warning(
+            "image_search: verificación VLM no disponible (fail-open, True): %s",
+            exc,
+        )
+        return True
+
+
+def _passes_quality_check(image_bytes: Optional[bytes]) -> bool:
+    """True si la imagen cumple los checks mínimos de calidad editorial.
+
+    §17 #48 Cambio C: SearXNG devuelve thumbnails/iconos/banners que ocupan
+    slots sin aportar valor de ilustración de capítulo. Checks (todos
+    env-overridable vía constantes del módulo):
+      - dimensiones mínimas (IMAGE_MIN_WIDTH x IMAGE_MIN_HEIGHT, defaults
+        400x300: ilustración de capítulo, no thumbnail/icono);
+      - aspect ratio (w/h) en rango [1/MAX, MAX] (defaults 0.4..3.0: descarta
+        tiras muy alargadas y banners).
+    Fail-safe total: bytes inválidos/corruptos/formato no soportado → False
+    (falla el check, NUNCA lanza excepción no controlada).
+    """
+    if not image_bytes:
+        return False
+    try:
+        import io
+
+        from PIL import Image
+
+        with Image.open(io.BytesIO(image_bytes)) as im:
+            width, height = im.size
+        if width < IMAGE_MIN_WIDTH or height < IMAGE_MIN_HEIGHT:
+            return False
+        ratio = width / float(height)
+        return IMAGE_MIN_ASPECT_RATIO <= ratio <= IMAGE_MAX_ASPECT_RATIO
+    except Exception:  # noqa: BLE001 - corrupta/formato no soportado: falla el check
+        return False
 
 # ---------------------------------------------------------------------------
 # Filtro de anclaje temático por idioma nativo (§17 #28)
@@ -467,16 +1029,38 @@ def _search_query_en(data: dict) -> str:
 
     Prioridad: title_en > chapter_title_en > chapter_text_en (primeras
     palabras) > cadena genérica EN. NUNCA cae al título/texto en español:
-    era exactamente la causa del mismatch de idioma de book_67."""
+    era exactamente la causa del mismatch de idioma de book_67.
+
+    §17 #48 Cambio B: añade (no reemplaza) hasta ``_MAX_QUERY_KEYWORDS``
+    keywords salientes de ``chapter_text_en`` (misma mecánica fail-safe que
+    _search_query), sin duplicar palabras ya presentes y acotada a
+    ``IMAGE_QUERY_MAX_WORDS`` palabras.
+    """
+    base: Optional[str] = None
     for field in ("chapter_search_topic", "title_en", "chapter_title_en"):
         value = str(data.get(field) or "").strip()
         if value:
-            return value[:200]
+            base = value
+            break
     text = str(data.get("chapter_text_en") or "").strip()
-    words = [w for w in re.split(r"\s+", text) if w.strip()]
-    if words:
-        return " ".join(words[:12])[:200]
-    return "book illustration"
+    if base is None:
+        words = [w for w in re.split(r"\s+", text) if w.strip()]
+        base = (" ".join(words[:12])[:200] if words else "book illustration")
+
+    # §17 #48 Cambio B: keywords salientes del texto EN (stopwords EN).
+    keywords = [
+        kw
+        for kw in _extract_salient_keywords(text or None, "en")
+        if kw.lower() not in {w.lower() for w in base.split()}
+    ]
+    if keywords:
+        candidate = f"{base} {' '.join(keywords)}"
+        words = candidate.split()
+        if len(words) > IMAGE_QUERY_MAX_WORDS:
+            spare = max(0, IMAGE_QUERY_MAX_WORDS - len(base.split()))
+            candidate = f"{base} {' '.join(keywords[:spare])}" if spare else base
+        return candidate[:200]
+    return base[:200]
 
 
 _CAPABILITY_LANGUAGES = {
@@ -522,13 +1106,21 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
     # sha1 -> {"chapter": N, "path": "..."} permite descartar la misma imagen
     # física cuando aparece en OTRO capítulo del mismo libro.
     _hash_registry = _load_content_hashes(book_id)
+    # §17 #48 Fase 2 — keywords salientes para el RANKING de candidatos: se
+    # calculan UNA sola vez (mismas que Cambio B usa para la query) y se pasan
+    # como parámetro a _score_candidate (no se recalculan por candidato).
+    _rank_lang = "en" if lang_is_en else "es"
+    _rank_keywords = _extract_salient_keywords(chapter_text, _rank_lang)
     # Query nativa por idioma (§17 #28): ES usa el comportamiento histórico;
     # EN usa campos nativos EN (title_en etc.) si existen.
     if lang_is_en:
         query = _search_query_en(data)
     else:
         query = _search_query(
-            chapter_title, chapter_text, search_topic=data.get("chapter_search_topic")
+            chapter_title,
+            chapter_text,
+            search_topic=data.get("chapter_search_topic"),
+            book_topic=topic,
         )
 
     # §17 #24: para libros EN se acota SearXNG por idioma; cualquier otro
@@ -557,6 +1149,14 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
     # setea dentro del loop de candidatos y se lee tras el loop interior para
     # romper también el loop de páginas y pasar directo al relleno final.
     _budget_exhausted = False
+    # §17 #48 Fase 3 — bandera de rate-limiting: si SearXNG devolvió 429
+    # persistente, el relleno final marca los slots con "rate_limited"
+    # (≠ "no_results") para diferenciarlo de un 0-resultados real.
+    _rate_limited = False
+    # §17 #48 Fase 4 — contador de candidatos probados desde la última
+    # aceptación de slot; se persiste como vlm_candidates_tried (trazabilidad
+    # de cuántos descartes de VLM hubo antes de aceptar cada imagen).
+    _vlm_candidates_tried = 0
     while slot < requested:
         if time.monotonic() - _start >= IMAGE_SEARCH_TOTAL_TIME_BUDGET:
             logger.warning(
@@ -576,9 +1176,29 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
                 requested - slot,
             )
             break
-        page_results = _searxng_search(
-            query, language=searxng_language, pageno=page
+        # §17 #48 Fase 3 — llamada con reintentos diferenciados por causa y
+        # deadline del budget total: el backoff NUNCA puede superar el
+        # presupuesto de la fase (si no cabría, degrada a rate_limited ya).
+        page_results, _fetch_status = _searxng_fetch(
+            query,
+            language=searxng_language,
+            pageno=page,
+            deadline=_start + IMAGE_SEARCH_TOTAL_TIME_BUDGET,
         )
+        if _fetch_status == "rate_limited":
+            # Señal aditiva (§17 #48 Fase 3): la página quedó sin resultados
+            # por rate-limiting de SearXNG (≠ 0-resultados real). Se propaga
+            # al relleno final vía campo `error` (string libre en schema) y
+            # se corta la paginación: pedir más páginas a un SearXNG
+            # rate-limited solo quemaría budget.
+            _rate_limited = True
+            logger.warning(
+                "image_search: página %d marcada rate_limited (≠ no_results): "
+                "cortando paginación con shortfall=%d",
+                page,
+                requested - slot,
+            )
+            break
 
         # Dedupe entre páginas por la MISMA clave que ya usa el filtrado:
         # img_src (clave de descarga) y url de la página fuente (clave de
@@ -605,6 +1225,11 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
             )
             break
 
+        # §17 #48 Fase 2 — pool de candidatos de la página que pasan los
+        # filtros de metadata (anclaje/denylist/non-raster); se puntúan con
+        # _score_candidate y la descarga se hace BEST-FIRST (mayor score
+        # primero), no en orden de llegada (first-fit).
+        _pool: list[tuple[float, dict]] = []
         for item in fresh:
             # §17 #30 — guard de CUPO dentro de la página: una página puede
             # traer MUCHOS más candidatos que `requested` (p.ej. ~2400 de
@@ -672,17 +1297,27 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
                 )
                 continue
 
+            # §17 #48 Fase 2 — candidato con metadata válida (anclaje + denylist):
+            # NO se descarga inline (first-fit). Se puntúa con _score_candidate y
+            # se añade al pool; la descarga se hace BEST-FIRST tras el `for`.
+            _pool.append((_score_candidate(item, _rank_keywords), item))
+
+        # §17 #48 Fase 2 — descarga BEST-FIRST: se ordena el pool por score
+        # descendente y se intenta descargar/validar en ese orden hasta llenar
+        # el cupo. El score es solo sobre metadata; la validación de bytes
+        # (PIL verify + quality check de Fase 1) sigue siendo necesaria después.
+        for _cand_score, item in sorted(_pool, key=lambda t: t[0], reverse=True):
+            if slot >= requested:
+                break
+
+            img_src = item.get("img_src") or item.get("thumbnail_src") or ""
             image_id = f"img_{slot + 1:02d}_web"
             engine = _normalize_engine(item.get("engine"))
             ext = _image_extension(img_src)
 
-            # §17 #30 — chequeo de presupuesto DENTRO de la página, ANTES de
-            # cada descarga. Una página con muchos candidatos que fallan en la
-            # descarga (403/timeout/SVG, cada uno hasta DOWNLOAD_TIMEOUT) puede
-            # superar IMAGE_SEARCH_TOTAL_TIME_BUDGET sin que el chequeo
-            # entre-páginas (nada más entrar al while) tenga ocasión de cortar.
-            # Si se agota a mitad de página, cortamos limpio ambos bucles y el
-            # relleno final marca los slots faltantes con "no_results".
+            # §17 #30 — chequeo de presupuesto ANTES de cada descarga. Si se
+            # agota a mitad de página, cortamos limpio ambos bucles y el relleno
+            # final marca los slots faltantes con "no_results".
             if time.monotonic() - _start >= IMAGE_SEARCH_TOTAL_TIME_BUDGET:
                 logger.warning(
                     "image_search: presupuesto agotado (%.1fs >= %.1fs) a mitad "
@@ -746,6 +1381,18 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
                 slot += 1
                 continue
 
+            # §17 #48 Cambio C — check de calidad (dimensiones mínimas + aspect
+            # ratio) ANTES de aceptar el candidato. Mismo patrón skip-and-
+            # continue que la denylist: descarta SIN ocupar slot ni marcar
+            # error, y el loop continúa con el siguiente candidato.
+            if not _passes_quality_check(data_bytes):
+                logger.warning(
+                    "image_search: descartado por chequeo de calidad "
+                    "(dimensiones/aspect ratio insuficientes): %s",
+                    img_src,
+                )
+                continue
+
             # §17 #30 (P1a, book_72) — dedupe cross-chapter por contenido: la
             # misma imagen física (mismos bytes) ya usada en OTRO capítulo del
             # mismo libro se descarta y el slot sigue intentando con el
@@ -767,6 +1414,27 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
                         img_src,
                     )
                     continue
+
+            # §17 #48 Fase 4 — verificación semántica VLM (DEFAULT OFF) del
+            # candidato ya seleccionado por el ranking best-first y validado
+            # por quality check + dedupe. Respuesta "NO" → skip-and-continue
+            # (mismo patrón que denylist/quality check: descarta SIN ocupar
+            # slot ni marcar error) y el loop prueba el siguiente candidato.
+            # El fallo/timeout del VLM en sí es fail-open (True, ver función).
+            _vlm_candidates_tried += 1
+            if not _verify_image_relevance(
+                data_bytes,
+                topic,
+                _rank_keywords,
+                deadline=_start + IMAGE_SEARCH_TOTAL_TIME_BUDGET,
+            ):
+                logger.warning(
+                    "image_search: descartado por verificación semántica VLM "
+                    "(tema: %s): %s",
+                    topic,
+                    img_src,
+                )
+                continue
 
             width, height = _image_dimensions(data_bytes)
             w = int(width or 1024)
@@ -807,6 +1475,13 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
                 },
             )
             meta["image_path"] = image_path
+            # §17 #48 Fase 4 — trazabilidad VLM persistida (Optional en schema):
+            # distingue "verificado y pasó" (vlm_checked=True) de "nunca se
+            # verificó" (flag a 0 → False), y cuántos candidatos se probaron
+            # antes de aceptar este (1 = a la primera).
+            meta["vlm_checked"] = VLM_VERIFICATION_ENABLED
+            meta["vlm_candidates_tried"] = _vlm_candidates_tried
+            _vlm_candidates_tried = 0
             _write_metadata(images_dir, meta)
             # §17 #30 (P1a): registra el contenido aceptado para el dedupe
             # cross-chapter de los siguientes capítulos del libro.
@@ -829,7 +1504,12 @@ def search_chapter_images(payload: dict, language: Optional[str] = None) -> dict
     # generate_image.
     while slot < requested:
         image_id = f"img_{slot + 1:02d}_web"
-        results.append(_error_meta(image_id, query, images_dir, "no_results"))
+        # §17 #48 Fase 3 — distinción rate_limited vs no_results: si la causa
+        # del shortfall fue rate-limiting de SearXNG, el slot lo refleja para
+        # que quality_gate/autopilot puedan diferenciarlo de un 0-resultados
+        # real (campo `error` string libre: cambio aditivo, contrato intacto).
+        _shortfall_error = "rate_limited" if _rate_limited else "no_results"
+        results.append(_error_meta(image_id, query, images_dir, _shortfall_error))
         failed += 1
         slot += 1
 

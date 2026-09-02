@@ -12,6 +12,7 @@ import json
 import os
 
 import pytest
+import requests
 from PIL import Image
 
 from core.schemas import ImageGenerateOutput, validate_output
@@ -46,7 +47,7 @@ class _HttpError(Exception):
     """Simula un error/tiempo de espera en red."""
 
 
-def _png_bytes(width=64, height=64):
+def _png_bytes(width=800, height=600):
     buf = io.BytesIO()
     Image.new("RGB", (width, height), (200, 30, 30)).save(buf, format="PNG")
     return buf.getvalue()
@@ -158,7 +159,7 @@ def test_ok_completo(tmp_path, monkeypatch):
     assert first["source_type"] == "web_search"
     assert first["source_url"] == "https://cdn.example.com/img1.png"
     assert "bing images" in first["engine"]
-    assert first["resolution"] == "64x64"
+    assert first["resolution"] == "800x600"
     assert first["license"] is None  # explícito, sin inventar
 
     metadata_path = os.path.join(out["images_dir"], f"{first['image_id']}.metadata.json")
@@ -278,8 +279,8 @@ def test_dedupe_cross_chapter_por_hash(tmp_path, monkeypatch):
     en OTRO capítulo del mismo libro se descarta SIN consumir slot de error y
     el slot sigue con el siguiente candidato. El mismo contenido en el PROPIO
     capítulo se permite (re-ejecución/overwrite)."""
-    same = _png_bytes(64, 64)
-    other = _png_bytes(100, 100)  # contenido distinto (bytes distintos, ≥64px)
+    same = _png_bytes(640, 480)   # 4:3, dentro del quality check
+    other = _png_bytes(800, 533)  # contenido distinto (bytes distintos), ~3:2
 
     def fake_get(url, **kwargs):
         if "/search" in url:
@@ -982,3 +983,472 @@ def test_cupo_corta_a_mitad_de_pagina_con_exceso_de_candidatos(tmp_path, monkeyp
     assert [r.image_id for r in validated.results] == [
         "img_01_web", "img_02_web", "img_03_web", "img_04_web", "img_05_web",
     ]
+
+
+# ---------------------------------------------------------------------------
+# §17 #48 Fase 1 — Cambio B (keywords salientes) y Cambio C (quality check)
+# ---------------------------------------------------------------------------
+def test_extract_salient_keywords_devuelve_keywords_razonables():
+    texto = (
+        "El estilo Imperio surgió en la Francia napoleónica. "
+        "El estilo Imperio se caracteriza por columnas romanas. "
+        "Napoleón Bonaparte impulsó el estilo Imperio en las artes decorativas. "
+        "Otros estilos menores no repiten entidad alguna."
+    )
+    kws = image_search_main._extract_salient_keywords(texto, "es")
+    assert kws, "debe extraer al menos una keyword de un texto con entidades"
+    assert all(len(kw) >= 4 for kw in kws)
+    assert len(kws) <= 4
+    joined = " ".join(kws).lower()
+    assert "imperio" in joined
+
+
+def test_extract_salient_keywords_vacio_con_texto_invalido():
+    assert image_search_main._extract_salient_keywords(None, "es") == []
+    assert image_search_main._extract_salient_keywords("", "es") == []
+    assert image_search_main._extract_salient_keywords("   ", "en") == []
+    # Texto sin entidades claras (todo minúsculas): sin candidatos → vacío.
+    assert image_search_main._extract_salient_keywords(
+        "esto no contiene nombres propios relevantes solo palabras comunes", "es"
+    ) == []
+
+
+def test_search_query_anade_keywords_sin_duplicar_topic():
+    texto = (
+        "Antonio Gaudi diseno la Sagrada Familia con influencias goticas. "
+        "Antonio Gaudi tambien trabajo en el Park Guell de Barcelona. "
+        "La Sagrada Familia sigue en construccion hoy."
+    )
+    query = image_search_main._search_query(
+        "Estilos arquitectónicos destacados",
+        texto,
+        search_topic="El estilo Imperio",
+        book_topic="Historia de la arquitectura",
+    )
+    qwords = [w.lower() for w in query.split()]
+    # no duplicados dentro de la query
+    assert len(qwords) == len(set(qwords))
+    # base intacta al principio y keywords añadidas al final
+    assert query.startswith("El estilo Imperio")
+    lowered = query.lower()
+    assert "gaudi" in lowered or "familia" in lowered
+    # acotada a IMAGE_QUERY_MAX_WORDS
+    assert len(qwords) <= image_search_main.IMAGE_QUERY_MAX_WORDS
+
+
+def _png_bytes_sized(width: int, height: int) -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), color=(120, 30, 90)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_passes_quality_check_rechaza_pequena_y_alargada():
+    # thumbnail pequeño: rechaza
+    assert image_search_main._passes_quality_check(_png_bytes_sized(200, 150)) is False
+    # banner alargado (ratio 4:1 > 3.0): rechaza
+    assert image_search_main._passes_quality_check(_png_bytes_sized(1200, 300)) is False
+    # corrupta/no-imagen: falla el check sin excepción
+    assert image_search_main._passes_quality_check(b"no es una imagen") is False
+    assert image_search_main._passes_quality_check(None) is False
+    assert image_search_main._passes_quality_check(b"") is False
+
+
+def test_passes_quality_check_acepta_imagen_normal():
+    assert image_search_main._passes_quality_check(_png_bytes_sized(800, 600)) is True
+    # ratio 16:9 dentro del rango
+    assert image_search_main._passes_quality_check(_png_bytes_sized(1024, 576)) is True
+    # ratio vertical 2:3 (0.667) dentro del rango
+    assert image_search_main._passes_quality_check(_png_bytes_sized(400, 600)) is True
+
+
+# ---------------------------------------------------------------------------
+# §17 #48 Fase 2 — ranking de candidatos (_score_candidate + best-first)
+# ---------------------------------------------------------------------------
+def _cand(img: str, title: str, resolution: str = "1024x768") -> dict:
+    return {
+        "url": f"https://example.com/page/{img}",
+        "title": title,
+        "img_src": f"https://cdn.example.com/{img}.png",
+        "engine": "bing images",
+        "resolution": resolution,
+    }
+
+
+def test_score_candidate_solapamiento_keywords():
+    """El candidato cuyo texto solapa más keywords recibe mayor score."""
+    keywords = ["caverna", "ecos", "subterraneo"]
+    mejor = _cand("a.png", "La Caverna de los Ecos — mapa del subterraneo")
+    peor = _cand("b.png", "Foto genérica de stock sin relación")
+    s_mejor = image_search_main._score_candidate(mejor, keywords)
+    s_peor = image_search_main._score_candidate(peor, keywords)
+    assert s_mejor > s_peor
+    # Sin keywords (fail-safe de Cambio B): componentes neutros, no excepción
+    # (kw 0.5*2.0=1.0 + res 1.0 para 1024x768 + ar 1.0 para 4:3).
+    assert image_search_main._score_candidate(peor, []) == 2.5
+
+
+def test_loop_selecciona_mayor_score_no_primero(tmp_path, monkeypatch):
+    """Con 2+ candidatos válidos, el loop best-first descarga primero el de
+    mayor score (aunque NO sea el primero de la lista de SearXNG)."""
+    # Primero en la lista: score bajo (sin keywords en el título, ratio 3:1
+    # fuera del rango fotográfico). Segundo: score alto (keywords + 4:3).
+    results = [
+        _cand("img_low", "Foto genérica de stock", resolution="1200x400"),
+        _cand("img_high", "La Caverna de los Ecos ilustración", resolution="1024x768"),
+    ]
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes(640, 480))
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=1))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+    assert validated.generated == 1 and validated.failed == 0
+    # El aceptado es el de mayor score (img_high), no el primero de la lista.
+    ok = validated.results[0]
+    assert ok.status == "ok"
+    raw_ok = [r for r in out["results"] if r.get("status") == "ok"][0]
+    assert "img_high" in (raw_ok.get("source_url") or "")
+    assert downloaded and "img_high" in downloaded[0]
+
+
+def test_loop_candidato_unico_no_rompe(tmp_path, monkeypatch):
+    """Con un solo candidato válido el comportamiento es idéntico al
+    pre-ranking: se descarga y se acepta."""
+    results = [_cand("img_only", "La Caverna de los Ecos — ilustración única")]
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"results": results})
+        return _FakeResp(content=_png_bytes(640, 480))
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=1))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+    assert validated.generated == 1 and validated.failed == 0
+    assert validated.results[0].status == "ok"
+
+
+# ---------------------------------------------------------------------------
+# §17 #48 Fase 3 — resiliencia / rate-limiting de SearXNG
+# ---------------------------------------------------------------------------
+class _RateLimitResp:
+    """Respuesta HTTP 429: raise_for_status lanza HTTPError con .response."""
+
+    status_code = 429
+
+    def raise_for_status(self):
+        raise image_search_main.requests.exceptions.HTTPError(
+            "429 Client Error", response=self
+        )
+
+    def json(self):  # pragma: no cover - no se debe llegar aquí
+        return {"results": []}
+
+
+def test_searxng_429_backoff_respeta_max_retries(monkeypatch):
+    """HTTP 429 dispara backoff exponencial con jitter y respeta
+    SEARXNG_MAX_RETRIES sin bucle infinito."""
+    calls = {"n": 0}
+    sleeps: list[float] = []
+
+    def fake_get(url, **kwargs):
+        calls["n"] += 1
+        return _RateLimitResp()
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+    monkeypatch.setattr(image_search_main.time, "sleep", lambda s: sleeps.append(s))
+
+    results, status = image_search_main._searxng_fetch("q", pageno=1)
+    assert results == [] and status == "rate_limited"
+    # Exactamente SEARXNG_MAX_RETRIES intentos, sin bucle infinito.
+    assert calls["n"] == image_search_main.SEARXNG_MAX_RETRIES
+    # Backoff exponencial: cada espera crece respecto a la anterior.
+    assert len(sleeps) == image_search_main.SEARXNG_MAX_RETRIES - 1
+    assert all(b >= a for a, b in zip(sleeps, sleeps[1:]))
+
+
+def test_429_agotado_se_distingue_de_0_resultados_real(tmp_path, monkeypatch):
+    """Tras agotar reintentos por 429, el slot del shortfall queda marcado
+    'rate_limited' (≠ 'no_results' de un 0-resultados real)."""
+
+    def fake_get(url, **kwargs):
+        return _RateLimitResp() if "/search" in url else _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+    monkeypatch.setattr(image_search_main.time, "sleep", lambda s: None)
+
+    out = image_search.search_chapter_images(_payload(num_images=2))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+    assert validated.generated == 0 and validated.failed == 2
+    failed_errors = [r.get("error") for r in out["results"] if r.get("status") != "ok"]
+    assert failed_errors and all(e == "rate_limited" for e in failed_errors)
+
+
+def test_error_conexion_no_reintenta_en_bucle(monkeypatch):
+    """Error de conexión/servidor caído: falla rápido (1 intento, 0 reintentos)."""
+    calls = {"n": 0}
+
+    def fake_get(url, **kwargs):
+        calls["n"] += 1
+        raise image_search_main.requests.exceptions.ConnectionError("server down")
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+    monkeypatch.setattr(image_search_main.time, "sleep", lambda s: None)
+
+    results, status = image_search_main._searxng_fetch("q", pageno=1)
+    assert results == [] and status == "error"
+    assert calls["n"] == 1  # fail fast: sin bucle de reintentos
+
+# ---------------------------------------------------------------------------
+# §17 #48 Fase 4 — verificación semántica VLM (moondream-local vía Ollama)
+# ---------------------------------------------------------------------------
+
+def _mock_ollama_post(monkeypatch, responses=(), error=None):
+    """Instala un fake de requests.post (Ollama) que registra payloads y
+    devuelve respuestas secuenciales o lanza error."""
+    calls: list[dict] = []
+    it = iter(list(responses))
+
+    def fake_post(url, **kwargs):
+        calls.append({"url": url, **kwargs})
+        if error is not None:
+            raise error
+        return _FakeResp(json_data={"response": next(it, "SI")})
+
+    monkeypatch.setattr(image_search_main.requests, "post", fake_post)
+    return calls
+
+
+def test_vlm_disabled_default_no_network_call_and_always_true(monkeypatch):
+    """(1) Con VLM_VERIFICATION_ENABLED=0 (DEFAULT): _verify_image_relevance
+    NO hace ninguna llamada de red y devuelve True siempre. Garantiza que el
+    comportamiento pre-Fase-4 es idéntico byte-a-byte."""
+    monkeypatch.delenv("VLM_VERIFICATION_ENABLED", raising=False)
+    calls = _mock_ollama_post(monkeypatch, error=AssertionError("NO debe llamarse"))
+
+    assert image_search_main.VLM_VERIFICATION_ENABLED is False
+    assert image_search_main._verify_image_relevance(_png_bytes(), "Doom", ["doom"]) is True
+    assert image_search_main._verify_image_relevance(None, "", None) is True
+    assert calls == []  # cero llamadas a Ollama
+
+
+def test_vlm_enabled_si_acepta_candidato(monkeypatch):
+    """(2) Flag activo + respuesta 'SI' del VLM (mockeado) → True y el
+    candidato se acepta en el flujo completo."""
+    monkeypatch.setattr(image_search_main, "VLM_VERIFICATION_ENABLED", True)
+    monkeypatch.setattr(image_search_main, "VLM_BASE_URL", "http://ollama.test:11434")
+    calls = _mock_ollama_post(monkeypatch, responses=["SI"])
+
+    assert image_search_main._verify_image_relevance(_png_bytes(), "Doom", ["doom"]) is True
+    assert len(calls) == 1
+    assert calls[0]["url"] == "http://ollama.test:11434/api/generate"
+    payload = calls[0]["json"]
+    assert payload["model"] == image_search_main.VLM_MODEL_NAME
+    assert payload["images"]  # base64 presente (payload multimodal)
+    assert "Doom" in payload["prompt"]
+
+    # Flujo completo: 1 candidato, VLM dice SI → aceptado.
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": _search_results(1)})
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+    out = image_search.search_chapter_images(_payload(num_images=1))
+    assert out["generated"] == 1
+    assert out["results"][0]["status"] == "ok"
+    # §17 #48 Fase 4 — trazabilidad VLM persistida en el meta aceptado:
+    # flag activo → vlm_checked=True; candidato único aceptado → tried >= 1.
+    assert out["results"][0].get("vlm_checked") is True
+    assert out["results"][0].get("vlm_candidates_tried", 0) >= 1
+
+
+def test_vlm_no_descarta_y_prueba_siguiente_candidato(monkeypatch):
+    """(3) Respuesta 'NO' → False: el loop descarta ESE candidato (sin ocupar
+    slot ni marcar error) y prueba el siguiente del pool ordenado por score."""
+    monkeypatch.setattr(image_search_main, "VLM_VERIFICATION_ENABLED", True)
+    # Primer candidato → NO, segundo → SI.
+    calls = _mock_ollama_post(monkeypatch, responses=["NO", " Sí, es relevante. "])
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": _search_results(2)})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    out = image_search.search_chapter_images(_payload(num_images=1))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+
+    # 2 llamadas VLM (NO → descarta 1º, SI → acepta 2º); solo se descarga el
+    # 2º candidato y el slot se llena con status ok (skip-and-continue).
+    assert len(calls) == 2
+    assert len(downloaded) == 2
+    assert validated.generated == 1
+    assert validated.results[0].status == "ok"
+    # El aceptado es el 2º candidato del pool (el 1º fue descartado por el VLM).
+    assert out["results"][0].get("source_url") == "https://cdn.example.com/img2.png"
+
+
+def test_vlm_timeout_error_fail_open(monkeypatch):
+    """(4) Timeout/error de Ollama con flag activo → fail-open (True): no
+    rompe la fase ni descarta candidatos que ya pasaron los filtros previos."""
+    monkeypatch.setattr(image_search_main, "VLM_VERIFICATION_ENABLED", True)
+    _mock_ollama_post(monkeypatch, error=requests.exceptions.Timeout("ollama timeout"))
+    downloaded: list[str] = []
+
+    def fake_get(url, **kwargs):
+        if "/search" in url:
+            return _FakeResp(json_data={"query": "q", "results": _search_results(1)})
+        downloaded.append(url)
+        return _FakeResp(content=_png_bytes())
+
+    monkeypatch.setattr(image_search_main.requests, "get", fake_get)
+
+    # Unit: fail-open True.
+    assert image_search_main._verify_image_relevance(_png_bytes(), "Doom", None) is True
+
+    # Flujo completo: el candidato se acepta pese al fallo del VLM.
+    out = image_search.search_chapter_images(_payload(num_images=1))
+    validated = ImageGenerateOutput(**validate_output("generate_image", out))
+    assert validated.generated == 1
+    assert validated.results[0].status == "ok"
+# ---------------------------------------------------------------------------
+# §17 imagenes — entity_keywords (siglas/consolas con dígito o "/")
+# ---------------------------------------------------------------------------
+def test_extract_entity_keywords_detecta_siglas_y_consolas():
+    texto = (
+        "La SNES superó en ventas a la NES y al Sega Genesis. "
+        "El PS2 dominó la década y la Xbox Series X/S llegó después. "
+        "También hubo Wii U y N64 en el mercado. "
+        "SNES y PS2 se repitieron en varias generaciones."
+    )
+    entities = image_search_main._extract_entity_keywords(
+        texto, "es", max_keywords=12
+    )
+    joined = " ".join(entities).upper()
+    assert "SNES" in joined
+    assert "PS2" in joined
+    assert "NES" in joined
+    assert "N64" in joined
+    assert "XBOX SERIES X" in joined or "XBOX SERIES X/S" in joined
+
+
+def test_search_query_diferencia_capitulos_por_siglas():
+    base_topic = "Historia de los videojuegos, desde el pong hasta..."
+    texto_snes = (
+        "La SNES superó a la NES en ventas. "
+        "La SNES relanzó la saga de Mario. "
+        "Muchos niños pidieron una SNES en Navidad."
+    )
+    texto_ps2 = (
+        "El PS2 dominó la generación. "
+        "El PS2 vendió más que cualquier consola. "
+        "La gente seguía comprando el PS2."
+    )
+    q_snes = image_search_main._search_query(
+        "Titulo", texto_snes, search_topic=base_topic, book_topic="Historia de los videojuegos"
+    ).upper()
+    q_ps2 = image_search_main._search_query(
+        "Titulo", texto_ps2, search_topic=base_topic, book_topic="Historia de los videojuegos"
+    ).upper()
+    # las queries finales ya no son idénticas (caso book_90)
+    assert q_snes != q_ps2
+    assert "SNES" in q_snes
+    assert "PS2" in q_ps2
+
+
+def test_extract_entity_keywords_regresion_sin_siglas():
+    texto = (
+        "El estilo Imperio surgió en la Francia napoleónica. "
+        "Napoleón Bonaparte impulsó el estilo Imperio."
+    )
+    entities = image_search_main._extract_entity_keywords(texto, "es")
+    assert entities == []
+    # las keywords genéricas Title-Case siguen igual que antes
+    gen = image_search_main._extract_salient_keywords(texto, "es")
+    joined = " ".join(gen).lower()
+    assert "imperio" in joined
+
+
+def test_entity_keywords_caso_real_book90_snes():
+    # Fragmento con el capítulo SNES de book_90 (SNES repetida muchas veces).
+    texto = (
+        "La SNES o Super Nintendo Entertainment System fue lanzada en 1990. "
+        "La SNES compitió contra el Sega Genesis y demostró su potencia. "
+        "Muchos desarrolladores apostaron por la SNES por su hardware. "
+        "La SNES y la NES convivieron durante años. "
+        "El catálogo de la SNES incluye títulos legendarios. "
+        "La SNES sigue siendo recordada como una de las mejores consolas."
+    )
+    entities = image_search_main._extract_entity_keywords(texto, "es")
+    joined = "|".join(entities).upper()
+    # SNES es la entidad más frecuente → debería aparecer al principio
+    assert "SNES" in joined
+    assert entities and "SNES" == entities[0].upper().split()[0]
+
+
+def test_entity_keywords_filtra_numeros_romanos_aislados():
+    # Romanos aislados (token exacto del patrón 1) NO se emiten. Un romano que
+    # el patrón 2 capture como parte de un nombre propio con sufijo de letra
+    # suelta (p.ej. "Mega Man X") sí se conserva.
+    texto_sueltos = (
+        "VII fue un título importante y VII repitió. "
+        "También salió un II que no recordamos. "
+        "En cambio XI no tuvo éxito."
+    )
+    entities = image_search_main._extract_entity_keywords(
+        texto_sueltos, "es", max_keywords=12
+    )
+    tok_set = {t.upper() for t in entities}
+    assert not (tok_set & {"VII", "II", "XI"}), (
+        "numerales romanos aislados no deben emitirse: %r" % entities
+    )
+    # Romiano fusionado en nombre propio con sufijo de letra suelta se conserva
+    texto_compuesto = (
+        "Mega Man X es un clásico. Mega Man X tuvo éxito en SNES."
+    )
+    comp = image_search_main._extract_entity_keywords(
+        texto_compuesto, "es", max_keywords=12
+    )
+    joined = "|".join(comp).upper()
+    assert "MEGA MAN X" in joined
+
+
+def test_entity_keywords_camelcase_playstation2_completo():
+    # "PlayStation" (camelCase) no debe partirse en "Station 2": debe emitirse
+    # como un solo token "PlayStation 2".
+    texto = (
+        "El PlayStation 2 dominó la generación. "
+        "El PlayStation 2 fue la consola más vendida. "
+        "La gente seguía comprando el PlayStation 2."
+    )
+    entities = image_search_main._extract_entity_keywords(
+        texto, "es", max_keywords=12
+    )
+    tok_set = set(entities)
+    assert "PlayStation 2" in tok_set, "debe emitirse 'PlayStation 2' completo, no %r" % entities
+    assert not any(t == "Station 2" for t in tok_set), (
+        "no debe partirse en 'Station 2': %r" % entities
+    )
+    # camelCase simple sin sufijo numérico cae en la extracción genérica normal
+    # (genéricas), no en entity_keywords (que exige sufijo) — sin regresión.
+    texto_cube = (
+        "El GameCube fue una consola de Nintendo. El GameCube tenía mandos."
+    )
+    gen_cube = image_search_main._extract_salient_keywords(texto_cube, "es")
+    ent_cube = image_search_main._extract_entity_keywords(
+        texto_cube, "es", max_keywords=12
+    )
+    joined_gen = " ".join(gen_cube).lower()
+    assert "cube" in joined_gen or "gamecube" in joined_gen
+    assert not any("GameCube" in t for t in ent_cube)

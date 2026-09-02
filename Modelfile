@@ -1,0 +1,7 @@
+FROM ./moondream2-050824-f16.gguf
+FROM ./moondream2-mmproj-050824-f16.gguf
+TEMPLATE """Question: {{ .Prompt }}
+
+Answer:"""
+PARAMETER stop "Question:"
+PARAMETER stop "<|endoftext|>"
