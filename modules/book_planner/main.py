@@ -27,8 +27,14 @@ DEFAULT_IMAGE_REQUIREMENTS = 3
 # max_tokens=2000 fijo truncaba el JSON con ~20 capítulos (~90-130
 # tokens/capítulo observados) y el parseo caía al fallback determinista.
 PLANNER_BASE_TOKENS = 400        # campos del libro + margen fijo
-PLANNER_TOKENS_PER_CHAPTER = 150  # margen holgado sobre el ~90-130 observado
-MAX_PLANNER_TOKENS = 6000        # techo razonable, evita presupuestos absurdos
+# 2026-09-02: el modo expandido (3 sections/capítulo, cada una con heading y
+# objective) pesa sustancialmente más que el compacto observado (~90-130
+# tokens/cap). Con 150/cap y target_chapters=10 el presupuesto daba 2000 y el
+# LLM truncó a mitad del capítulo 8 (caía a fallback). Se sube el margen por
+# capítulo a 400, que escala PROPORCIONALMENTE (tc=5→2400, tc=10→4400,
+# tc=20→8000) sin hardcodear un valor fijo para ningún conteo.
+PLANNER_TOKENS_PER_CHAPTER = 400  # margen holgado para el modo expandido (3 sections)
+MAX_PLANNER_TOKENS = 8000        # techo: permite quepan target_chapters=20 expandidos
 MIN_PLANNER_TOKENS = 2000        # preserva el valor actual como piso
 
 
@@ -453,6 +459,16 @@ def _build_prompt(validated: BookPlanPayload) -> str:
         "- Cada sección debe ser un objeto con \"heading\" (título) y \"objective\" (objetivo).\n"
         "- Nunca omitas sections ni las dejes vacías. Esto es obligatorio.\n"
         "Devuelve SOLO el JSON, sin texto adicional."
+        # 2026-09-02 (fix json_no_extraible): instrucción explícita y genérica
+        # prohibiendo abreviar/truncar/aparcar capítulos. El LLM qwen-agent
+        # metía comentarios "// Capítulos N a 10 siguen..." dentro del arreglo
+        # en vez de generar los target_chapters completos; esto lo prohíbe
+        # expresamente (la tolerancia del parser es la Parte 3, red de
+        # seguridad, no la solución).
+        "- IMPORTANTE: debes generar los {validated.target_chapters} capítulos COMPLETOS, numerados del 1 al {validated.target_chapters}, TODOS dentro del arreglo \"chapters\". Cada capítulo debe ser un objeto JSON completo, con todas sus claves (incluida \"sections\") pobladas con contenido real y propio de ese capítulo.\n"
+        "- PROHIBIDO abreviar o truncar: NO generes comentarios de código (\"//\" o \"/* */\") dentro del JSON bajo ninguna circunstancia. NO uses \"...\" de relleno. NO uses frases tipo \"los capítulos siguen un patrón similar\", \"los capítulos N a 10 continúan igual\" ni equivalentes.\n"
+        "- El JSON debe cerrar todos sus arrays y objetos hasta el último capítulo ({validated.target_chapters}). Si lo entregas incompleto o abreviado, se rechazará y te pedirán regenerarlo.\n"
+        "Devuelve SOLO el JSON completo y cerrado, sin texto adicional ni comentarios."
     )
 
 
@@ -518,25 +534,62 @@ def _short_idea_title(idea: str, max_words: int = 8) -> str:
 def _extract_named_entities(text: str) -> list[str]:
     """Extrae candidatos a entidad nombrada de un texto (determinista, sin NLP).
 
-    Criterio simple: secuencias de 2+ palabras capitalizadas consecutivas,
-    tolerando conectores minúsculos intermedios (de, del, la, y, von, ...).
-    Ej.: "Reyes Católicos, Imperio Español y Guerra Civil" → 3 entidades;
-    "Estados Unidos de América" → 1 entidad. Una sola palabra capitalizada
-    NO cuenta (evita falsos positivos con inicios de oración).
+    Dos criterios complementarios, sin dependencias ni heurísticas de POS:
+
+    1) Secuencias de 2+ palabras capitalizadas consecutivas, tolerando
+       conectores minúsculos intermedios (de, del, la, el, von, ...).
+       Ej.: "Reyes Católicos, Imperio Español y Guerra Civil" → 3 entidades;
+       "Estados Unidos de América" → 1 entidad.
+
+    2) Nombres propios SIMPLES (una sola palabra capitalizada) cuando van
+       precedidos de preposición/artículo: patrón típico de topónimos y
+       personas en español (p.ej. "de Magallanes", "la Antártida",
+       "El último tango en París" → "París"). Se descartan si ya son parte
+       de una secuencia más larga del criterio 1 (evita duplicados).
+
+    NO cuenta una única palabra capitalizada al inicio de frase sin
+    preposición precedente ("Grandes expediciones...", "Novela corta...") —
+    es inicio descriptivo, no entidad.
 
     Fail-safe: lista vacía si no hay coincidencias (nunca inventa).
     """
     if not text:
         return []
     cap = r"[A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+"
+    # Conectores que SÍ unen palabras de un mismo nombre propio.
     connector = r"(?:de|del|la|el|los|las|von|van|da|do|das|dos)"
-    pattern = re.compile(
+    # Criterio 1: secuencias Title-Case (mismo comportamiento histórico).
+    multi = re.compile(
         cap + r"(?:\s+" + cap + r"|\s+" + connector + r"\s+" + cap + r")+(?:\s+"
         + connector + r"\s+" + cap + r")*"
     )
-    matches = pattern.findall(text)
-    # Dedupe preservando orden de aparición.
-    return list(dict.fromkeys(m.strip() for m in matches if m.strip()))
+    # Criterio 2: preposiciones/artículos que preceden a un nombre propio simple.
+    prep = (
+        r"(?:a|al|de|desde|del|hasta|hacia|en|por|con|para|entre|tras|sobre"
+        r"|la|el|los|las|un|una)"
+    )
+    single = re.compile(r"(?<![A-Za-zÁÉÍÓÚÑÜáéíóúñü])(" + prep + r")\s+(" + cap + r")")
+
+    spans: list[tuple[int, int, str]] = []
+    for m in multi.finditer(text):
+        if m.group(0).strip():
+            spans.append((m.start(), m.end(), m.group(0).strip()))
+    for m in single.finditer(text):
+        token = m.group(2)
+        if token:
+            spans.append((m.start(2), m.end(2), token))
+
+    # Unificar por posición de aparición, descartando solapamientos
+    # (una palabra capitalizada ya absorbida por una secuencia más larga).
+    spans.sort(key=lambda s: s[0])
+    merged: list[str] = []
+    covered_until = -1
+    for start, end, txt in spans:
+        if start <= covered_until:
+            continue
+        merged.append(txt)
+        covered_until = end
+    return list(dict.fromkeys(merged))
 
 
 def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
@@ -588,13 +641,64 @@ def _fallback_plan(validated: BookPlanPayload) -> dict[str, Any]:
     }
 
 
+def _strip_json_comments(text: str) -> str:
+    """Elimina líneas de comentario ``//...`` que el LLM pueda colar en el JSON.
+
+    Red de seguridad genérica de la Parte 3 (fix json_no_extraible): cuando el
+    modelo (p.ej. qwen-agent) inserta abreviaciones tipo
+    ``// Capítulos 8 a 10 siguen el mismo patrón`` dentro del arreglo, esa
+    línea rompe ``json.loads``. Este preprocesado descarta cualquier línea cuyo
+    primer token (fuera de string) sea ``//``.
+
+    Es string-aware: recorre el texto línea a línea vigilando si estamos
+    dentro de un string JSON (respetando escapes) para NO tocar ``//`` legítimos
+    (p.ej. URLs ``https://`` dentro de una descripción u objective). Como el
+    JSON válido no permite saltos de línea dentro de strings, en la práctica
+    ``in_string`` solo queda activo a mitad de línea en textos ya corruptos; la
+    protección es meramente defensiva y no sustituye a la Parte 1.
+
+    Args:
+        text: porción del JSON extraído (entre el primer ``{`` y el último ``}``).
+
+    Returns:
+        El mismo texto sin las líneas que sean comentarios ``//`` fuera de string.
+    """
+    out: list[str] = []
+    in_string = False
+    escaped = False
+    for line in text.split("\n"):
+        stripped = line.lstrip()
+        # Una línea ES comentario si empieza por '//' y en esa posición no
+        # estamos dentro de un string heredado de la línea anterior.
+        is_comment = (not in_string) and stripped.startswith("//")
+        if is_comment:
+            continue
+        out.append(line)
+        # Actualizar el estado de string recorriendo la línea conservada.
+        for ch in line:
+            if escaped:
+                escaped = False
+                continue
+            if ch == "\\":
+                escaped = True
+                continue
+            if ch == '"':
+                in_string = not in_string
+                escaped = False
+    return "\n".join(out)
+
+
 def _extract_json(text: str) -> dict[str, Any]:
     """Extrae el primer objeto JSON del texto de respuesta del LLM."""
     start = text.find("{")
     end = text.rfind("}")
     if start == -1 or end == -1 or end <= start:
         raise ValueError("No se encontró JSON en la respuesta")
-    return json.loads(text[start : end + 1])
+    # Parte 3 (fix json_no_extraible): antes de json.loads, eliminar líneas de
+    # comentario "//..." que el LLM pueda colar (fuera de strings). Si el resto
+    # del JSON es válido y completo, un comentario residual ya no tumba el parseo.
+    candidate = _strip_json_comments(text[start : end + 1])
+    return json.loads(candidate)
 
 
 # ---------------------------------------------------------------------------
@@ -664,9 +768,15 @@ def _deterministic_outline_en(sections: list[dict]) -> Optional[list[dict]]:
 def _planner_max_tokens(target_chapters: int) -> int:
     """Presupuesto de salida dinámico para la llamada LLM del plan (§17 #22).
 
-    El JSON del plan consume ~90-130 tokens por capítulo; con max_tokens fijo
-    en 2000, pedidos de ~20 capítulos truncaban la respuesta a mitad del array
-    y el parseo caía al fallback. Escala linealmente con techo y piso.
+    Fórmula (2026-09-02, tras el fallo json_no_extraible):
+        min(MAX_PLANNER_TOKENS, max(MIN_PLANNER_TOKENS,
+            PLANNER_BASE_TOKENS + PLANNER_TOKENS_PER_CHAPTER * target_chapters))
+        = min(8000, max(2000, 400 + 400*target_chapters))
+
+    ANTES era 150 tokens/cap (tc=10 → 2000) y el modo expandido de 3 sections
+    por capítulo truncaba a mitad del capítulo 8; ahora con 400 tokens/cap el
+    presupuesto queda: tc=5→2400, tc=10→4400, tc=20→8000. Escala
+    linealmente con techo y piso; nunca un valor fijo para un conteo concreto.
     """
     return min(
         MAX_PLANNER_TOKENS,

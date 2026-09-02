@@ -16,6 +16,7 @@ from modules.book_planner.main import (
     _fallback_plan,
     _normalize_plan,
     _resolve_explicit_image_count,
+    _strip_json_comments,
     execute,
     health_check,
 )
@@ -59,6 +60,33 @@ def test_extract_json_happy_path() -> None:
 def test_extract_json_raises_if_missing() -> None:
     with pytest.raises(ValueError):
         _extract_json("sin json aqui")
+
+
+def test_extract_json_strips_comment_lines_part_3() -> None:
+    """Parte 3 (fix json_no_extraible): líneas '//...' fuera de string se eliminan.
+
+    El LLM puede colar abreviaciones tipo '// Capítulos 8 a 10 siguen...'
+    dentro del arreglo; si el resto del JSON es válido y completo debe parsear.
+    """
+    with_comment = (
+        '{"title":"T",\n'
+        ' // Capítulos 8 a 10 siguen el mismo patrón\n'
+        ' "chapters":[{"number":1,"title":"C1"}]}'
+    )
+    data = _extract_json(with_comment)
+    assert data["title"] == "T"
+    assert len(data["chapters"]) == 1
+    assert data["chapters"][0]["title"] == "C1"
+
+
+def test_strip_json_comments_keeps_urls_inside_strings() -> None:
+    """Parte 3: '//' dentro de un string (p.ej. URLs) NO se trata como comentario."""
+    sample = '{"desc":"ver https://example.com/a y https://example.com/b"}'
+    cleaned = _strip_json_comments(sample)
+    assert cleaned == sample  # sin cambios
+    assert _extract_json(sample)["desc"].count("https://") == 2
+    # Una línea 100% comentario queda vacía.
+    assert _strip_json_comments("// solo comentario\n") == ""
 
 
 def test_fallback_plan_shape() -> None:
@@ -1038,23 +1066,29 @@ def test_fallback_plan_fewer_entities_than_target_pads_generic() -> None:
 
 
 def test_max_tokens_scales_with_target_chapters() -> None:
-    """§17 #22: el presupuesto de salida escala con target_chapters.
+    """§17 #22 (fix 2026-09-02): el presupuesto de salida escala con target_chapters.
 
     Fórmula: min(MAX_PLANNER_TOKENS, max(MIN_PLANNER_TOKENS,
     PLANNER_BASE_TOKENS + PLANNER_TOKENS_PER_CHAPTER * target_chapters)).
-    - tc=1  → piso MIN_PLANNER_TOKENS=2000 (comportamiento actual preservado).
-    - tc=5  → 400+5*150=1150 < 2000 → sigue en el piso 2000.
-    - tc=20 → 400+20*150=3400 (>2000, <6000) → presupuesto notablemente mayor.
-    - tc=60 → 9400 > techo → capado a MAX_PLANNER_TOKENS=6000.
+    Tras el fallo json_no_extraible los tokens/capítulo subieron de 150→400
+    (el modo expandido de 3 sections truncaba a mitad del cap. 8 en tc=10):
+    - tc=1  → piso MIN_PLANNER_TOKENS=2000 (preservado).
+    - tc=5  → 400+5*400=2400 (>2000) → escala proporcional, sin hardcodear.
+    - tc=10 → 400+10*400=4400 (CASO REAL del fallo: antes 2000, truncaba).
+    - tc=20 → 400+20*400=8400 > techo → capado a MAX_PLANNER_TOKENS=8000.
+    - tc=60 → 24400 > techo → capado a 8000.
     Además verifica que execute pasa ese valor al provider.
     """
     import modules.book_planner.main as main
 
     assert main._planner_max_tokens(1) == main.MIN_PLANNER_TOKENS == 2000
-    assert main._planner_max_tokens(5) == 2000
-    assert main._planner_max_tokens(20) == 3400
-    assert main._planner_max_tokens(20) > main._planner_max_tokens(5)
-    assert main._planner_max_tokens(60) == main.MAX_PLANNER_TOKENS == 6000
+    assert main._planner_max_tokens(5) == 2400
+    assert main._planner_max_tokens(10) == 4400
+    assert main._planner_max_tokens(20) == main.MAX_PLANNER_TOKENS == 8000
+    assert main._planner_max_tokens(60) == main.MAX_PLANNER_TOKENS == 8000
+    # Escalado estrictamente monótono y no-trivial (no cae al piso).
+    assert main._planner_max_tokens(10) > main._planner_max_tokens(5) > main.MIN_PLANNER_TOKENS
+    assert main._planner_max_tokens(20) > main._planner_max_tokens(10)
 
     captured: dict = {}
 
@@ -1090,7 +1124,7 @@ def test_max_tokens_scales_with_target_chapters() -> None:
         payload = _payload()
         payload["target_chapters"] = 20
         execute(payload)
-        assert captured["max_tokens"] == 3400
+        assert captured["max_tokens"] == 8000
     finally:
         monkeypatch.undo()
 
