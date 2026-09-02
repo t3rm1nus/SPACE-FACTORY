@@ -120,6 +120,10 @@ DEFAULT_BACKOFF_STEP = 2.0
 SAVE_MAX_ATTEMPTS = 3
 SAVE_BACKOFF_BASE = 0.05  # segundos; backoff lineal (base * intento)
 
+# §17 #44 (fix book_80): tope de títulos de capítulo usados como queries
+# adicionales en el fallback multi-query de research (coste acotado).
+RESEARCH_MULTI_QUERY_MAX_CHAPTERS = 5
+
 
 def _default_jobs_dir() -> str:
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1057,6 +1061,83 @@ def _pick_module(modules: dict, cap_map: dict, capability: str) -> Optional[dict
     return None
 
 
+# §17 #40 (book_76): headings canónicos que el fallback determinista del
+# planner usa como outline genérico (Introduction/Development/Conclusion y su
+# versión ES). NO son temas reales de un capítulo: usarlos como query de
+# búsqueda de imágenes devuelve pseudo-resultados genéricos (book_76 cap.1 EN
+# resuelto como "Introduction"). No bloquean títulos legítimos que los
+# contengan (p.ej. "The Conclusion of the Console War") porque la comparación
+# es EXACTA tras strip, case-insensitive.
+_GENERIC_OUTLINE_HEADINGS = {
+    "introducción", "introduccion", "desarrollo", "conclusión", "conclusion",
+    "introduction", "development",
+}
+
+
+def _resolve_chapter_search_topic(chapter, img_lang: str = "es") -> str:
+    """§17 #39/#40: tema de búsqueda de imágenes de un capítulo, diferenciado.
+
+    Preferencia:
+    1. Primer heading NO genérico del outline del capítulo (outline_en para EN,
+       outline para ES), que sea usable (>=3 caracteres tras strip).
+    2. Si todos los headings son canónicos genéricos o no hay ninguno usable,
+       el título real del capítulo (title_en para EN, title para ES).
+
+    Devuelve "" si no hay nada usable (la query histórica por chapter_title se
+    usa en image_search). Fail-safe ante outline corrupto.
+    """
+    if not chapter:
+        return ""
+    raw = (
+        (chapter.get("outline_en") if img_lang == "en" else chapter.get("outline"))
+        or chapter.get("outline")
+        or ""
+    )
+    sections: list = []
+    if str(raw).strip():
+        try:
+            parsed = json.loads(raw)
+            sections = parsed if isinstance(parsed, list) else (
+                parsed.get("sections", []) if isinstance(parsed, dict) else []
+            )
+        except (json.JSONDecodeError, TypeError, ValueError):
+            sections = []
+    for sec in sections:
+        head = str((sec or {}).get("heading") or "").strip()
+        if not head or len(head) < 3:
+            continue
+        if head.lower() in _GENERIC_OUTLINE_HEADINGS:
+            continue
+        return head[:2000]
+    # Fallback al título real del capítulo (title_en para EN), comportamiento
+    # histórico anterior al fix §17 #39 (la query caía a chapter_title).
+    title = str(
+        (chapter.get("title_en") if img_lang == "en" else chapter.get("title"))
+        or ""
+    ).strip()
+    return title[:2000]
+
+
+def _combine_chapter_search_topic(book_topic: str, chapter_topic: str) -> str:
+    """§17 #48 (book_84): query de imagen = tema del LIBRO + heading del capítulo.
+
+    El heading en solitario (ej. "Minimalismo") es demasiado ambiguo para la
+    búsqueda web; combinado con el topic del libro (ej. "Estilos de decoración
+    de interiores") obtiene candidatos relevantes. Si el heading ya contiene al
+    topic (o viceversa), se devuelve el más largo sin duplicar. Degradación:
+    sin book_topic → heading solo; sin heading → book_topic solo (histórico).
+    La variante EN usa topic_en (§17 #29 fail-open intacto: topic_en vacío
+    degrada al heading sin bloquear por idioma).
+    """
+    head = str(chapter_topic or "").strip()
+    base = str(book_topic or "").strip()
+    if not head:
+        return base[:2000]
+    if not base or head.lower() in base.lower() or base.lower() in head.lower():
+        return head[:2000]
+    return f"{base} {head}"[:2000]
+
+
 def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Executor:
     """Devuelve un ejecutor que reutiliza la ruta real de ``core.scheduler``.
 
@@ -1270,39 +1351,24 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         num_images = int(_num) if _num is not None else 3
         num_images = max(0, min(num_images, 20))
 
-        # §17 #30 (P1b, book_72): query diferenciada por capítulo. Con títulos
-        # genéricos de fallback ("... - Parte N"), las queries idénticas hacían
-        # que SearXNG devolviera los mismos top-results a todos los capítulos
-        # (12 contenidos únicos en 51 imágenes). Preferimos el primer heading
-        # usable del outline del capítulo (EN nativo si aplica), luego el
-        # objective; si nada es usable, el campo no se rellena y la query cae
-        # al título (comportamiento histórico).
-        chapter_search_topic = ""
+        # §17 #30/#40 (P1b, book_72/book_76): query diferenciada por capítulo.
+        # Preferimos el primer heading REAL del outline del capítulo (EN nativo
+        # si aplica); si es un heading canónico genérico del fallback del planner
+        # ("Introduction"/"Development"/"Conclusion"/es), NO se usa como query y
+        # se cae al título real del capítulo (title_en/title), como ANTES del fix
+        # §17 #39. Fail-safe: sin tema usable, el campo queda vacío y la query
+        # histórica (chapter_title) se usa en image_search.
         try:
             _chapter = editorial._get_chapter(job["book_id"], chapter_id)
-            _raw_outline = (
-                (_chapter or {}).get("outline_en" if img_lang == "en" else "outline")
-                or (_chapter or {}).get("outline")
-                or ""
-            )
-            _sections = []
-            if str(_raw_outline).strip():
-                _parsed = json.loads(_raw_outline)
-                if isinstance(_parsed, list):
-                    _sections = _parsed
-                elif isinstance(_parsed, dict):
-                    _sections = _parsed.get("sections", []) or []
-            for _sec in _sections:
-                _head = str((_sec or {}).get("heading") or "").strip()
-                if _head and len(_head) >= 3:
-                    chapter_search_topic = _head[:2000]
-                    break
-            if not chapter_search_topic:
-                _obj = str((_chapter or {}).get("objective") or "").strip()
-                if _obj:
-                    chapter_search_topic = _obj[:2000]
-        except Exception:  # noqa: BLE001 - fail-safe: sin tema usable, query histórica
-            chapter_search_topic = ""
+        except Exception:  # noqa: BLE001
+            _chapter = None
+        # §17 #48 (book_84): la query combina el tema del libro (topic para ES,
+        # topic_en para EN — fail-open §17 #29 intacto si topic_en está vacío)
+        # con el heading específico del capítulo resuelto por §17 #39/#40.
+        chapter_book_topic = topic_en if img_lang == "en" else topic
+        chapter_search_topic = _combine_chapter_search_topic(
+            chapter_book_topic, _resolve_chapter_search_topic(_chapter, img_lang)
+        )
         n_search = max(0, min(round(num_images * ratio), num_images))
         n_generate = num_images - n_search
 
@@ -1687,6 +1753,140 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
             docx_path=paths[0] if paths else None,
         )
 
+    def _run_research_with_chapter_fallback(phase: dict, job: dict, language: str) -> PhaseResult:
+        """Si la pasada normal de research falla por source_count insuficiente,
+        reintenta con títulos de capítulo como queries adicionales (fix book_80,
+        §17 #44) antes de rendirse. Regresión cero: si la pasada normal ya pasa,
+        esta función no hace nada distinto de _run_single.
+        """
+        from frontend import editorial
+
+        res = _run_single(phase, job, language=language)
+        if res.ok:
+            return res
+        if not (
+            isinstance(res.error, str)
+            and res.error.startswith("research#")
+            and "source_count=" in res.error
+        ):
+            return res  # otro tipo de fallo: no se toca, comportamiento histórico
+
+        data = job.setdefault("data", {})
+        min_sources = int(data.get("min_sources") or 3)
+        original_query = data.get("query")
+        original_min_sources = data.get("min_sources")
+
+        try:
+            book = editorial._get_book(job["book_id"])
+        except Exception:
+            book = None
+        try:
+            chapters = editorial.get_chapters(job["book_id"])
+        except Exception:
+            chapters = []
+
+        title_field = "title_en" if language == "en" else "title"
+        seen_titles: set[str] = set()
+        chapter_titles: list[str] = []
+        for ch in chapters:
+            t = (ch.get(title_field) or ch.get("title") or "").strip()
+            if t and t not in seen_titles:
+                seen_titles.add(t)
+                chapter_titles.append(t)
+            if len(chapter_titles) >= RESEARCH_MULTI_QUERY_MAX_CHAPTERS:
+                break
+
+        # §17 #49 (fix book_85): si todos los capítulos comparten el mismo
+        # título (planner en fallback), los títulos no aportan queries
+        # distintivas. Segunda fuente: nombres propios extraídos de
+        # book.description (regex simple, sin NLP), respetando el MISMO tope
+        # total RESEARCH_MULTI_QUERY_MAX_CHAPTERS combinado con los títulos.
+        description_entities: list[str] = []
+        try:
+            if len(seen_titles) <= 1 and book is not None:
+                description = str(book.get("description") or "").strip()
+                if description:
+                    import re as _re
+
+                    _NAME = _re.compile(
+                        r"\b[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+){0,2}\b"
+                    )
+                    seen_names: set[str] = set()
+                    for segment in _re.split(r"[.,;]", description):
+                        # solo se descarta el DETERMINANTE inicial (La/El/Los/
+                        # The...), no la primera palabra entera: así no se
+                        # pierden entidades de 1 palabra o nombres completos
+                        # en listas ("La Pantoja", "Rocío Jurado, Chiquetete")
+                        body = _re.sub(
+                            r"^\s*(?:El|La|Los|Las|Un|Una|Unos|Unas|The|A|An)\s+",
+                            "",
+                            segment,
+                            flags=_re.IGNORECASE,
+                        )
+                        for m in _NAME.finditer(body):
+                            name = _re.sub(r"\s+", " ", m.group(0)).strip()
+                            if name and name not in seen_names and name not in seen_titles:
+                                seen_names.add(name)
+                                description_entities.append(name)
+                                break  # 1 nombre por segmento basta
+        except Exception:
+            description_entities = []
+        free = RESEARCH_MULTI_QUERY_MAX_CHAPTERS - len(chapter_titles)
+        description_entities = description_entities[: max(0, free)]
+
+        if not chapter_titles and not description_entities:
+            return res  # nada que probar, comportamiento histórico
+
+        merged_sources: list[dict] = list((res.metrics or {}).get("sources") or [])
+        seen_urls: set[str] = {s.get("url") for s in merged_sources if s.get("url")}
+        last_res = res
+
+        for query in [*chapter_titles, *description_entities]:
+            data["query"] = query
+            data["min_sources"] = 0
+            try:
+                r2 = _run_single(phase, job, language=language)
+            finally:
+                pass
+            if r2.ok:
+                last_res = r2
+                for s in (r2.metrics or {}).get("sources") or []:
+                    url = (s or {}).get("url")
+                    if url and url in seen_urls:
+                        continue
+                    if url:
+                        seen_urls.add(url)
+                    merged_sources.append(s)
+
+        data["query"] = original_query
+        data["min_sources"] = original_min_sources
+
+        if len(merged_sources) >= min_sources:
+            metrics = dict(last_res.metrics or {})
+            metrics["sources"] = merged_sources
+            metrics["source_count"] = len(merged_sources)
+            metrics["execution_mode"] = "multi_query_fallback"
+            metrics["chapter_queries_used"] = chapter_titles
+            if description_entities:
+                metrics["description_entities_used"] = description_entities
+            log(
+                logger,
+                logging.INFO,
+                "research: fallback multi-query por capítulo recuperó fuentes suficientes",
+                language=language,
+                source_count=len(merged_sources),
+                chapter_queries=chapter_titles,
+                description_entities=description_entities,
+            )
+            return PhaseResult(
+                ok=True,
+                metrics=metrics,
+                module=last_res.module,
+                task_id=last_res.task_id,
+            )
+
+        return res  # sigue sin fuentes suficientes: mismo gate_fail que antes
+
     def _run_research_multilang(phase: dict, job: dict) -> PhaseResult:
         """Fase research (fix book_56 / deuda §19 P3): UNA pasada POR IDIOMA.
 
@@ -1705,7 +1905,7 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
 
         langs = _resolve_book_languages(editorial._get_book(job["book_id"]))
         if len(langs) <= 1:
-            return _run_single(phase, job, language=langs[0])
+            return _run_research_with_chapter_fallback(phase, job, language=langs[0])
 
         merged_sources: list[dict] = []
         seen_urls: set[str] = set()
@@ -1722,7 +1922,13 @@ def default_executor_factory(modules: dict, cap_map: dict, store=None) -> Execut
         # real) o fallo del idioma PRIMARIO sigue abortando igual que antes.
         warnings: list[str] = []
         for idx, lang in enumerate(langs):
-            res = _run_single(phase, job, language=lang)
+            if idx == 0:
+                # §17 #44: fallback multi-query SOLO para el idioma primario;
+                # el idioma secundario conserva su fallback histórico
+                # (reutilización de fuentes del primario, fix book_62).
+                res = _run_research_with_chapter_fallback(phase, job, language=lang)
+            else:
+                res = _run_single(phase, job, language=lang)
             if not res.ok:
                 if (
                     idx > 0

@@ -384,6 +384,14 @@ class ImageMetadata(BaseModel):
     error: Optional[str] = Field(default=None, max_length=2000)
     created_at: str = Field(..., min_length=1)
     extra: dict[str, Any] = Field(default_factory=dict)
+    # §17 #48 Fase 4 — trazabilidad VLM. Optional: los datos históricos no
+    # tienen estos campos (contrato intacto con resultados previos).
+    # - vlm_checked: True si VLM_VERIFICATION_ENABLED estaba activo cuando se
+    #   procesó la imagen (False = nunca se verificó, flag a 0).
+    # - vlm_candidates_tried: candidatos probados antes de aceptar este
+    #   (1 = aceptado a la primera; >1 = el VLM descartó anteriores).
+    vlm_checked: Optional[bool] = Field(default=None)
+    vlm_candidates_tried: Optional[int] = Field(default=None, ge=0)
 
 
 class ImageGeneratePayload(TaskPayload):

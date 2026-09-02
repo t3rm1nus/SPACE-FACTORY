@@ -942,3 +942,43 @@ def test_image_gen_rerun_replaces_images_no_accumulation(store, tmp_path, monkey
     for p in stored:
         assert os.path.isfile(p), f"imagen nueva no existe: {p}"
     assert not (set(stored) & set(old_paths)), "rutas viejas re-persistidas"
+
+
+# ---------------------------------------------------------------------------
+# §17 #40 (book_76): guard de headings canónicos genéricos del fallback del planner
+# ---------------------------------------------------------------------------
+def test_chapter_search_topic_ignores_generic_outline_heading_and_uses_title():
+    """§17 #40: un outline con heading canónico genérico ("Introduction", caso
+    real book_76 cap.1 EN) NO se usa como query de imagen: cae al título real
+    del capítulo (title_en para EN), como antes del fix §17 #39. Un heading real
+    sí se usa sin cambios."""
+    from core.autopilot import _resolve_chapter_search_topic
+
+    # Caso book_76 cap.1 EN: outline genérico Introduction/Development/Conclusion.
+    ch_gen = {
+        "title": "Repaso de los cantantes/cantautores Espa",
+        "title_en": "Overview of Spanish singers/songwriters",
+        "outline_en": json.dumps({"sections": [
+            {"heading": "Introduction"},
+            {"heading": "Development"},
+            {"heading": "Conclusion"},
+        ]}),
+    }
+    topic = _resolve_chapter_search_topic(ch_gen, "en")
+    assert topic != "Introduction"
+    assert topic == ch_gen["title_en"]  # cae al título real EN
+
+    # Variante ES: same, con título ES.
+    ch_gen_es = {"title": "Historia de los videojuegos",
+                 "outline": json.dumps([{"heading": "Introducción"}])}
+    topic_es = _resolve_chapter_search_topic(ch_gen_es, "es")
+    assert topic_es == "Historia de los videojuegos"
+
+    # Heading real -> sin cambios (lo usa tal cual).
+    ch_real = {"outline_en": json.dumps({"sections": [
+        {"heading": "The Golden Age of Arcades"}, {"heading": "Conclusion"},
+    ]})}
+    assert _resolve_chapter_search_topic(ch_real, "en") == "The Golden Age of Arcades"
+
+    # Sin capítulo -> vacío (query histórica).
+    assert _resolve_chapter_search_topic(None, "en") == ""
