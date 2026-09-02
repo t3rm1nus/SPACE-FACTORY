@@ -93,3 +93,7 @@ data/images/
 data/artifacts/
 data/autopilot/jobs/
 
+
+# Modelos locales VLM (binarios, nunca commitear)
+moondream2-*.gguf
+*.gguf
