@@ -430,35 +430,40 @@ def _check_images(book: Book) -> list[QualityControlItem]:
 
     # El total esperado por capítulo es el REAL del libro (books.image_count,
     # propagado a Book.image_count con default 3). No un literal fijo.
-    expected = max(0, min(int(book.image_count or 3), 20))
+    # Nota §17 #40: `or 3` hacía que image_count=0 (libro sin imágenes) se
+    # interpretara como expected=3, rompiendo la rama "Sin imágenes requeridas"
+    # para libros que explícitamente no piden imágenes (p.ej. el runner E2E usa
+    # image_count=0); se usa `is not None` para respetar el 0 explícito.
+    expected = max(0, min(int(book.image_count if book.image_count is not None else 3), 20))
 
     wrong_count = []
     has_images = False
     for ch in chapters:
         if len(ch.images) > 0:
             has_images = True
-        if has_images and len(ch.images) != expected:
+        # §17 #40 (book_76): cuando expected>=1 (el libro pide imágenes), el
+        # déficit se evalúa SIEMPRE capítulo por capítulo, sin depender de
+        # has_images como precondición — un capítulo con 0 imágenes es déficit
+        # tanto como uno con menos de las esperadas (bug de gate: expected>=1
+        # con 0 imágenes en todos los capítulos caía a "PASS Sin imágenes
+        # requeridas"). Si expected==0 (libro sin imágenes) no se evalúa nada y
+        # la rama final pasa a "Sin imágenes requeridas".
+        if expected >= 1 and len(ch.images) != expected:
             wrong_count.append("cap {}: {}".format(ch.number, len(ch.images)))
-    # §17 #30: con image_search_ratio=1.0 (100% web, elección explícita del
-    # usuario) la cuota de compensación IA es 0 por diseño (§16); un 403/timeout
-    # puntual de descarga web deja el capítulo con 1 imagen menos y no es
-    # corregible por el pipeline. Tolerancia de déficit <=1 por capítulo SOLO
-    # con ratio==1.0 (mayor déficit o exceso siguen fallando; ratio distinto
-    # de 1.0: comparación exacta como siempre).
-    _ratio = getattr(book, "image_search_ratio", None)
-    try:
-        _ratio = float(_ratio) if _ratio is not None else None
-    except (TypeError, ValueError):
-        _ratio = None
+    # §17 #48 Fase 4 (decisión explícita del arquitecto, 2026-09-01): el
+    # DÉFICIT de imágenes (count < target, cualquier magnitud) degrada a
+    # WARNING — trazable pero NO bloquea el gate (mismo mecanismo de
+    # severidad que "Investigación faltante": check WARNING no fuerza
+    # overall_status=FAIL). El EXCESO (count > target) sigue FAIL como antes.
     _tolerated = []
-    if wrong_count and _ratio == 1.0:
+    if wrong_count:
         _strict = []
         for entry in wrong_count:
             _n = int(entry.rsplit(":", 1)[1])
-            if 0 <= expected - _n <= 1:  # déficit de como máximo 1
+            if _n < expected:  # déficit (cualquier magnitud): WARNING
                 _tolerated.append(entry)
             else:
-                _strict.append(entry)
+                _strict.append(entry)  # exceso: FAIL, sin cambios
         wrong_count = _strict
     if wrong_count:
         checks.append(
@@ -469,11 +474,12 @@ def _check_images(book: Book) -> list[QualityControlItem]:
             )
         )
     elif _tolerated:
-        # Déficit <=1 tolerado por ratio=1.0: WARNING trazable, nunca PASS silencioso.
+        # Déficit tolerado (cualquier magnitud): WARNING trazable, nunca
+        # PASS silencioso. No fuerza overall_status=FAIL.
         checks.append(
             QualityControlItem(
                 status="WARNING",
-                message="Imágenes por capítulo: {} (tolerado, ratio=1.0 100% web): {}".format(
+                message="Imágenes por capítulo: {} (déficit tolerado): {}".format(
                     expected, _tolerated
                 ),
                 origin_phase="image_gen",

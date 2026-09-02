@@ -102,13 +102,13 @@ def test_check_images_fail_carries_origin_phase_image_gen(tmp_path: Path):
                 "book_id": 1,
                 "number": 2,
                 "edited_es": "Texto cap 2.",
-                "images": [str(img_path)],  # cap 2 con menos -> desigualdad -> FAIL
+                "images": [str(img_path)] * 6,  # cap 2 EXCEDE (6>3) -> exceso -> FAIL
             },
         ],
     })
     checks = _check_images(book)
     fails = [c for c in checks if c.status == "FAIL"]
-    assert fails, "se espera un FAIL por desigualdad de imágenes entre capítulos"
+    assert fails, "se espera un FAIL por EXCESO de imágenes entre capítulos (exceso no se degrada)"
     assert all(c.origin_phase == "image_gen" for c in fails)
 
 
@@ -275,38 +275,84 @@ def _make_images_book(tmp_path: Path, image_count: int, per_chapter: int, ratio)
     return Book.model_validate(data)
 
 
-def test_check_images_ratio_1_tolerates_deficit_of_one(tmp_path: Path):
-    """§17 #30: ratio=1.0 con déficit de 1 imagen/capítulo (4/5) -> NO falla;
-    queda como WARNING trazable (tolerado, 100% web), nunca PASS silencioso."""
+def test_check_images_deficit_of_one_now_warning(tmp_path: Path):
+    """§17 #48 Fase 4 (decisión explícita del arquitecto, 2026-09-01): el déficit
+    de 1 imagen/capítulo (4/5) degrada a WARNING trazable (nunca PASS silencioso),
+    independientemente del ratio. El mensaje es \"déficit tolerado\" (antes decía
+    \"ratio=1.0 100% web\", ya derogado — el ratio dejó de condicionar nada)."""
     from modules.quality_control.main import _check_images
 
     book = _make_images_book(tmp_path, image_count=5, per_chapter=4, ratio=1.0)
     checks = _check_images(book)
     fails = [c for c in checks if c.status == "FAIL" and "Imágenes por capítulo" in c.message]
-    assert not fails, fails
+    assert not fails, [c.message for c in fails]
     warns = [c for c in checks if c.status == "WARNING" and "tolerado" in c.message]
-    assert len(warns) == 1 and "ratio=1.0 100% web" in warns[0].message
+    assert len(warns) == 1 and "déficit tolerado" in warns[0].message
     assert warns[0].origin_phase == "image_gen"
 
 
-def test_check_images_ratio_1_still_fails_deficit_of_two(tmp_path: Path):
-    """§17 #30 (regresión de seguridad): ratio=1.0 con déficit de 2 imágenes/capítulo
-    (3/5) -> SIGUE fallando igual que antes; la tolerancia no relaja de más."""
+def test_check_images_deficit_of_two_now_warning(tmp_path: Path):
+    """§17 #48 Fase 4 (política nueva): un déficit mayor (3/5) también es WARNING,
+    no FAIL. Antes (ratio=1.0) toleraba solo <=1; ahora el déficit de cualquier
+    magnitud degrada a WARNING."""
     from modules.quality_control.main import _check_images
 
     book = _make_images_book(tmp_path, image_count=5, per_chapter=3, ratio=1.0)
     checks = _check_images(book)
     fails = [c for c in checks if c.status == "FAIL" and "Imágenes por capítulo" in c.message]
-    assert len(fails) == 1 and fails[0].origin_phase == "image_gen"
+    assert not fails, [c.message for c in fails]
+    warns = [c for c in checks if c.status == "WARNING" and "tolerado" in c.message]
+    assert len(warns) == 1 and "déficit tolerado" in warns[0].message
+    assert warns[0].origin_phase == "image_gen"
 
 
-def test_check_images_ratio_not_1_keeps_exact_comparison(tmp_path: Path):
-    """§17 #30 (aislamiento): ratio=0.5 con déficit de 1 imagen (4/5) -> SIGUE
-    fallando como siempre; la tolerancia no se cuela fuera de ratio=1.0."""
+def test_check_images_deficit_ratio_not_1_now_warning(tmp_path: Path):
+    """§17 #48 Fase 4 (política nueva): el ratio ya no condiciona la severidad.
+    Con ratio=0.5 y déficit de 1 imagen (4/5) -> WARNING, igual que con ratio=1.0
+    (antes ratio!=1.0 mantenía comparación exacta -> FAIL; eso quedó derogado)."""
     from modules.quality_control.main import _check_images
 
     book = _make_images_book(tmp_path, image_count=5, per_chapter=4, ratio=0.5)
     checks = _check_images(book)
     fails = [c for c in checks if c.status == "FAIL" and "Imágenes por capítulo" in c.message]
-    assert len(fails) == 1 and fails[0].origin_phase == "image_gen"
-    assert not any(c.status == "WARNING" and "tolerado" in c.message for c in checks)
+    assert not fails, [c.message for c in fails]
+    warns = [c for c in checks if c.status == "WARNING" and "tolerado" in c.message]
+    assert len(warns) == 1 and "déficit tolerado" in warns[0].message
+    assert warns[0].origin_phase == "image_gen"
+
+
+@pytest.mark.parametrize(
+    "image_count,per_chapter,ratio",
+    [
+        # (a) Libro sin imágenes (expected=0), 0 imágenes en todos los capítulos
+        #     -> comportamiento histórico intacto: PASS "Sin imágenes requeridas".
+        (0, 0, None),
+        # (b) expected=5, 0 imágenes en TODOS los capítulos, ratio=1.0
+        #     -> tras el cambio de política (déficit -> WARNING) ya NO es FAIL;
+        #     es déficit de 5 en cada capítulo -> WARNING "déficit tolerado",
+        #     nunca "PASS Sin imágenes requeridas" silencioso.
+        (5, 0, 1.0),
+    ],
+)
+def test_check_images_zero_images_vs_expected_no_false_pass(tmp_path, image_count, per_chapter, ratio):
+    """§17 #40 (book_76): cuando expected>=1 y ningún capítulo tiene imágenes, el gate
+    no cae a la rama silenciosa "PASS Sin imágenes requeridas". Tras el cambio de
+    política (2026-09-01) ese déficit es WARNING "déficit tolerado", no FAIL.
+    Con expected=0 el comportamiento histórico se mantiene (PASS Sin imágenes)."""
+    from modules.quality_control.main import _check_images
+
+    book = _make_images_book(tmp_path, image_count=image_count, per_chapter=per_chapter, ratio=ratio)
+    checks = _check_images(book)
+
+    if image_count == 0:
+        # (a) expected=0: PASS "Sin imágenes requeridas", sin FAIL de imagen.
+        assert any(c.status == "PASS" and c.message == "Sin imágenes requeridas" for c in checks)
+        assert not any(c.status == "FAIL" and "Imágenes por capítulo" in c.message for c in checks)
+    else:
+        # (b) expected>=1 con 0 imágenes en todos los capítulos: WARNING "déficit
+        # tolerado" (política nueva), nunca un PASS silencioso.
+        warns = [c for c in checks if c.status == "WARNING" and "déficit tolerado" in c.message]
+        assert len(warns) == 1, [c.message for c in checks]
+        assert warns[0].origin_phase == "image_gen"
+        assert "cap 1: 0" in warns[0].message and "cap 2: 0" in warns[0].message
+        assert not any(c.status == "PASS" and c.message == "Sin imágenes requeridas" for c in checks)
