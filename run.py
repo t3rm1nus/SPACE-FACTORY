@@ -86,7 +86,7 @@ def _get_task_or_exit(task_id: int) -> dict:
     """Verifica que la tarea existe; muestra error y sale si no."""
     task = task_queue.get_task(task_id)
     if task is None:
-        click.echo(f"❌ No existe la tarea {task_id}")
+        click.echo(f"[ERR] No existe la tarea {task_id}")
         sys.exit(1)
     return task
 
@@ -108,7 +108,7 @@ def cli() -> None:
 @cli.command()
 def demo() -> None:
     """Ejecuta una demo: encola tareas de ejemplo y corre el scheduler."""
-    click.echo("🚀 Space Lair - Demo")
+    click.echo("[Space Lair] - Demo")
     click.echo("=====================")
 
     modules = load_modules()
@@ -151,14 +151,14 @@ def demo() -> None:
     click.echo("\nEjecutando scheduler (max. 10 iteraciones)...\n")
     run_loop(modules, cap_map, max_iterations=10)
 
-    click.echo("\n📊 Estado final:")
+    click.echo("\n[METRICS] Estado final:")
     _print_status_table(task_queue.all_tasks())
 
 
 @cli.command()
 def serve() -> None:
     """Ejecuta el scheduler en bucle infinito (CLI)."""
-    click.echo("🚀 Space Lair - Servidor (scheduler)")
+    click.echo("[Space Lair] - Servidor (scheduler)")
     click.echo("====================================")
 
     modules = load_modules()
@@ -178,7 +178,7 @@ def web(host: str, port: int) -> None:
     os.environ.setdefault("CHAP_FORCE_MIN", "1")
     from frontend.frontend_api import run_server
 
-    click.echo(f"🚀 Space Lair - Servidor Web (puerto {port})")
+    click.echo(f"[Space Lair] - Servidor Web (puerto {port})")
     click.echo("================================")
     click.echo(f"Abre http://localhost:{port} en tu navegador")
     click.echo("Ctrl+C para detener.\n")
@@ -205,11 +205,11 @@ def enqueue(capability: str, payload_json: str, attempts: int) -> None:
     try:
         payload = json.loads(payload_json)
     except json.JSONDecodeError as e:
-        click.echo(f"❌ JSON inválido: {e}")
+        click.echo(f"[ERR] JSON inválido: {e}")
         sys.exit(1)
 
     if not isinstance(payload, dict):
-        click.echo("❌ El payload debe ser un objeto JSON (dict)")
+        click.echo("[ERR] El payload debe ser un objeto JSON (dict)")
         sys.exit(1)
 
     # Validar con Pydantic si existe esquema para la capability
@@ -219,7 +219,7 @@ def enqueue(capability: str, payload_json: str, attempts: int) -> None:
         pass  # No hay esquema definido; encolar tal cual
 
     task_id = task_queue.enqueue_task(capability, payload, max_attempts=attempts)
-    click.echo(f"✅ Tarea creada con ID {task_id} (capability: {capability})")
+    click.echo(f"[OK] Tarea creada con ID {task_id} (capability: {capability})")
 
 
 @cli.command()
@@ -236,7 +236,7 @@ def _require_valid_token(token_value: str) -> dict:
     """Valida el token JWT; muestra error y sale si es inválido."""
     payload = verify_token(token_value)
     if payload is None:
-        click.echo("❌ Token JWT inválido o expirado")
+        click.echo("[ERR] Token JWT inválido o expirado")
         sys.exit(1)
     return payload
 
@@ -257,7 +257,7 @@ def approve(task_id: int, token_value: str) -> None:
         sys.exit(1)
 
     task_queue.approve_task(task_id)
-    click.echo(f"✅ Tarea {task_id} aprobada y devuelta a la cola")
+    click.echo(f"[OK] Tarea {task_id} aprobada y devuelta a la cola")
 
 
 @cli.command()
@@ -276,7 +276,7 @@ def reject(task_id: int, token_value: str) -> None:
         sys.exit(1)
 
     task_queue.reject_task(task_id)
-    click.echo(f"❌ Tarea {task_id} rechazada")
+    click.echo(f"[ERR] Tarea {task_id} rechazada")
 
 
 @cli.command()
@@ -284,7 +284,7 @@ def costs() -> None:
     """Muestra métricas de coste y tokens (total y por módulo)."""
     data = summarize_costs()
 
-    click.echo(f"\n📊 Métricas de Coste")
+    click.echo(f"\n[METRICS] Métricas de Coste")
     click.echo("=" * 60)
     click.echo(f"  Tareas completadas: {data['total_tasks_done']}")
     click.echo(f"  Coste total:        ${data['total_cost']:.6f}")
@@ -358,7 +358,7 @@ def task_approve(task_id: int, token_value: str) -> None:
         sys.exit(1)
 
     task_queue.approve_task(task_id)
-    click.echo(f"✅ Tarea {task_id} aprobada y devuelta a la cola")
+    click.echo(f"[OK] Tarea {task_id} aprobada y devuelta a la cola")
 
 
 @task.command("reject")
@@ -377,7 +377,7 @@ def task_reject(task_id: int, token_value: str) -> None:
         sys.exit(1)
 
     task_queue.reject_task(task_id)
-    click.echo(f"❌ Tarea {task_id} rechazada")
+    click.echo(f"[ERR] Tarea {task_id} rechazada")
 
 
 # ============================================
@@ -453,9 +453,9 @@ def workflow_create(name: str, definition_file: str) -> None:
         with open(definition_file, "r", encoding="utf-8") as f:
             definition = f.read()
         workflow_id = create_workflow(name, definition)
-        click.echo(f"✅ Workflow '{name}' creado con ID {workflow_id}")
+        click.echo(f"[OK] Workflow '{name}' creado con ID {workflow_id}")
     except Exception as e:
-        click.echo(f"❌ Error creando workflow: {e}")
+        click.echo(f"[ERR] Error creando workflow: {e}")
         sys.exit(1)
 
 
@@ -487,10 +487,10 @@ def workflow_show(workflow_id: int) -> None:
     """Muestra los detalles de un workflow."""
     wf = get_workflow(workflow_id)
     if wf is None:
-        click.echo(f"❌ No existe el workflow {workflow_id}")
+        click.echo(f"[ERR] No existe el workflow {workflow_id}")
         sys.exit(1)
 
-    click.echo(f"\n📋 Workflow #{wf['id']}: {wf['name']}")
+    click.echo(f"\n[WF] Workflow #{wf['id']}: {wf['name']}")
     click.echo(f"   Estado: {wf['status']}")
     click.echo(f"   Creado: {wf['created_at']}")
     if wf.get("error"):
@@ -518,12 +518,12 @@ def workflow_run(workflow_id: int) -> None:
     cap_map = capabilities_map(modules)
     try:
         result = run_workflow(workflow_id, modules, cap_map)
-        click.echo(f"\n✅ Workflow {workflow_id} finalizado: {result['status']}")
+        click.echo(f"\n[OK] Workflow {workflow_id} finalizado: {result['status']}")
         for step in result["steps"]:
-            status_icon = "✅" if step["status"] == "done" else "❌" if step["status"] == "error" else "⏭️" if step["status"] == "skipped" else "⏳"
+            status_icon = "[OK]" if step["status"] == "done" else "[ERR]" if step["status"] == "error" else "[SKIP]" if step["status"] == "skipped" else "[PEND]"
             click.echo(f"   {status_icon} {step['step_id']}: {step['status']}")
     except Exception as e:
-        click.echo(f"❌ Error ejecutando workflow: {e}")
+        click.echo(f"[ERR] Error ejecutando workflow: {e}")
         sys.exit(1)
 
 
@@ -534,11 +534,11 @@ def workflow_cancel(workflow_id: int) -> None:
     try:
         result = cancel_workflow(workflow_id)
         if result is None:
-            click.echo(f"❌ No existe el workflow {workflow_id}")
+            click.echo(f"[ERR] No existe el workflow {workflow_id}")
             sys.exit(1)
-        click.echo(f"❌ Workflow {workflow_id} cancelado")
+        click.echo(f"[ERR] Workflow {workflow_id} cancelado")
     except Exception as e:
-        click.echo(f"❌ Error cancelando workflow: {e}")
+        click.echo(f"[ERR] Error cancelando workflow: {e}")
         sys.exit(1)
 
 
