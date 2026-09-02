@@ -198,6 +198,34 @@ def _autopilot_current_book(job: dict) -> Optional[dict]:
     }
 
 
+def _resolve_image_entry(entry, book_id: int, chapter_number) -> dict:
+    """Resuelve una entry de chapters.images (string de ruta) a un dict con
+    metadata real cargada de <image_id>.metadata.json (§17 #48 Fase 4).
+
+    Los paths históricos son relativos a la raíz del proyecto
+    (data/images/books/{id}/chapters/{n}/images/img_XX_web.jpg); el metadata
+    json vive en el mismo directorio. Si no existe (imagen huérfana), devuelve
+    {"path": <string>} sin inventar campos.
+    """
+    if not isinstance(entry, str):
+        # Entradas futuras ya-objeto (con vlm_checked etc.): pasar tal cual.
+        return entry if isinstance(entry, dict) else {"path": str(entry)}
+    try:
+        img_path = entry.replace("\\", "/")
+        fname = os.path.basename(img_path)
+        stem = os.path.splitext(fname)[0]
+        base_dir = os.path.dirname(os.path.join(os.getcwd(), img_path))
+        meta_path = os.path.join(base_dir, f"{stem}.metadata.json")
+        if os.path.isfile(meta_path):
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            meta.setdefault("path", entry)
+            return meta
+    except (OSError, json.JSONDecodeError, ValueError):
+        pass
+    return {"path": entry}
+
+
 def _autopilot_current_chapters(job: dict) -> list:
     try:
         data = load_book(job.get("book_id"))
@@ -419,6 +447,23 @@ def create_app() -> Flask:
         try:
             books = conn.execute("SELECT * FROM books ORDER BY updated_at DESC").fetchall()
             result = []
+            # §17 #46: mover all_tasks() FUERA del bucle por libro. Hidrata
+            # resultados externalizados desde disco y recorrer 2507 tareas por
+            # cada libro costaba ~14 pasadas en total (~11s). Se carga 1 sola vez
+            # y se indexa por book_id con el MISMO criterio de matching que usa
+            # el bucle (payload.book_id o payload.book.id).
+            # §17 #46-b: all_tasks_for_books_view() extrae book_id del payload en
+            # SQLite (json_extract) en vez de transferir payloads gigantes a
+            # Python; el payload solo se usa para book_id.
+            tasks = task_queue.all_tasks_for_books_view()
+            tasks_by_book: dict[int, list[dict]] = {}
+            for t in tasks:
+                bid = t.get("book_id")
+                if bid is not None:
+                    try:
+                        tasks_by_book.setdefault(int(bid), []).append(t)
+                    except (TypeError, ValueError):
+                        pass
             for book in books:
                 book_id = book["id"]
                 chapters = conn.execute(
@@ -471,23 +516,18 @@ def create_app() -> Flask:
                     "build_book_pdf",
                     "final_quality_control",
                 }
-                tasks = task_queue.all_tasks()
                 active_tasks = 0
                 task_errors = 0
-                for t in tasks:
+                for t in tasks_by_book.get(book_id, []):
                     if t.get("capability") in book_capabilities:
-                        try:
-                            payload = json.loads(t.get("payload") or "{}")
-                            if str(payload.get("book_id")) == str(book_id) or (
-                                isinstance(payload.get("book"), dict)
-                                and str(payload.get("book", {}).get("id")) == str(book_id)
-                            ):
-                                if t["status"] in ("pending", "running"):
-                                    active_tasks += 1
-                                elif t["status"] == "error":
-                                    task_errors += 1
-                        except (json.JSONDecodeError, TypeError, AttributeError):
-                            pass
+                        # Las tareas ya están asociadas a book_id: tasks_by_book se
+                        # indexa por el book_id extraído del payload en SQLite.
+                        # El re-chequeo previo del payload contra book_id era
+                        # redundante (siempre True para tareas ya asignadas).
+                        if t["status"] in ("pending", "running"):
+                            active_tasks += 1
+                        elif t["status"] == "error":
+                            task_errors += 1
 
                 checkpoint_dir = os.path.join("data", "checkpoints", str(book_id))
                 checkpoint_count = 0
@@ -498,7 +538,7 @@ def create_app() -> Flask:
                 has_docx = False
                 has_pdf = False
                 has_qc = False
-                for t in tasks:
+                for t in tasks_by_book.get(book_id, []):
                     if t.get("capability") == "build_book_docx" and t["status"] == "done":
                         try:
                             result_data = json.loads(t.get("result") or "{}")
@@ -600,6 +640,9 @@ def create_app() -> Flask:
                     "edited_es": bool((c["edited_es"] or "").strip()),
                     "edited_en": bool((c["edited_en"] or "").strip()),
                     "image_count": len(images),
+                    # §17 #48 Fase 4 — imágenes reales resueltas a su metadata
+                    # (incluye vlm_checked/vlm_candidates_tried en datos nuevos).
+                    "images": [_resolve_image_entry(img, book_id, c["number"]) for img in images],
                     "source_count": len(sources),
                     "quality_status": c.get("quality_status"),
                 })

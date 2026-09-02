@@ -2617,3 +2617,7 @@ body { font-size: 16px; line-height: 1.5; color: var(--text-hi); background: var
   .metrics-content { grid-template-columns: 1fr; }
 }
 
+
+/* §17 #48 Fase 4 — imágenes por capítulo (solo layout; badges reutilizan .cb-status) */
+.cb-image-line { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 2px 0; }
+.cb-vlm-note { color: var(--text-dim); font-size: 11px; }

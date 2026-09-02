@@ -45,7 +45,7 @@ const CAPABILITY_LABELS = {
 
 const state = {
   books: [], selectedBookId: null,
-  currentBookDetail: null, currentStats: {},
+  currentBookDetail: null, currentBookImages: null, currentStats: {},
   modules: [], tasks: [], jobs: [], logs: [], feed: [],
   autopilot: null, autopilotBookId: null, autopilotLoading: false,
   connected: false, isLoading: false,
@@ -182,6 +182,9 @@ async function loadAutopilot() {
 async function loadCurrentBookDetail() {
   const bid = state.selectedBookId || state.autopilotBookId;
   state.currentBookDetail = bid ? await apiFetchOrNull('/api/books/' + bid + '/load') : null;
+  // §17 #48 Fase 4 — imágenes por capítulo con metadata + trazabilidad VLM
+  // (GET /api/books/<id> expone chapters[].images desde Parte 1).
+  state.currentBookImages = bid ? await apiFetchOrNull('/api/books/' + bid) : null;
 }
 async function refreshData() {
   state.isLoading = true;
@@ -429,6 +432,29 @@ function renderCurrentBook() {
     + '</div>';
   if (err) html += '<div class="station-error">' + err + '</div>';
   if (docx) html += '<div class="cb-docx"><span class="cb-label">DOCX:</span> <code class="docx-path">' + esc(docx) + '</code></div>';
+  // §17 #48 Fase 4 — imágenes por capítulo con badge de estado VLM.
+  // vlm_checked true→done(verde) false→pending(ámbar) null/undefined→cancelled(gris, dato histórico).
+  const imgChapters = ((state.currentBookImages || {}).chapters || []).filter(c => (c.images || []).length > 0);
+  if (imgChapters.length) {
+    html += '<div class="cb-images">';
+    imgChapters.forEach(c => {
+      html += '<div class="cb-chapter-images"><div class="cb-chapter-title">Capítulo ' + esc(c.number) + ' · ' + esc(c.title || '') + '</div>';
+      (c.images || []).forEach(img => {
+        const src = img.source_url || img.path || img.image_path || '';
+        let badge;
+        if (img.vlm_checked === true) badge = '<span class="cb-status done">VLM OK</span>';
+        else if (img.vlm_checked === false) badge = '<span class="cb-status pending">VLM: sin verificar</span>';
+        else badge = '<span class="cb-status cancelled">VLM: N/D</span>';
+        let note = '';
+        if (img.vlm_candidates_tried != null && img.vlm_candidates_tried > 1) {
+          note = '<span class="cb-vlm-note">(rechazó ' + (img.vlm_candidates_tried - 1) + ' antes)</span>';
+        }
+        html += '<div class="cb-image-line"><code class="docx-path">' + esc(trunc(src, 90)) + '</code>' + badge + note + '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  }
   container.innerHTML = html;
 }
 
@@ -759,6 +785,7 @@ function deleteBook() {
       state.selectedBookId = null;
       state.autopilot = null;
       state.currentBookDetail = null;
+      state.currentBookImages = null;
       addFeed('failed', 'Libro borrado: ' + title);
       renderBookSelector();
       renderBooks();
@@ -803,6 +830,7 @@ function deleteAllBooks() {
         state.selectedBookId = null;
         state.autopilot = null;
         state.currentBookDetail = null;
+        state.currentBookImages = null;
       }
       addFeed('failed', 'Borrado masivo: ' + (res.deleted || []).length + ' borrado(s), ' + (res.skipped_running || []).length + ' saltado(s)');
       _showError('BORRADOS ' + (res.deleted || []).length + ' · SALTADOS (en ejecución) ' + (res.skipped_running || []).length);
